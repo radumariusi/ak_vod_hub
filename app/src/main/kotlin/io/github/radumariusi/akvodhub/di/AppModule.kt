@@ -7,7 +7,9 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import io.github.radumariusi.akvodhub.BuildConfig
+import io.github.radumariusi.akvodhub.data.catalog.CatalogIndexer
 import io.github.radumariusi.akvodhub.data.catalog.CatalogRepository
+import io.github.radumariusi.akvodhub.data.catalog.HubRepository
 import io.github.radumariusi.akvodhub.data.catalog.MatchScheduler
 import io.github.radumariusi.akvodhub.data.catalog.TitleMatcher
 import io.github.radumariusi.akvodhub.data.db.AkVodDatabase
@@ -80,7 +82,8 @@ object AppModule {
         xtream: XtreamClient,
         importer: PlaylistImporter,
         scheduler: PlaylistScheduler,
-    ): PlaylistRepository = PlaylistRepository(context, db, cipher, xtream, importer, scheduler)
+        indexer: CatalogIndexer,
+    ): PlaylistRepository = PlaylistRepository(context, db, cipher, xtream, importer, scheduler, indexer)
 
     @Provides
     @Singleton
@@ -123,5 +126,23 @@ object AppModule {
         db: AkVodDatabase,
         matcher: TitleMatcher,
         matchScheduler: MatchScheduler,
-    ): PlaylistWorkerFactory = PlaylistWorkerFactory(importer, db.playlistDao(), matcher, matchScheduler)
+        indexer: CatalogIndexer,
+    ): PlaylistWorkerFactory = PlaylistWorkerFactory(importer, db.playlistDao(), matcher, matchScheduler, indexer)
+
+    @Provides
+    @Singleton
+    fun catalogIndexer(
+        @ApplicationContext context: Context,
+        db: AkVodDatabase,
+    ): CatalogIndexer = CatalogIndexer(context, db)
+
+    @Provides
+    @Singleton
+    fun hubRepository(
+        db: AkVodDatabase,
+        indexer: CatalogIndexer,
+        importer: PlaylistImporter,
+        tmdb: TmdbClient,
+        settings: TmdbSettings,
+    ): HubRepository = HubRepository(db, indexer, importer, tmdb, settings)
 }

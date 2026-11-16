@@ -23,9 +23,13 @@ class MatchWorker(
     params: WorkerParameters,
     private val matcher: TitleMatcher,
     private val scheduler: MatchScheduler,
+    private val indexer: CatalogIndexer,
 ) : CoroutineWorker(context, params) {
-    override suspend fun doWork(): Result =
-        when (matcher.run(BUDGET_MS)) {
+    override suspend fun doWork(): Result {
+        val outcome = matcher.run(BUDGET_MS)
+        // Hub-ul vede rezultatele după fiecare rundă (și titlurile locale, chiar fără cheie TMDB).
+        indexer.refresh()
+        return when (outcome) {
             MatchOutcome.MORE -> {
                 scheduler.enqueue()
                 Result.success()
@@ -39,6 +43,7 @@ class MatchWorker(
                 Result.success()
             }
         }
+    }
 
     private companion object {
         const val BUDGET_MS = 8 * 60_000L

@@ -1,0 +1,127 @@
+package io.github.radumariusi.akvodhub.hub
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.lifecycle.HiltViewModel
+import io.github.radumariusi.akvodhub.data.catalog.HubRepository
+import io.github.radumariusi.akvodhub.data.db.TitleCard
+import io.github.radumariusi.akvodhub.parser.catalog.CatalogFilter
+import io.github.radumariusi.akvodhub.parser.match.MediaType
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+data class BrowseState(
+    val filter: CatalogFilter,
+    val items: List<TitleCard> = emptyList(),
+    val loading: Boolean = true,
+    val endReached: Boolean = false,
+)
+
+/**
+ * O grilă paginată de titluri cu filtre (Filme, Seriale, Căutare). Schimbarea filtrelor anulează
+ * încărcarea în curs; textul căutat așteaptă [TYPING_DELAY_MS] după ultima tastă.
+ */
+class Browser(
+    private val scope: CoroutineScope,
+    private val repository: HubRepository,
+    initial: CatalogFilter,
+    /** Căutarea nu arată nimic până nu scrii ceva sau alegi un filtru. */
+    private val needsInput: Boolean,
+) {
+    private val mutableState = MutableStateFlow(BrowseState(initial))
+    val state: StateFlow<BrowseState> = mutableState.asStateFlow()
+    private var job: Job? = null
+    private var started = false
+
+    /** Prima încărcare, când ecranul apare. */
+    fun start() {
+        if (started) return
+        started = true
+        load(mutableState.value.filter, debounce = false)
+    }
+
+    fun reload() {
+        if (started) load(mutableState.value.filter, debounce = false)
+    }
+
+    fun setFilter(filter: CatalogFilter) {
+        val old = mutableState.value.filter
+        if (filter == old) return
+        load(filter, debounce = filter.text != old.text)
+    }
+
+    private fun load(
+        filter: CatalogFilter,
+        debounce: Boolean,
+    ) {
+        job?.cancel()
+        mutableState.update { it.copy(filter = filter, loading = true) }
+        job =
+            scope.launch {
+                if (debounce) delay(TYPING_DELAY_MS)
+                val empty = needsInput && filter.text.isBlank() && !filter.hasFilters
+                val items = if (empty) emptyList() else repository.page(filter, PAGE, 0)
+                mutableState.value = BrowseState(filter, items, loading = false, endReached = items.size < PAGE)
+            }
+    }
+
+    /** Ultimul element vizibil e [index]: dacă suntem aproape de capăt, aducem pagina următoare. */
+    fun onVisible(index: Int) {
+        val s = mutableState.value
+        if (s.loading || s.endReached || index < s.items.size - PREFETCH) return
+        mutableState.update { it.copy(loading = true) }
+        job =
+            scope.launch {
+                val more = repository.page(s.filter, PAGE, s.items.size)
+                val known = s.items.mapTo(HashSet()) { it.id }
+                mutableState.value =
+                    s.copy(
+                        items = s.items + more.filter { it.id !in known },
+                        loading = false,
+                        endReached =
+                            more.size < PAGE,
+                    )
+            }
+    }
+
+    companion object {
+        const val PAGE = 48
+        const val PREFETCH = 18
+        const val TYPING_DELAY_MS = 300L
+    }
+}
+
+/** Grilele Filme, Seriale și Căutare, fiecare cu filtrele ei (păstrate cât timp aplicația e deschisă). */
+@HiltViewModel
+class BrowseViewModel
+    @Inject
+    constructor(
+        private val repository: HubRepository,
+    ) : ViewModel() {
+        val movies = Browser(viewModelScope, repository, CatalogFilter(type = MediaType.MOVIE), needsInput = false)
+        val series = Browser(viewModelScope, repository, CatalogFilter(type = MediaType.TV), needsInput = false)
+        val search = Browser(viewModelScope, repository, CatalogFilter(), needsInput = true)
+
+        private val mutableLanguages = MutableStateFlow<List<String>>(emptyList())
+
+        /** Limbile audio din playlist-uri, pentru filtrul „Limbă”. */
+        val languages: StateFlow<List<String>> = mutableLanguages.asStateFlow()
+
+        init {
+            viewModelScope.launch { mutableLanguages.value = repository.languages() }
+            viewModelScope.launch {
+                repository.catalogVersion.drop(1).collect {
+                    mutableLanguages.value = repository.languages()
+                    listOf(movies, series, search).forEach(Browser::reload)
+                }
+            }
+        }
+    }

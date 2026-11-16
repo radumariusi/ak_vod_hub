@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.room.withTransaction
+import io.github.radumariusi.akvodhub.data.catalog.CatalogIndexer
 import io.github.radumariusi.akvodhub.data.db.AkVodDatabase
 import io.github.radumariusi.akvodhub.data.db.PlaylistSourceEntity
 import io.github.radumariusi.akvodhub.data.db.PlaylistType
@@ -48,6 +49,7 @@ class PlaylistRepository(
     private val xtream: XtreamClient,
     private val importer: PlaylistImporter,
     private val scheduler: PlaylistScheduler,
+    private val indexer: CatalogIndexer,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private val dao = db.playlistDao()
@@ -176,6 +178,8 @@ class PlaylistRepository(
             }
         }
         if (dao.sources().isEmpty()) scheduler.cancelPeriodic()
+        // Titlurile playlist-ului șters dispar din hub.
+        indexer.refresh()
     }
 
     /** Episoadele unui serial (la Xtream se cer de la server la prima deschidere). */

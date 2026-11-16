@@ -8,8 +8,14 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [PlaylistSourceEntity::class, RawEntryEntity::class, TitleEntity::class, MatchCacheEntity::class],
-    version = 3,
+    entities = [
+        PlaylistSourceEntity::class,
+        RawEntryEntity::class,
+        TitleEntity::class,
+        MatchCacheEntity::class,
+        WatchStateEntity::class,
+    ],
+    version = 4,
     exportSchema = false,
 )
 abstract class AkVodDatabase : RoomDatabase() {
@@ -22,9 +28,22 @@ abstract class AkVodDatabase : RoomDatabase() {
             Room
                 .databaseBuilder(context, AkVodDatabase::class.java, "akvodhub.db")
                 // Până la prima versiune stabilă, o schimbare de schemă reface baza (playlist-ul se reimportă).
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .fallbackToDestructiveMigration(dropAllTables = true)
-                .build()
+                .addCallback(
+                    object : RoomDatabase.Callback() {
+                        override fun onOpen(db: SupportSQLiteDatabase) = createSearchTable(db)
+                    },
+                ).build()
+
+        /**
+         * Indexul de căutare (FTS4): titlul TMDB, titlul original și numele din playlist ale fiecărui titlu
+         * (deci și „Der Pate” găsește „The Godfather”). `docid` = `title.id`. Nu e entitate Room (Room ar cere
+         * schema exactă la migrare); îl umple `CatalogIndexer`. `unicode61` ignoră diacriticele și majusculele.
+         */
+        fun createSearchTable(db: SupportSQLiteDatabase) {
+            db.execSQL("CREATE VIRTUAL TABLE IF NOT EXISTS title_search USING fts4(name, alt, tokenize=unicode61)")
+        }
 
         /** Etapa 3: câmpurile parsate din nume. Se completează la următoarea reîmprospătare a playlist-ului. */
         val MIGRATION_1_2 =
@@ -73,6 +92,31 @@ abstract class AkVodDatabase : RoomDatabase() {
                         "CREATE TABLE IF NOT EXISTS `match_cache` (`queryKey` TEXT NOT NULL, `tmdbId` INTEGER, " +
                             "`score` REAL NOT NULL, `checkedAt` INTEGER NOT NULL, PRIMARY KEY(`queryKey`))",
                     )
+                }
+            }
+
+        /**
+         * Etapa 5: rezumatele surselor pe titlu (pentru listele din hub), indexuri pentru ordonare,
+         * „Continuă vizionarea” și indexul de căutare. Rezumatele se calculează la prima pornire (`CatalogIndexer`).
+         */
+        val MIGRATION_3_4 =
+            object : Migration(3, 4) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE title ADD COLUMN sourceCount INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE title ADD COLUMN addedAt INTEGER")
+                    db.execSQL("ALTER TABLE title ADD COLUMN bestQuality INTEGER")
+                    db.execSQL("ALTER TABLE title ADD COLUMN qualities TEXT")
+                    db.execSQL("ALTER TABLE title ADD COLUMN audioLanguages TEXT")
+                    for (column in listOf("popularity", "addedAt", "rating", "name")) {
+                        db.execSQL("CREATE INDEX IF NOT EXISTS `index_title_$column` ON `title` (`$column`)")
+                    }
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `watch_state` (`titleId` INTEGER NOT NULL, " +
+                            "`entryId` INTEGER NOT NULL, `season` INTEGER, `episode` INTEGER, " +
+                            "`positionMs` INTEGER NOT NULL, `durationMs` INTEGER NOT NULL, " +
+                            "`updatedAt` INTEGER NOT NULL, PRIMARY KEY(`titleId`))",
+                    )
+                    createSearchTable(db)
                 }
             }
     }
