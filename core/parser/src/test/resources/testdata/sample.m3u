@@ -1,0 +1,21 @@
+#EXTM3U url-tvg="http://example.invalid/epg.xml"
+#EXTINF:-1 tvg-id="news.example" tvg-name="EN| News 24" tvg-logo="http://example.invalid/news.png" group-title="UK | News",EN| News 24
+http://example.invalid:8080/user/pass/1001
+#EXTINF:-1 tvg-name="RO| Sport 1" group-title="RO | Sport",RO| Sport 1
+http://example.invalid:8080/live/user/pass/1002.ts
+#EXTINF:-1 tvg-id="" tvg-name="EN| The Matrix (1999) 4K" tvg-logo="http://example.invalid/matrix.jpg" group-title="EN | Movies 4K",EN| The Matrix (1999) 4K
+http://example.invalid:8080/movie/user/pass/2001.mkv
+#EXTINF:-1 tvg-name="|DE| Matrix 1999 [MULTI-SUB]" group-title="DE | Filme",|DE| Matrix 1999 [MULTI-SUB]
+http://example.invalid:8080/movie/user/pass/2002.mp4
+#EXTINF:-1 tvg-name="Breaking Bad S01E02" group-title="EN | Series",Breaking Bad S01E02
+http://example.invalid:8080/series/user/pass/3001.mkv
+#EXTINF:-1,RO - Matrix (1999) FHD
+#EXTGRP:Filme RO
+http://cdn.example.invalid/vod/matrix-ro.avi
+#EXTINF:-1 group-title="24/7 Movies",24/7 Action Movies
+http://example.invalid:8080/user/pass/1003
+#EXTINF:-1 group-title="Seriale RO",Las Fierbinti S10 E05
+http://cdn.example.invalid/hls/fierbinti/s10e05/index.m3u8
+#EXTVLCOPT:http-user-agent=Test
+#EXTINF:-1 group-title="Radio",Radio Example
+http://radio.example.invalid/stream.mp3

@@ -4,13 +4,21 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
+import io.github.radumariusi.akvodhub.playlist.PlaylistsViewModel
 import io.github.radumariusi.akvodhub.update.UpdateState
 import io.github.radumariusi.akvodhub.update.UpdateViewModel
 
@@ -18,9 +26,41 @@ import io.github.radumariusi.akvodhub.update.UpdateViewModel
 fun SettingsScreen(
     viewModel: UpdateViewModel,
     state: UpdateState,
+    playlistsViewModel: PlaylistsViewModel,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.widthIn(max = 720.dp)) {
+    var adding by rememberSaveable { mutableStateOf(false) }
+    val playlists by playlistsViewModel.playlists.collectAsState()
+    val addState by playlistsViewModel.addState.collectAsState()
+
+    if (adding) {
+        AddPlaylistScreen(
+            state = addState,
+            onAddUrl = playlistsViewModel::addM3uUrl,
+            onAddFile = playlistsViewModel::addM3uFile,
+            onAddXtream = playlistsViewModel::addXtream,
+            onClose = {
+                playlistsViewModel.resetAddState()
+                adding = false
+            },
+        )
+        return
+    }
+
+    Column(
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier.widthIn(max = 720.dp).verticalScroll(rememberScrollState()),
+    ) {
         Text("Setări", style = MaterialTheme.typography.headlineMedium)
+
+        PlaylistsSection(
+            playlists = playlists,
+            onAdd = {
+                playlistsViewModel.resetAddState()
+                adding = true
+            },
+            onRefresh = playlistsViewModel::refresh,
+            onDelete = playlistsViewModel::delete,
+        )
 
         Text("Actualizări", style = MaterialTheme.typography.titleLarge)
         Text("Versiunea instalată: ${viewModel.currentVersion}", style = MaterialTheme.typography.bodyLarge)
@@ -32,13 +72,6 @@ fun SettingsScreen(
                 Button(onClick = { viewModel.downloadAndInstall(update) }) { Text("Instalează ${update.version}") }
             }
         }
-
-        Text("Playlist-uri", style = MaterialTheme.typography.titleLarge)
-        Text(
-            "Adăugarea de playlist-uri (M3U, Xtream) vine în etapa următoare.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
 
         Text("Despre", style = MaterialTheme.typography.titleLarge)
         Text(
