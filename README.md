@@ -30,4 +30,4 @@ Module: `app` (UI TV), `core:parser` (Kotlin pur), `core:data` (rețea, date, up
 
 ## Stare
 
-Etapele 0–2 gata: schelet Android TV, CI, release automat, update din aplicație și import de playlist-uri (M3U link/fișier, Xtream) cu păstrarea doar a filmelor și serialelor. Urmează etapa 3 (parser de titluri).
+Etapele 0–4 gata: schelet Android TV, CI, update din aplicație, import de playlist-uri (M3U link/fișier, Xtream) doar cu filme și seriale, parser de titluri, potrivire TMDB cu unirea duplicatelor și gruparea surselor pe calitate și limbă. Urmează etapa 5 (hub-ul: Home, Detalii, Căutare).

@@ -7,6 +7,9 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import io.github.radumariusi.akvodhub.BuildConfig
+import io.github.radumariusi.akvodhub.data.catalog.CatalogRepository
+import io.github.radumariusi.akvodhub.data.catalog.MatchScheduler
+import io.github.radumariusi.akvodhub.data.catalog.TitleMatcher
 import io.github.radumariusi.akvodhub.data.db.AkVodDatabase
 import io.github.radumariusi.akvodhub.data.playlist.PlaylistImporter
 import io.github.radumariusi.akvodhub.data.playlist.PlaylistRepository
@@ -15,6 +18,8 @@ import io.github.radumariusi.akvodhub.data.playlist.PlaylistWorkerFactory
 import io.github.radumariusi.akvodhub.data.playlist.xtream.XtreamClient
 import io.github.radumariusi.akvodhub.data.security.KeystoreSecretCipher
 import io.github.radumariusi.akvodhub.data.security.SecretCipher
+import io.github.radumariusi.akvodhub.data.tmdb.TmdbClient
+import io.github.radumariusi.akvodhub.data.tmdb.TmdbSettings
 import io.github.radumariusi.akvodhub.data.update.UpdateChecker
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
@@ -79,8 +84,44 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun tmdbClient(client: OkHttpClient): TmdbClient = TmdbClient(client)
+
+    @Provides
+    @Singleton
+    fun tmdbSettings(
+        @ApplicationContext context: Context,
+        cipher: SecretCipher,
+    ): TmdbSettings = TmdbSettings(context, cipher)
+
+    @Provides
+    @Singleton
+    fun titleMatcher(
+        db: AkVodDatabase,
+        tmdb: TmdbClient,
+        settings: TmdbSettings,
+    ): TitleMatcher = TitleMatcher(db, tmdb, settings)
+
+    @Provides
+    @Singleton
+    fun matchScheduler(
+        @ApplicationContext context: Context,
+    ): MatchScheduler = MatchScheduler(context)
+
+    @Provides
+    @Singleton
+    fun catalogRepository(
+        db: AkVodDatabase,
+        tmdb: TmdbClient,
+        settings: TmdbSettings,
+        scheduler: MatchScheduler,
+    ): CatalogRepository = CatalogRepository(db, tmdb, settings, scheduler)
+
+    @Provides
+    @Singleton
     fun playlistWorkerFactory(
         importer: PlaylistImporter,
         db: AkVodDatabase,
-    ): PlaylistWorkerFactory = PlaylistWorkerFactory(importer, db.playlistDao())
+        matcher: TitleMatcher,
+        matchScheduler: MatchScheduler,
+    ): PlaylistWorkerFactory = PlaylistWorkerFactory(importer, db.playlistDao(), matcher, matchScheduler)
 }

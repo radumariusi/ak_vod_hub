@@ -32,7 +32,7 @@ Regulile astea se aplică în fiecare etapă. Scopul: muncă ordonată pe etape 
 ## Merge și livrare
 
 - Claude face merge la PR-uri când CI e verde (aprobat de Radu), apoi șterge branch-ul.
-- APK-urile ajung la Radu prin GitHub Releases și update-ul din aplicație.
+- APK-urile ajung la Radu prin GitHub Releases și update-ul din aplicație. Release-ul se pornește **manual** (Actions → Release → Run workflow), nu la fiecare merge; vezi [RELEASES.md](RELEASES.md).
 
 ## Cod
 

@@ -28,6 +28,7 @@ import androidx.tv.material3.NavigationDrawer
 import androidx.tv.material3.NavigationDrawerItem
 import androidx.tv.material3.Text
 import io.github.radumariusi.akvodhub.R
+import io.github.radumariusi.akvodhub.catalog.TmdbViewModel
 import io.github.radumariusi.akvodhub.playlist.PlaylistsViewModel
 import io.github.radumariusi.akvodhub.update.UpdateViewModel
 
@@ -44,6 +45,7 @@ enum class Destination(
 fun AppRoot(
     updateViewModel: UpdateViewModel,
     playlistsViewModel: PlaylistsViewModel,
+    tmdbViewModel: TmdbViewModel,
 ) {
     var current by rememberSaveable { mutableStateOf(Destination.HOME) }
     val updateState by updateViewModel.state.collectAsState()
@@ -77,7 +79,7 @@ fun AppRoot(
             when (current) {
                 Destination.HOME -> HomeScreen(totals, onOpenSettings = { current = Destination.SETTINGS })
                 Destination.SEARCH -> SearchScreen()
-                Destination.SETTINGS -> SettingsScreen(updateViewModel, updateState, playlistsViewModel)
+                Destination.SETTINGS -> SettingsScreen(updateViewModel, updateState, playlistsViewModel, tmdbViewModel)
             }
         }
     }
