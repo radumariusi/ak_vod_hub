@@ -31,6 +31,8 @@ local.properties
 secrets.properties
 *.keystore
 *.jks
+*.p12
+*.pem
 keystore.properties
 google-services.json
 .env
