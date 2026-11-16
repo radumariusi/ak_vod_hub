@@ -1,0 +1,72 @@
+@file:OptIn(ExperimentalTvMaterial3Api::class)
+
+package io.github.radumariusi.akvodhub.ui.hub
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.tv.material3.ExperimentalTvMaterial3Api
+import androidx.tv.material3.ListItem
+import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.Surface
+import androidx.tv.material3.SurfaceDefaults
+import androidx.tv.material3.Text
+
+/** O alegere dintr-o listă (filtru, sursă de redare), cu focusul pe opțiunea curentă. */
+data class Choice(
+    val title: String,
+    val options: List<String>,
+    val selected: Int?,
+    val onPick: (Int) -> Unit,
+)
+
+@Composable
+fun ChoiceDialog(
+    choice: Choice,
+    onDismiss: () -> Unit,
+) {
+    val focus = remember { FocusRequester() }
+    val initial = (choice.selected ?: 0).coerceIn(0, (choice.options.size - 1).coerceAtLeast(0))
+    LaunchedEffect(choice) { runCatching { focus.requestFocus() } }
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier.width(520.dp),
+            shape = MaterialTheme.shapes.large,
+            colors = SurfaceDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+        ) {
+            Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(choice.title, style = MaterialTheme.typography.headlineSmall)
+                LazyColumn(
+                    state = rememberLazyListState(initialFirstVisibleItemIndex = initial),
+                    modifier = Modifier.heightIn(max = 400.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    itemsIndexed(choice.options) { index, label ->
+                        ListItem(
+                            selected = index == choice.selected,
+                            onClick = {
+                                choice.onPick(index)
+                                onDismiss()
+                            },
+                            headlineContent = { Text(label) },
+                            modifier = if (index == initial) Modifier.focusRequester(focus) else Modifier,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}

@@ -138,10 +138,23 @@ object MatchState {
  * Un film sau un serial TMDB: o singură fișă pentru toate sursele din playlist-uri.
  * [detailsFetched] = false înseamnă că avem doar ID-ul (de la furnizor) sau date în altă limbă; detaliile
  * se completează în fundal.
+ *
+ * Titlurile cu [tmdbId] negativ sunt „locale”: intrări din playlist încă nepotrivite (sau fără rezultat pe
+ * TMDB), grupate după nume + an, ca să apară și ele în hub. Pentru ele [posterPath] e un URL complet (logo-ul
+ * din playlist). Când potrivirea le găsește pe TMDB, sursele trec la titlul real, iar cel local se șterge.
+ *
+ * [sourceCount], [addedAt], [bestQuality], [qualities] și [audioLanguages] sunt rezumate ale surselor,
+ * calculate de `CatalogIndexer`, ca listele din hub să nu facă JOIN cu toate intrările din playlist.
  */
 @Entity(
     tableName = "title",
-    indices = [Index(value = ["mediaType", "tmdbId"], unique = true)],
+    indices = [
+        Index(value = ["mediaType", "tmdbId"], unique = true),
+        Index(value = ["popularity"]),
+        Index(value = ["addedAt"]),
+        Index(value = ["rating"]),
+        Index(value = ["name"]),
+    ],
 )
 data class TitleEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -161,6 +174,47 @@ data class TitleEntity(
     val originalLanguage: String? = null,
     val imdbId: String? = null,
     val detailsFetched: Boolean = false,
+    val updatedAt: Long,
+    /** Câte intrări din playlist-uri (inclusiv episoade) are titlul; 0 = nu apare în hub. */
+    val sourceCount: Int = 0,
+    /** Cea mai recentă adăugare în playlist a unei surse (ms), pentru „Adăugate recent”. */
+    val addedAt: Long? = null,
+    /** Cea mai bună calitate a surselor (`VideoQuality.ordinal`). */
+    val bestQuality: Int? = null,
+    /** Calitățile surselor, cu virgule la capete pentru filtrare: `,UHD,FHD,`. */
+    val qualities: String? = null,
+    /** Limbile audio ale surselor, cu virgule la capete: `,en,de,ro,`. */
+    val audioLanguages: String? = null,
+)
+
+/** Titlu local (din playlist, fără potrivire TMDB). */
+val TitleEntity.isLocal: Boolean get() = tmdbId < 0
+
+/** Un titlu într-o listă din hub (rând pe Acasă, grilă, rezultat de căutare): doar ce trebuie pe card. */
+data class TitleCard(
+    val id: Long,
+    val mediaType: MediaType,
+    val name: String,
+    val year: Int?,
+    val posterPath: String?,
+    val backdropPath: String?,
+    val rating: Double?,
+    val bestQuality: Int?,
+    val overview: String?,
+)
+
+/**
+ * Unde a rămas utilizatorul cu un titlu (pentru „Continuă vizionarea”). Scris de player (etapa 6);
+ * la seriale, [season]/[episode] arată episodul curent.
+ */
+@Entity(tableName = "watch_state")
+data class WatchStateEntity(
+    @PrimaryKey val titleId: Long,
+    val entryId: Long,
+    val season: Int? = null,
+    val episode: Int? = null,
+    val positionMs: Long,
+    val durationMs: Long,
     val updatedAt: Long,
 )
 

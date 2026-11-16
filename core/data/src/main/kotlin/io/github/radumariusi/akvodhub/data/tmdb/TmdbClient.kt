@@ -67,6 +67,17 @@ class TmdbClient(
         return json.decodeFromString<TmdbItem>(body)
     }
 
+    /** Distribuția (actori, regizori) unui titlu. null = nu există pe TMDB. */
+    suspend fun credits(
+        key: String,
+        type: MediaType,
+        tmdbId: Long,
+    ): TmdbCredits? {
+        val path = if (type == MediaType.TV) "tv/$tmdbId/aggregate_credits" else "movie/$tmdbId/credits"
+        val body = get(key, url(path).addQueryParameter("language", METADATA_LANGUAGE).build()) ?: return null
+        return json.decodeFromString<TmdbCredits>(body)
+    }
+
     private fun url(path: String): HttpUrl.Builder = "$baseUrl/$path".toHttpUrl().newBuilder()
 
     /** GET cu cheia; întoarce corpul, null la 404; aruncă [TmdbAuthException] la 401. */

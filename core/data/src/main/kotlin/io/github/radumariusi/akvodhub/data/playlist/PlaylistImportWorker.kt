@@ -8,6 +8,7 @@ import androidx.work.ListenableWorker
 import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import io.github.radumariusi.akvodhub.data.catalog.CatalogIndexer
 import io.github.radumariusi.akvodhub.data.catalog.MatchScheduler
 import io.github.radumariusi.akvodhub.data.catalog.MatchWorker
 import io.github.radumariusi.akvodhub.data.catalog.TitleMatcher
@@ -73,6 +74,7 @@ class PlaylistWorkerFactory(
     private val dao: PlaylistDao,
     private val matcher: TitleMatcher,
     private val matchScheduler: MatchScheduler,
+    private val indexer: CatalogIndexer,
 ) : WorkerFactory() {
     override fun createWorker(
         appContext: Context,
@@ -85,7 +87,7 @@ class PlaylistWorkerFactory(
             }
 
             MatchWorker::class.java.name -> {
-                MatchWorker(appContext, workerParameters, matcher, matchScheduler)
+                MatchWorker(appContext, workerParameters, matcher, matchScheduler, indexer)
             }
 
             else -> {

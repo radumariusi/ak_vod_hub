@@ -2,8 +2,10 @@
 
 package io.github.radumariusi.akvodhub.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -12,10 +14,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,57 +33,162 @@ import androidx.tv.material3.NavigationDrawerItem
 import androidx.tv.material3.Text
 import io.github.radumariusi.akvodhub.R
 import io.github.radumariusi.akvodhub.catalog.TmdbViewModel
+import io.github.radumariusi.akvodhub.data.db.TitleCard
+import io.github.radumariusi.akvodhub.hub.BrowseViewModel
+import io.github.radumariusi.akvodhub.hub.DetailsViewModel
+import io.github.radumariusi.akvodhub.hub.HomeViewModel
 import io.github.radumariusi.akvodhub.playlist.PlaylistsViewModel
+import io.github.radumariusi.akvodhub.ui.hub.BrowseScreen
+import io.github.radumariusi.akvodhub.ui.hub.DetailsScreen
+import io.github.radumariusi.akvodhub.ui.hub.HomeScreen
 import io.github.radumariusi.akvodhub.update.UpdateViewModel
+import kotlinx.coroutines.delay
 
 enum class Destination(
     val label: String,
     @param:DrawableRes val icon: Int,
 ) {
     HOME("Acasă", R.drawable.ic_home),
+    MOVIES("Filme", R.drawable.ic_movie),
+    SERIES("Seriale", R.drawable.ic_tv),
     SEARCH("Căutare", R.drawable.ic_search),
     SETTINGS("Setări", R.drawable.ic_settings),
 }
 
+/** ViewModel-urile ecranelor hub-ului. */
+class HubViewModels(
+    val home: HomeViewModel,
+    val browse: BrowseViewModel,
+    val details: DetailsViewModel,
+)
+
+/**
+ * Navigarea: meniul lateral (Acasă, Filme, Seriale, Căutare, Setări) și pagina de detalii peste tot ecranul.
+ * La „Înapoi” din detalii, ecranul de dinainte revine cu aceeași derulare, iar focusul pe cardul deschis.
+ */
 @Composable
 fun AppRoot(
     updateViewModel: UpdateViewModel,
     playlistsViewModel: PlaylistsViewModel,
     tmdbViewModel: TmdbViewModel,
+    hub: HubViewModels,
 ) {
     var current by rememberSaveable { mutableStateOf(Destination.HOME) }
+    var openTitle by rememberSaveable { mutableStateOf<Long?>(null) }
+    var openedFrom by rememberSaveable { mutableStateOf<String?>(null) }
+    var restoreKey by rememberSaveable { mutableStateOf<String?>(null) }
     val updateState by updateViewModel.state.collectAsState()
     val showDialog by updateViewModel.showDialog.collectAsState()
     val totals by playlistsViewModel.totals.collectAsState()
+    val languages by hub.browse.languages.collectAsState()
+    val states = rememberSaveableStateHolder()
 
-    NavigationDrawer(
-        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
-        drawerContent = {
-            Column(
-                modifier = Modifier.fillMaxHeight().padding(12.dp),
-                verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
-                horizontalAlignment = Alignment.Start,
-            ) {
-                Destination.entries.forEach { destination ->
-                    NavigationDrawerItem(
-                        selected = current == destination,
-                        onClick = { current = destination },
-                        leadingContent = {
-                            Icon(painter = painterResource(destination.icon), contentDescription = null)
-                        },
+    val open: (TitleCard, String) -> Unit = { card, key ->
+        openedFrom = key
+        openTitle = card.id
+    }
+    val onRestored = { restoreKey = null }
+    // Dacă cardul nu mai e pe ecran (listă reîncărcată), nu „furăm” focusul mai târziu.
+    LaunchedEffect(restoreKey) {
+        if (restoreKey != null) {
+            delay(1_500)
+            restoreKey = null
+        }
+    }
+
+    val titleId = openTitle
+    if (titleId != null) {
+        BackHandler {
+            openTitle = null
+            restoreKey = openedFrom
+        }
+        DetailsScreen(hub.details, titleId)
+    } else {
+        BackHandler(enabled = current != Destination.HOME) { current = Destination.HOME }
+        states.SaveableStateProvider("main") {
+            NavigationDrawer(
+                modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
+                drawerContent = {
+                    Column(
+                        modifier = Modifier.fillMaxHeight().padding(12.dp),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.Start,
                     ) {
-                        Text(destination.label)
+                        Destination.entries.forEach { destination ->
+                            NavigationDrawerItem(
+                                selected = current == destination,
+                                onClick = { current = destination },
+                                leadingContent = {
+                                    Icon(painter = painterResource(destination.icon), contentDescription = null)
+                                },
+                            ) {
+                                Text(destination.label)
+                            }
+                            Spacer(Modifier.height(4.dp))
+                        }
                     }
-                    Spacer(Modifier.height(4.dp))
+                },
+            ) {
+                Box(Modifier.fillMaxSize().padding(start = 24.dp, top = 28.dp, end = 32.dp, bottom = 8.dp)) {
+                    // Fiecare ecran își păstrează derularea când treci prin meniu sau prin detalii.
+                    states.SaveableStateProvider(current.name) {
+                        when (current) {
+                            Destination.HOME -> {
+                                HomeScreen(
+                                    totals = totals,
+                                    viewModel = hub.home,
+                                    onOpenSettings = { current = Destination.SETTINGS },
+                                    onOpen = open,
+                                    restoreKey = restoreKey,
+                                    onRestored = onRestored,
+                                )
+                            }
+
+                            Destination.MOVIES -> {
+                                BrowseScreen(
+                                    "Filme",
+                                    hub.browse.movies,
+                                    languages,
+                                    false,
+                                    "movies",
+                                    open,
+                                    restoreKey,
+                                    onRestored,
+                                )
+                            }
+
+                            Destination.SERIES -> {
+                                BrowseScreen(
+                                    "Seriale",
+                                    hub.browse.series,
+                                    languages,
+                                    false,
+                                    "series",
+                                    open,
+                                    restoreKey,
+                                    onRestored,
+                                )
+                            }
+
+                            Destination.SEARCH -> {
+                                BrowseScreen(
+                                    "Căutare",
+                                    hub.browse.search,
+                                    languages,
+                                    true,
+                                    "search",
+                                    open,
+                                    restoreKey,
+                                    onRestored,
+                                )
+                            }
+
+                            Destination.SETTINGS -> {
+                                SettingsScreen(updateViewModel, updateState, playlistsViewModel, tmdbViewModel)
+                            }
+                        }
+                    }
                 }
-            }
-        },
-    ) {
-        Box(Modifier.fillMaxSize().padding(start = 24.dp, top = 32.dp, end = 48.dp, bottom = 32.dp)) {
-            when (current) {
-                Destination.HOME -> HomeScreen(totals, onOpenSettings = { current = Destination.SETTINGS })
-                Destination.SEARCH -> SearchScreen()
-                Destination.SETTINGS -> SettingsScreen(updateViewModel, updateState, playlistsViewModel, tmdbViewModel)
             }
         }
     }

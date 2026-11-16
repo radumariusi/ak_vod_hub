@@ -4,7 +4,9 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.RawQuery
 import androidx.room.Update
+import androidx.sqlite.db.SupportSQLiteQuery
 import io.github.radumariusi.akvodhub.parser.VodKind
 import io.github.radumariusi.akvodhub.parser.match.MediaType
 import kotlinx.coroutines.flow.Flow
@@ -109,7 +111,80 @@ interface CatalogDao {
     @Query("SELECT matchState AS state, COUNT(*) AS count FROM raw_entry WHERE matchState <> 3 GROUP BY matchState")
     fun observeStateCounts(): Flow<List<StateCount>>
 
-    /** Câte filme/seriale unice (după unirea duplicatelor) au surse în playlist-uri. */
-    @Query("SELECT COUNT(DISTINCT titleId) FROM raw_entry WHERE titleId IS NOT NULL")
+    /** Câte filme/seriale TMDB unice (după unirea duplicatelor) au surse în playlist-uri. */
+    @Query("SELECT COUNT(DISTINCT titleId) FROM raw_entry WHERE titleId IS NOT NULL AND matchState = 1")
     fun observeTitleCount(): Flow<Int>
+
+    // ------------------------------------------------------------ hub (etapa 5)
+
+    /** Liste de titluri construite de `CatalogQuery` (filtre, căutare FTS, ordonare, paginare). */
+    @RawQuery
+    suspend fun cards(query: SupportSQLiteQuery): List<TitleCard>
+
+    @Query(
+        "SELECT t.id, t.mediaType, t.name, t.year, t.posterPath, t.backdropPath, t.rating, t.bestQuality, " +
+            "t.overview FROM watch_state w JOIN title t ON t.id = w.titleId WHERE t.sourceCount > 0 " +
+            "ORDER BY w.updatedAt DESC LIMIT :limit",
+    )
+    suspend fun continueWatching(limit: Int): List<TitleCard>
+
+    @Query("SELECT * FROM raw_entry WHERE id = :id")
+    suspend fun entry(id: Long): RawEntryEntity?
+
+    /** Combinațiile de limbi din playlist-uri, cele mai frecvente primele (pentru filtrul „Limbă”). */
+    @Query(
+        "SELECT languages FROM raw_entry WHERE languages IS NOT NULL AND titleId IS NOT NULL " +
+            "GROUP BY languages ORDER BY COUNT(*) DESC LIMIT 80",
+    )
+    suspend fun languageCombinations(): List<String>
+
+    // ------------------------------------------------------------ indexarea catalogului
+
+    /** Intrări fără titlu încă (de potrivit sau negăsite pe TMDB), pentru titlurile locale. */
+    @Query(
+        "SELECT id, kind, name, groupTitle, title, year, languages, tmdbId, matchState FROM raw_entry " +
+            "WHERE titleId IS NULL AND matchState IN (0, 2, 4) AND id > :afterId ORDER BY id LIMIT :limit",
+    )
+    suspend fun unlinked(
+        afterId: Long,
+        limit: Int,
+    ): List<PendingEntry>
+
+    /** Primul logo din playlist al unor intrări (posterul unui titlu local). */
+    @Query("SELECT logo FROM raw_entry WHERE id IN (:ids) AND logo IS NOT NULL AND logo <> '' LIMIT 1")
+    suspend fun firstLogo(ids: List<Long>): String?
+
+    /** Leagă intrările de un titlu local, fără să schimbe starea potrivirii (rămân de potrivit / negăsite). */
+    @Query("UPDATE raw_entry SET titleId = :titleId WHERE id IN (:ids)")
+    suspend fun linkLocal(
+        ids: List<Long>,
+        titleId: Long,
+    )
+
+    /** Rezumatele surselor pentru fiecare titlu (vezi [TitleEntity]). `bestQuality` = `VideoQuality.ordinal`. */
+    @Query(
+        "UPDATE title SET " +
+            "sourceCount = (SELECT COUNT(*) FROM raw_entry r WHERE r.titleId = title.id), " +
+            "addedAt = (SELECT MAX(CASE WHEN r.providerAddedAt IS NULL THEN r.firstSeenAt " +
+            "WHEN r.providerAddedAt < 100000000000 THEN r.providerAddedAt * 1000 ELSE r.providerAddedAt END) " +
+            "FROM raw_entry r WHERE r.titleId = title.id), " +
+            "bestQuality = (SELECT MAX(CASE r.quality WHEN 'UHD' THEN 3 WHEN 'FHD' THEN 2 WHEN 'HD' THEN 1 " +
+            "WHEN 'SD' THEN 0 END) FROM raw_entry r WHERE r.titleId = title.id), " +
+            "qualities = (SELECT ',' || group_concat(DISTINCT r.quality) || ',' FROM raw_entry r " +
+            "WHERE r.titleId = title.id), " +
+            "audioLanguages = (SELECT ',' || group_concat(DISTINCT r.languages) || ',' FROM raw_entry r " +
+            "WHERE r.titleId = title.id)",
+    )
+    suspend fun updateSummaries()
+
+    /** Titlurile locale rămase fără surse (potrivite între timp pe TMDB sau scoase din playlist). */
+    @Query("DELETE FROM title WHERE tmdbId < 0 AND sourceCount = 0")
+    suspend fun deleteEmptyLocalTitles(): Int
+
+    /** O „amprentă” ieftină a catalogului: dacă nu s-a schimbat, indexarea nu are ce reface. */
+    @Query(
+        "SELECT (SELECT COUNT(*) || ':' || TOTAL(id) || ':' || TOTAL(titleId) FROM raw_entry) || '|' || " +
+            "(SELECT COUNT(*) || ':' || IFNULL(MAX(updatedAt), 0) || ':' || TOTAL(sourceCount > 0) FROM title)",
+    )
+    suspend fun fingerprint(): String
 }

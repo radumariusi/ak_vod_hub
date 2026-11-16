@@ -51,5 +51,36 @@ data class TmdbPage(
     val results: List<TmdbItem> = emptyList(),
 )
 
+/** Distribuția și echipa unui titlu (`/movie/{id}/credits`, `/tv/{id}/aggregate_credits`). */
+@Serializable
+data class TmdbCredits(
+    val cast: List<TmdbCastMember> = emptyList(),
+    val crew: List<TmdbCrewMember> = emptyList(),
+)
+
+@Serializable
+data class TmdbCastMember(
+    val id: Long,
+    val name: String,
+    val character: String? = null,
+    @SerialName("profile_path") val profilePath: String? = null,
+    /** La seriale (`aggregate_credits`), personajele vin într-o listă. */
+    val roles: List<TmdbRole>? = null,
+) {
+    val role: String? get() = character?.ifBlank { null } ?: roles?.firstOrNull()?.character?.ifBlank { null }
+}
+
+@Serializable
+data class TmdbRole(
+    val character: String? = null,
+)
+
+@Serializable
+data class TmdbCrewMember(
+    val id: Long,
+    val name: String,
+    val job: String? = null,
+)
+
 /** Cheia TMDB lipsește sau a fost respinsă (401). */
 class TmdbAuthException : Exception("Cheia TMDB nu e validă.")
