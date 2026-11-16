@@ -82,11 +82,12 @@ Documentele astea, `.gitignore`, workflow de curățenie automată, reguli de lu
 - **Gata când:** un playlist real de 100.000+ intrări se importă în sub ~1 minut pe un box TV, fără erori de memorie.
 - *Cum s-a făcut:* la Xtream, importul complet ia filmele și lista de serialele (2 cereri mari, citite în flux); episoadele unui serial se cer la nevoie (`get_series_info`, un apel pe serial), altfel un cont cu 10.000 de seriale ar însemna 10.000 de cereri la fiecare import. Linkurile Xtream nu se salvează (conțin parola); se construiesc la redare. Datele contului sunt criptate cu o cheie din Android Keystore.
 
-### Etapa 3: Parser de titluri (normalizare)
+### ✅ Etapa 3: Parser de titluri (normalizare)
 - Din nume ca `EN| The Matrix (1999) 4K HDR`, `|DE| Matrix 1999 [MULTI-SUB]`, `RO - Matrix (1999) FHD`, `Breaking Bad S01E02` scoatem: titlu curat, an, sezon/episod, calitate (4K/UHD, FHD/1080p, HD/720p, SD), HDR/DV, codec, limbi (din prefix, grup sau etichete), subtitrări.
 - Limba se deduce și din numele categoriei (ex. „DE | Filme 4K”).
 - Set mare de teste cu nume reale anonimizate (`core:parser/src/test/resources/testdata/`).
 - **Gata când:** peste 95% din cazurile de test sunt parsate corect.
+- *Cum s-a făcut:* `TitleParser` (în `core:parser`) taie prefixul de furnizor (`EN|`, `|DE|`, `[RO]`, `RO - `, `|NF|`, `ᴴᴰ`…), apoi caută „ancora” (`S01E02`, an, `1080p`/`4K`/`HEVC`/`MULTI`, paranteză cu etichete); titlul e tot ce e înainte. Limbile sunt coduri ISO 639-1 (`mul` = mai multe), cu limba subtitrării separată (`SUB RO`, `VOSTFR`, `MULTI-SUB`). Numele are prioritate față de categorie. Rezultatul se salvează în `raw_entry` la import (migrare Room 1→2, fără pierderea playlist-urilor; intrările vechi se completează la următoarea reîmprospătare). Setul de teste: `testdata/titles.tsv`, 187 de nume, toate corecte. Limită cunoscută: un an fără paranteză la final e luat drept an (ex. „Wonder Woman 1984” fără `(2020)`); potrivirea TMDB din etapa 4 poate reîncerca fără el.
 
 ### Etapa 4: Potrivire TMDB și grupare surse
 - Cheia TMDB a utilizatorului (gratuită) în Setări; niciodată în repo.
