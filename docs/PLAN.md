@@ -73,13 +73,14 @@ Documentele astea, `.gitignore`, workflow de curățenie automată, reguli de lu
 - **Update în aplicație:** la pornire (și din Setări), aplicația verifică ultimul release din GitHub, arată ce e nou și descarcă + instalează APK-ul.
 - **Gata când:** APK-ul se instalează pe Android TV, navighezi cu telecomanda, iar un release nou apare în aplicație ca update și se instalează.
 
-### Etapa 2: Import playlist și filtrare VOD
+### ✅ Etapa 2: Import playlist și filtrare VOD
 - Adăugare playlist: URL M3U, fișier M3U, cont Xtream (server, user, parolă).
 - Xtream: `get_vod_streams`, `get_series`, `get_series_info`. Live TV ignorat complet.
 - M3U: parser în flux (nu încarcă tot fișierul în memorie). Detectare VOD: URL cu `/movie/` sau `/series/`, extensii `.mkv/.mp4/.avi`, grupuri de tip „VOD/Filme/Movies/Series”; restul se ignoră.
 - Salvare în Room în loturi; reîmprospătare periodică cu WorkManager, cu diferențe (ce s-a adăugat / șters).
 - Ecran Setări → Playlist-uri, cu progres la import.
 - **Gata când:** un playlist real de 100.000+ intrări se importă în sub ~1 minut pe un box TV, fără erori de memorie.
+- *Cum s-a făcut:* la Xtream, importul complet ia filmele și lista de serialele (2 cereri mari, citite în flux); episoadele unui serial se cer la nevoie (`get_series_info`, un apel pe serial), altfel un cont cu 10.000 de seriale ar însemna 10.000 de cereri la fiecare import. Linkurile Xtream nu se salvează (conțin parola); se construiesc la redare. Datele contului sunt criptate cu o cheie din Android Keystore.
 
 ### Etapa 3: Parser de titluri (normalizare)
 - Din nume ca `EN| The Matrix (1999) 4K HDR`, `|DE| Matrix 1999 [MULTI-SUB]`, `RO - Matrix (1999) FHD`, `Breaking Bad S01E02` scoatem: titlu curat, an, sezon/episod, calitate (4K/UHD, FHD/1080p, HD/720p, SD), HDR/DV, codec, limbi (din prefix, grup sau etichete), subtitrări.

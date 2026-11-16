@@ -28,6 +28,7 @@ import androidx.tv.material3.NavigationDrawer
 import androidx.tv.material3.NavigationDrawerItem
 import androidx.tv.material3.Text
 import io.github.radumariusi.akvodhub.R
+import io.github.radumariusi.akvodhub.playlist.PlaylistsViewModel
 import io.github.radumariusi.akvodhub.update.UpdateViewModel
 
 enum class Destination(
@@ -40,10 +41,14 @@ enum class Destination(
 }
 
 @Composable
-fun AppRoot(updateViewModel: UpdateViewModel) {
+fun AppRoot(
+    updateViewModel: UpdateViewModel,
+    playlistsViewModel: PlaylistsViewModel,
+) {
     var current by rememberSaveable { mutableStateOf(Destination.HOME) }
     val updateState by updateViewModel.state.collectAsState()
     val showDialog by updateViewModel.showDialog.collectAsState()
+    val totals by playlistsViewModel.totals.collectAsState()
 
     NavigationDrawer(
         modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
@@ -70,9 +75,9 @@ fun AppRoot(updateViewModel: UpdateViewModel) {
     ) {
         Box(Modifier.fillMaxSize().padding(start = 24.dp, top = 32.dp, end = 48.dp, bottom = 32.dp)) {
             when (current) {
-                Destination.HOME -> HomeScreen(onOpenSettings = { current = Destination.SETTINGS })
+                Destination.HOME -> HomeScreen(totals, onOpenSettings = { current = Destination.SETTINGS })
                 Destination.SEARCH -> SearchScreen()
-                Destination.SETTINGS -> SettingsScreen(updateViewModel, updateState)
+                Destination.SETTINGS -> SettingsScreen(updateViewModel, updateState, playlistsViewModel)
             }
         }
     }

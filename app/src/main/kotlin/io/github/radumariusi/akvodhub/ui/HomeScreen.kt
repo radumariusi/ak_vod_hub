@@ -14,9 +14,13 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import io.github.radumariusi.akvodhub.data.playlist.LibraryTotals
 
 @Composable
-fun HomeScreen(onOpenSettings: () -> Unit) {
+fun HomeScreen(
+    totals: LibraryTotals?,
+    onOpenSettings: () -> Unit,
+) {
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
 
@@ -25,15 +29,22 @@ fun HomeScreen(onOpenSettings: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text("AK VOD Hub", style = MaterialTheme.typography.displaySmall)
+        val hasPlaylists = totals != null && totals.playlists > 0
         Text(
-            "Încă nu ai niciun playlist. În curând vei putea adăuga din Setări un playlist M3U sau un cont Xtream, " +
-                "iar aici vor apărea filmele și serialele tale.",
+            if (totals != null && hasPlaylists) {
+                "Biblioteca ta: ${formatCount(totals.movies)} filme, ${formatCount(totals.series)} seriale" +
+                    (if (totals.episodes > 0) " și ${formatCount(totals.episodes)} episoade" else "") +
+                    ", din ${totals.playlists} playlist-uri. Hub-ul cu postere și căutare vine în etapele următoare."
+            } else {
+                "Încă nu ai niciun playlist. Adaugă din Setări un cont Xtream sau un playlist M3U; " +
+                    "păstrăm doar filmele și serialele."
+            },
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.widthIn(max = 640.dp),
         )
         Button(onClick = onOpenSettings, modifier = Modifier.focusRequester(focus)) {
-            Text("Deschide Setările")
+            Text(if (hasPlaylists) "Playlist-uri" else "Adaugă un playlist")
         }
     }
 }
