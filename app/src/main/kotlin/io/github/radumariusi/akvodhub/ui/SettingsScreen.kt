@@ -18,6 +18,7 @@ import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
+import io.github.radumariusi.akvodhub.catalog.TmdbViewModel
 import io.github.radumariusi.akvodhub.playlist.PlaylistsViewModel
 import io.github.radumariusi.akvodhub.update.UpdateState
 import io.github.radumariusi.akvodhub.update.UpdateViewModel
@@ -27,10 +28,13 @@ fun SettingsScreen(
     viewModel: UpdateViewModel,
     state: UpdateState,
     playlistsViewModel: PlaylistsViewModel,
+    tmdbViewModel: TmdbViewModel,
 ) {
     var adding by rememberSaveable { mutableStateOf(false) }
     val playlists by playlistsViewModel.playlists.collectAsState()
     val addState by playlistsViewModel.addState.collectAsState()
+    val matchStatus by tmdbViewModel.status.collectAsState()
+    val keyState by tmdbViewModel.keyState.collectAsState()
 
     if (adding) {
         AddPlaylistScreen(
@@ -60,6 +64,15 @@ fun SettingsScreen(
             },
             onRefresh = playlistsViewModel::refresh,
             onDelete = playlistsViewModel::delete,
+        )
+
+        TmdbSection(
+            status = matchStatus,
+            keyState = keyState,
+            onSaveKey = tmdbViewModel::saveKey,
+            onClearKey = tmdbViewModel::clearKey,
+            onMatchNow = tmdbViewModel::matchNow,
+            onRetryUnmatched = tmdbViewModel::retryUnmatched,
         )
 
         Text("Actualizări", style = MaterialTheme.typography.titleLarge)

@@ -2,6 +2,7 @@ package io.github.radumariusi.akvodhub.data.db
 
 import androidx.room.Dao
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import io.github.radumariusi.akvodhub.parser.VodKind
@@ -30,13 +31,24 @@ interface PlaylistDao {
     @Query("SELECT sourceId, kind, COUNT(*) AS count FROM raw_entry GROUP BY sourceId, kind")
     fun observeCounts(): Flow<List<KindCount>>
 
-    @Query("SELECT id, providerKey, firstSeenAt FROM raw_entry WHERE sourceId = :sourceId AND providerKey IN (:keys)")
+    @Query("SELECT * FROM raw_entry WHERE sourceId = :sourceId AND providerKey IN (:keys)")
     suspend fun existing(
         sourceId: Long,
         keys: List<String>,
-    ): List<ExistingKey>
+    ): List<RawEntryEntity>
 
-    @Insert
+    @Query("SELECT EXISTS(SELECT 1 FROM raw_entry WHERE sourceId = :sourceId)")
+    suspend fun hasEntries(sourceId: Long): Boolean
+
+    /** Intrările neschimbate de la furnizor: doar le marcăm ca văzute la importul [run]. */
+    @Query("UPDATE raw_entry SET seenRun = :run WHERE id IN (:ids)")
+    suspend fun markSeen(
+        ids: List<Long>,
+        run: Long,
+    )
+
+    /** REPLACE: același link poate apărea de două ori într-un M3U (în loturi diferite la primul import). */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertEntries(entries: List<RawEntryEntity>)
 
     @Update
@@ -59,6 +71,14 @@ interface PlaylistDao {
 
     @Query("DELETE FROM raw_entry WHERE sourceId = :sourceId")
     suspend fun deleteEntries(sourceId: Long)
+
+    /** Episoadele Xtream iau titlul TMDB al serialului lor. */
+    @Query(
+        "UPDATE raw_entry SET titleId = (SELECT s.titleId FROM raw_entry s WHERE s.sourceId = raw_entry.sourceId " +
+            "AND s.providerKey = 'series:' || raw_entry.seriesId) " +
+            "WHERE kind = 'EPISODE' AND matchState = 3 AND seriesId IS NOT NULL",
+    )
+    suspend fun inheritSeriesTitles()
 
     @Query("SELECT * FROM raw_entry WHERE sourceId = :sourceId AND kind = 'EPISODE' AND seriesId = :seriesId")
     suspend fun episodes(

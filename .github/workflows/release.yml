@@ -1,9 +1,8 @@
-# La fiecare merge în main: APK semnat → GitHub Releases. Se păstrează doar ultimele 2 release-uri.
+# APK semnat → GitHub Releases, doar la cerere (Actions → Release → Run workflow), nu la fiecare merge.
+# Se păstrează doar ultimele 2 release-uri.
 name: Release
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 concurrency:

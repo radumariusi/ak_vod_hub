@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.room.withTransaction
 import io.github.radumariusi.akvodhub.data.db.AkVodDatabase
+import io.github.radumariusi.akvodhub.data.db.MatchState
 import io.github.radumariusi.akvodhub.data.db.PlaylistSourceEntity
 import io.github.radumariusi.akvodhub.data.db.PlaylistType
 import io.github.radumariusi.akvodhub.data.db.RawEntryEntity
@@ -147,10 +148,12 @@ class PlaylistImporter(
                     providerAddedAt = e.added,
                     firstSeenAt = now,
                     seenRun = now,
+                    matchState = MatchState.INHERITED,
                 ),
             )
         }
         writer.flush()
+        dao.inheritSeriesTitles()
         return dao.episodes(sourceId, seriesId)
     }
 
@@ -284,13 +287,20 @@ class PlaylistImporter(
             password = source.password?.let(cipher::decrypt).orEmpty(),
         )
 
-    /** Scrie intrările în loturi; separă ce e nou de ce exista deja (pentru diferențe la reîmprospătare). */
+    /**
+     * Scrie intrările în loturi și separă ce e nou de ce exista deja (pentru diferențe la reîmprospătare).
+     *
+     * Ca reîmprospătarea să fie rapidă, o intrare primită identic ca data trecută doar se marchează „văzută”
+     * (fără re-parsare și fără rescrierea rândului), iar potrivirea TMDB rămâne neatinsă. Numele se parsează
+     * doar pentru intrările noi sau schimbate.
+     */
     private inner class BatchWriter(
         private val sourceId: Long,
         val run: Long,
     ) {
         private val buffer = LinkedHashMap<String, RawEntryEntity>(BATCH_SIZE * 2)
         private val counts = IntArray(VodKind.entries.size)
+        private var hadEntries: Boolean? = null
         var scanned = 0
         var total = 0
             private set
@@ -301,7 +311,7 @@ class PlaylistImporter(
         fun count(kind: VodKind) = counts[kind.ordinal]
 
         suspend fun add(entry: RawEntryEntity) {
-            buffer[entry.providerKey] = entry.parsed()
+            buffer[entry.providerKey] = entry
             if (buffer.size >= BATCH_SIZE) flush()
         }
 
@@ -309,22 +319,49 @@ class PlaylistImporter(
             if (buffer.isEmpty()) return
             val batch = buffer.values.toList()
             buffer.clear()
+            // La primul import nu există nimic de comparat: sărim peste căutări.
+            val compare = hadEntries ?: dao.hasEntries(sourceId).also { hadEntries = it }
             db.withTransaction {
-                val existing = dao.existing(sourceId, batch.map { it.providerKey }).associateBy { it.providerKey }
+                val existing =
+                    if (compare) {
+                        batch
+                            .chunked(SQL_CHUNK)
+                            .flatMap { chunk -> dao.existing(sourceId, chunk.map { it.providerKey }) }
+                            .associateBy { it.providerKey }
+                    } else {
+                        emptyMap()
+                    }
                 val inserts = ArrayList<RawEntryEntity>(batch.size)
                 val updates = ArrayList<RawEntryEntity>()
+                val unchanged = ArrayList<Long>()
                 for (entry in batch) {
                     val old = existing[entry.providerKey]
-                    if (old ==
-                        null
-                    ) {
-                        inserts += entry
-                    } else {
-                        updates += entry.copy(id = old.id, firstSeenAt = old.firstSeenAt)
+                    when {
+                        old == null -> {
+                            inserts += entry.parsed()
+                        }
+
+                        old.title != null && old.sameFromProvider(entry) -> {
+                            unchanged += old.id
+                        }
+
+                        else -> {
+                            val parsed = entry.parsed()
+                            val sameTitle =
+                                parsed.title == old.title && parsed.year == old.year && parsed.tmdbId == old.tmdbId
+                            updates +=
+                                parsed.copy(
+                                    id = old.id,
+                                    firstSeenAt = old.firstSeenAt,
+                                    titleId = if (sameTitle) old.titleId else null,
+                                    matchState = if (sameTitle) old.matchState else entry.matchState,
+                                )
+                        }
                     }
                 }
                 if (inserts.isNotEmpty()) dao.insertEntries(inserts)
                 if (updates.isNotEmpty()) dao.updateEntries(updates)
+                unchanged.chunked(SQL_CHUNK).forEach { dao.markSeen(it, run) }
                 added += inserts.size
             }
             batch.forEach { counts[it.kind.ordinal]++ }
@@ -343,7 +380,10 @@ class PlaylistImporter(
         }
 
     private companion object {
-        const val BATCH_SIZE = 500
+        const val BATCH_SIZE = 2_000
+
+        /** Android 6 (SQLite vechi) acceptă cel mult 999 de parametri într-o interogare. */
+        const val SQL_CHUNK = 500
         const val PROGRESS_EVERY = 2_000
     }
 }
