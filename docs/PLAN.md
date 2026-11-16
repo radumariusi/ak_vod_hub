@@ -7,7 +7,7 @@ O aplicație Android TV care ia un playlist IPTV (M3U sau Xtream), **păstrează
 - fiecare film / serial apare **o singură dată**, cu poster, descriere, rating (TMDB);
 - sub el sunt **toate sursele din playlist, grupate**: de ex. *Filmul X: 4K în EN și DE, 1080p în alte 7 limbi*;
 - **căutare, descoperire și recomandări doar din ce există în playlist**;
-- subtitrări (și opțional cataloage / liste) prin **addon-uri Stremio**.
+- subtitrări, cataloage și liste prin **addon-uri Stremio** (aplicația doar le folosește; nu construim un addon propriu).
 
 Ce nu facem: Live TV, EPG, găzduire de conținut. Aplicația nu vine cu niciun playlist; utilizatorul îl adaugă pe al lui.
 
@@ -64,11 +64,14 @@ Fiecare etapă = un fir de discuție nou, un branch, un PR. Reguli în [WORKFLOW
 ### ✅ Etapa 0: Cercetare, plan, igienă repo
 Documentele astea, `.gitignore`, workflow de curățenie automată, reguli de lucru.
 
-### Etapa 1: Scheletul aplicației Android TV
+### Etapa 1: Scheletul aplicației, CI și update din GitHub
 - Proiect Gradle (Kotlin DSL, version catalog), modulele de mai sus, Hilt, Compose for TV.
 - Ecran Home gol cu navigare de bază (Home / Căutare / Setări), temă întunecată.
-- CI pe GitHub Actions: build + teste unitare + lint pe PR. APK ca artefact **doar la rulare manuală**, `retention-days: 3`.
-- **Gata când:** APK-ul de debug se instalează pe Android TV / emulator TV și navighezi cu telecomanda.
+- CI pe GitHub Actions: build + teste unitare + lint pe fiecare PR (fără artefacte).
+- **Release automat:** la fiecare merge în `main` (sau tag `v*`), CI construiește APK-ul de release semnat și îl publică în **GitHub Releases**. Se păstrează doar ultimele 2 release-uri; cele vechi și tag-urile lor se șterg automat.
+- **Semnare stabilă:** o singură cheie de semnare, ținută în GitHub Secrets (niciodată în repo), ca fiecare APK nou să se instaleze peste cel vechi.
+- **Update în aplicație:** la pornire (și din Setări), aplicația verifică ultimul release din GitHub, arată ce e nou și descarcă + instalează APK-ul.
+- **Gata când:** APK-ul se instalează pe Android TV, navighezi cu telecomanda, iar un release nou apare în aplicație ca update și se instalează.
 
 ### Etapa 2: Import playlist și filtrare VOD
 - Adăugare playlist: URL M3U, fișier M3U, cont Xtream (server, user, parolă).
@@ -122,11 +125,6 @@ Documentele astea, `.gitignore`, workflow de curățenie automată, reguli de lu
 - Rândul „Watch Next” / canale pe ecranul principal Android TV; căutare vocală globală.
 - Configurare de pe telefon (QR + pagină web locală) ca să nu tastezi URL-uri cu telecomanda.
 - Profiluri (inclusiv copii, după certificare), backup / restaurare setări.
-- Release APK pe GitHub (păstrăm doar ultimele 2 release-uri).
-
-### Etapa 10 (opțional): addon Stremio propriu
-- Un mic server (Node + `stremio-addon-sdk`) care expune catalogul tău potrivit (TMDB/IMDb ID) în Stremio, cu sursele grupate, ca să ai același hub și pe alte dispozitive.
-- Necesită găzduire (local sau gratuit); de decis după etapa 8.
 
 ## Idei suplimentare
 
@@ -139,8 +137,9 @@ Documentele astea, `.gitignore`, workflow de curățenie automată, reguli de lu
 7. **Trakt (opțional)**: sincronizare istoric și watchlist; watchlist-ul afișat doar cu ce e disponibil.
 8. **Statistici playlist**: câte filme, câte în 4K, pe limbi, cât s-a potrivit; util pentru a compara furnizori.
 
-## Decizii deschise (pentru Radu)
+## Decizii luate
 
-- **Licența proiectului.** GPL-3.0 ne permite să refolosim cod din NuvioTV / M3UAndroid; Apache-2.0 sau MIT e mai permisivă, dar atunci doar ne inspirăm. Recomandare: GPL-3.0, dacă vrei să poți refolosi cod din ele.
-- **Repo public sau privat.** Pentru un repo public, minutele GitHub Actions sunt gratuite nelimitat; pentru unul privat, sunt 2.000 min/lună. Proiectul nu conține playlist-uri sau secrete, deci poate fi public.
-- **Addon Stremio propriu (etapa 10):** da / nu / mai târziu.
+- **Licență:** GPL-3.0 (putem refolosi cod din NuvioTV / M3UAndroid, cu atribuire).
+- **Repo:** public deocamdată; poate deveni privat mai târziu (atunci CI are 2.000 min/lună, deci build-urile trebuie să rămână scurte).
+- **Addon Stremio propriu:** nu. Folosim addon-uri Stremio existente doar pentru subtitrări, cataloage și liste.
+- **Livrare:** APK-urile vin din GitHub Releases, cu update direct din aplicație. Claude face merge la PR-uri când CI e verde.

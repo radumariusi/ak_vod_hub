@@ -24,14 +24,18 @@ Regulile astea se aplică în fiecare etapă. Scopul: muncă ordonată pe etape 
 | Istoric | Commit-uri mici și clare. PR-urile se pot face squash la merge, ca istoria să rămână curată. |
 | CI | Rulează doar pe PR și pe `main`, cu `concurrency` (anulează rulările vechi) și timeout. |
 
-## Setări GitHub de făcut o singură dată (manual, de Radu)
+## Setări GitHub (o singură dată, manual)
 
-- **Settings → General → Pull Requests:** bifează „Automatically delete head branches” și (opțional) lasă doar „Allow squash merging”.
-- **Settings → Actions → General → Artifact and log retention:** setează **3 zile**.
-- **Settings → Actions → General → Workflow permissions:** „Read and write permissions” (necesar pentru workflow-ul de curățenie).
+- **Settings → Actions → General → Artifact and log retention:** 3 zile (plasă de siguranță; workflow-ul de curățenie șterge oricum).
+- **Settings → General → Pull Requests:** „Automatically delete head branches”.
+
+## Merge și livrare
+
+- Claude face merge la PR-uri când CI e verde (aprobat de Radu), apoi șterge branch-ul.
+- APK-urile ajung la Radu prin GitHub Releases și update-ul din aplicație.
 
 ## Cod
 
 - Kotlin, stil oficial (`ktlint`). Logica pură (parser, potrivire titluri) are teste unitare JVM, rapide.
 - Fără dependențe grele adăugate „pentru orice eventualitate”. Fiecare bibliotecă nouă se justifică în PR.
-- Nu copiem cod din proiecte GPL decât dacă alegem și noi GPL (vezi decizia de licență în PLAN.md). Ne inspirăm din idei, nu copiem.
+- Proiectul e GPL-3.0, deci putem refolosi cod din proiecte GPL-3.0 compatibile (NuvioTV, M3UAndroid), păstrând atribuirea și licența în fișierele preluate.

@@ -10,6 +10,8 @@ Aplicația nu conține și nu oferă conținut. Utilizatorul își adaugă propr
 - [Reguli de lucru și igienă GitHub](docs/WORKFLOW.md)
 - [Cercetare: proiecte similare](docs/RESEARCH.md)
 
+Licență: [GPL-3.0](LICENSE).
+
 ## Stare
 
 Etapa 0 (plan) gata. Codul aplicației începe din etapa 1.
