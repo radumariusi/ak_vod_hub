@@ -34,7 +34,7 @@ object M3uParser {
                 line = line.trim()
                 when {
                     line.isEmpty() -> {
-                        Unit
+                        continue
                     }
 
                     line.startsWith("#EXTINF", ignoreCase = true) -> {
@@ -47,7 +47,7 @@ object M3uParser {
                     }
 
                     line.startsWith("#") -> {
-                        Unit
+                        continue
                     }
 
                     else -> {

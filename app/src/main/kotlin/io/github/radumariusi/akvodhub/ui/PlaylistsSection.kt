@@ -109,6 +109,7 @@ private fun statusColor(playlist: PlaylistSummary) =
 private fun statusText(playlist: PlaylistSummary): String {
     val activity = playlist.activity
     val progress = activity?.progress
+    val lastImportAt = playlist.lastImportAt
     return when {
         progress != null -> {
             "${progress.phase} ${formatCount(
@@ -124,8 +125,8 @@ private fun statusText(playlist: PlaylistSummary): String {
             "Eroare la ultimul import: ${playlist.lastImportError}"
         }
 
-        playlist.lastImportAt != null -> {
-            val date = SimpleDateFormat("dd.MM.yyyy HH:mm", roLocale).format(Date(playlist.lastImportAt))
+        lastImportAt != null -> {
+            val date = SimpleDateFormat("dd.MM.yyyy HH:mm", roLocale).format(Date(lastImportAt))
             val seconds = (playlist.lastDurationMs + 500) / 1000
             "Actualizat $date: +${formatCount(playlist.lastAdded)} noi, " +
                 "−${formatCount(playlist.lastRemoved)} dispărute, în $seconds s"
