@@ -64,7 +64,7 @@ Fiecare etapă = un fir de discuție nou, un branch, un PR. Reguli în [WORKFLOW
 ### ✅ Etapa 0: Cercetare, plan, igienă repo
 Documentele astea, `.gitignore`, workflow de curățenie automată, reguli de lucru.
 
-### Etapa 1: Scheletul aplicației, CI și update din GitHub
+### ✅ Etapa 1: Scheletul aplicației, CI și update din GitHub
 - Proiect Gradle (Kotlin DSL, version catalog), modulele de mai sus, Hilt, Compose for TV.
 - Ecran Home gol cu navigare de bază (Home / Căutare / Setări), temă întunecată.
 - CI pe GitHub Actions: build + teste unitare + lint pe fiecare PR (fără artefacte).

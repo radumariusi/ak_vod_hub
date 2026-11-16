@@ -1,0 +1,89 @@
+# La fiecare merge în main: APK semnat → GitHub Releases. Se păstrează doar ultimele 2 release-uri.
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      AK_SIGNING_KEY: ${{ secrets.AK_SIGNING_KEY }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Verifică cheia de semnare
+        id: key
+        run: |
+          if [ -z "$AK_SIGNING_KEY" ]; then
+            echo "::warning::Lipsește secretul AK_SIGNING_KEY, deci nu public release. Vezi docs/RELEASES.md."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v7
+        if: steps.key.outputs.ok == 'true'
+        with:
+          fetch-depth: 0
+
+      - name: Versiune
+        if: steps.key.outputs.ok == 'true'
+        id: version
+        run: |
+          code=$(git rev-list --count HEAD)
+          base=$(grep '^akvod.versionBase=' gradle.properties | cut -d= -f2)
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "name=$base.$code" >> "$GITHUB_OUTPUT"
+          if git rev-parse -q --verify "refs/tags/v$base.$code" >/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-java@v6
+        if: steps.key.outputs.ok == 'true' && steps.version.outputs.exists == 'false'
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Build APK semnat
+        if: steps.key.outputs.ok == 'true' && steps.version.outputs.exists == 'false'
+        run: |
+          ./gradlew --no-daemon --stacktrace :app:assembleRelease -Pakvod.versionCode=${{ steps.version.outputs.code }}
+          apk=app/build/outputs/apk/release/app-release.apk
+          test -f "$apk" || { echo "::error::APK-ul nu a fost semnat (lipsește $apk)."; exit 1; }
+          cp "$apk" "$RUNNER_TEMP/ak-vod-hub-${{ steps.version.outputs.name }}.apk"
+
+      - name: Publică release-ul
+        if: steps.key.outputs.ok == 'true' && steps.version.outputs.exists == 'false'
+        run: |
+          name="${{ steps.version.outputs.name }}"
+          prev=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)
+          if [ -n "$prev" ]; then
+            git log "$prev..HEAD" --no-merges --pretty='- %s' > "$RUNNER_TEMP/notes.md"
+          else
+            git log -1 --pretty='- %s' > "$RUNNER_TEMP/notes.md"
+          fi
+          gh release create "v$name" "$RUNNER_TEMP/ak-vod-hub-$name.apk" \
+            --target "$GITHUB_SHA" --title "AK VOD Hub $name" --notes-file "$RUNNER_TEMP/notes.md"
+
+      - name: Păstrează doar ultimele 2 release-uri
+        if: steps.key.outputs.ok == 'true'
+        run: |
+          gh release list --limit 100 --json tagName,createdAt \
+            --jq 'sort_by(.createdAt) | reverse | .[2:] | .[].tagName' |
+          while read -r tag; do
+            echo "delete release $tag"
+            gh release delete "$tag" --yes --cleanup-tag
+          done

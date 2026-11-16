@@ -9,9 +9,25 @@ Aplicația nu conține și nu oferă conținut. Utilizatorul își adaugă propr
 - [Plan pe etape](docs/PLAN.md)
 - [Reguli de lucru și igienă GitHub](docs/WORKFLOW.md)
 - [Cercetare: proiecte similare](docs/RESEARCH.md)
+- [Release-uri, semnare și update](docs/RELEASES.md)
 
 Licență: [GPL-3.0](LICENSE).
 
+## Instalare
+
+Ultimul APK: [Releases](https://github.com/radumariusi/ak_vod_hub/releases/latest). După prima instalare, aplicația se actualizează singură din GitHub (Setări > Caută actualizări).
+
+## Build local
+
+Ai nevoie de JDK 21 și Android SDK (Android Studio). Apoi:
+
+```
+./gradlew assembleDebug        # APK de test: app/build/outputs/apk/debug/
+./gradlew :core:parser:test testDebugUnitTest lintDebug
+```
+
+Module: `app` (UI TV), `core:parser` (Kotlin pur), `core:data` (rețea, date, updater), `core:player` (player, din etapa 6).
+
 ## Stare
 
-Etapa 0 (plan) gata. Codul aplicației începe din etapa 1.
+Etapele 0 și 1 gata: schelet Android TV, CI, release automat și update din aplicație. Urmează etapa 2 (import playlist).
