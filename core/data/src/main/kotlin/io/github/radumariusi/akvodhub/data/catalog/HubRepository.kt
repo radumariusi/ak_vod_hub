@@ -25,6 +25,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.StateFlow
+import java.util.Collections
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 
@@ -77,7 +78,7 @@ class HubRepository(
     private val creditsCache = ConcurrentHashMap<Long, Credits>()
 
     /** Episoadele Xtream cerute de la server în sesiunea curentă (o dată pe serial și playlist). */
-    private val episodesLoaded = ConcurrentHashMap.newKeySet<Long>()
+    private val episodesLoaded: MutableSet<Long> = Collections.newSetFromMap(ConcurrentHashMap())
 
     val catalogVersion: StateFlow<Long> get() = indexer.version
 
