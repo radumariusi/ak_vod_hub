@@ -1,0 +1,68 @@
+# ---- Build outputs (nu se comit niciodată) ----
+build/
+**/build/
+out/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+release/
+outputs/
+
+# ---- Gradle ----
+.gradle/
+.kotlin/
+gradle-app.setting
+!gradle/wrapper/gradle-wrapper.jar
+
+# ---- Android Studio / IntelliJ ----
+.idea/
+*.iml
+*.ipr
+*.iws
+captures/
+.externalNativeBuild/
+.cxx/
+.navigation/
+
+# ---- Config locală și secrete ----
+local.properties
+secrets.properties
+*.keystore
+*.jks
+keystore.properties
+google-services.json
+.env
+.env.*
+!.env.example
+
+# ---- Node (addon Stremio) ----
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.pnpm-store/
+dist/
+coverage/
+
+# ---- Date de test mari / playlist-uri reale (pot conține credențiale) ----
+*.m3u
+*.m3u8
+!**/testdata/**/*.m3u
+playlists/
+*.db
+*.sqlite
+
+# ---- Fișiere media și arhive mari ----
+*.mp4
+*.mkv
+*.ts
+*.zip
+*.tar.gz
+*.7z
+
+# ---- Sistem ----
+.DS_Store
+Thumbs.db
+*.log
+*.tmp

@@ -1,0 +1,55 @@
+# Curățenie automată: ține GitHub-ul ușor (artefacte, rulări vechi, cache-uri).
+name: Cleanup
+
+on:
+  schedule:
+    - cron: "0 3 * * 1" # luni, 03:00 UTC
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Șterge artefactele mai vechi de 3 zile
+        run: |
+          cutoff=$(date -u -d '3 days ago' +%s)
+          gh api --paginate "repos/$REPO/actions/artifacts?per_page=100" \
+            --jq '.artifacts[] | "\(.id) \(.created_at)"' |
+          while read -r id created; do
+            if [ "$(date -u -d "$created" +%s)" -lt "$cutoff" ]; then
+              echo "delete artifact $id ($created)"
+              gh api -X DELETE "repos/$REPO/actions/artifacts/$id" || true
+            fi
+          done
+
+      - name: Șterge rulările de workflow mai vechi de 14 zile
+        run: |
+          cutoff=$(date -u -d '14 days ago' +%s)
+          gh api --paginate "repos/$REPO/actions/runs?per_page=100" \
+            --jq '.workflow_runs[] | select(.status == "completed") | "\(.id) \(.created_at)"' |
+          while read -r id created; do
+            if [ "$(date -u -d "$created" +%s)" -lt "$cutoff" ]; then
+              echo "delete run $id ($created)"
+              gh api -X DELETE "repos/$REPO/actions/runs/$id" || true
+            fi
+          done
+
+      - name: Șterge cache-urile Actions nefolosite de 7 zile
+        run: |
+          cutoff=$(date -u -d '7 days ago' +%s)
+          gh api --paginate "repos/$REPO/actions/caches?per_page=100" \
+            --jq '.actions_caches[] | "\(.id) \(.last_accessed_at)"' |
+          while read -r id used; do
+            if [ "$(date -u -d "$used" +%s)" -lt "$cutoff" ]; then
+              echo "delete cache $id ($used)"
+              gh api -X DELETE "repos/$REPO/actions/caches/$id" || true
+            fi
+          done
