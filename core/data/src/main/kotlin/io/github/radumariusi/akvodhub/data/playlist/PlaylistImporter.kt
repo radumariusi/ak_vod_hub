@@ -301,7 +301,7 @@ class PlaylistImporter(
         fun count(kind: VodKind) = counts[kind.ordinal]
 
         suspend fun add(entry: RawEntryEntity) {
-            buffer[entry.providerKey] = entry
+            buffer[entry.providerKey] = entry.parsed()
             if (buffer.size >= BATCH_SIZE) flush()
         }
 
