@@ -7,6 +7,7 @@ import io.github.radumariusi.akvodhub.data.catalog.HubRepository
 import io.github.radumariusi.akvodhub.data.db.TitleCard
 import io.github.radumariusi.akvodhub.data.discover.DiscoverRepository
 import io.github.radumariusi.akvodhub.data.discover.DiscoverRow
+import io.github.radumariusi.akvodhub.parser.catalog.CatalogCursor
 import io.github.radumariusi.akvodhub.parser.catalog.CatalogFilter
 import io.github.radumariusi.akvodhub.parser.catalog.CatalogSort
 import io.github.radumariusi.akvodhub.parser.catalog.Genres
@@ -34,6 +35,7 @@ data class HomeRow(
     val filter: CatalogFilter?,
     val endReached: Boolean,
     val newsCursor: NewsCursor? = null,
+    val catalogCursor: CatalogCursor? = null,
 )
 
 data class HomeState(
@@ -113,8 +115,10 @@ class HomeViewModel
                 for ((key, title, filter) in specs) {
                     // Păstrăm câte titluri erau deja încărcate, ca rândul să nu „sară” sub focus.
                     val size = maxOf(PAGE, keep[key] ?: 0)
-                    val items = repository.page(filter, size, 0)
-                    if (items.isNotEmpty()) rows += HomeRow(key, title, items, filter, items.size < size)
+                    val page = repository.page(filter, size)
+                    if (page.items.isNotEmpty()) {
+                        rows += HomeRow(key, title, page.items, filter, page.next == null, catalogCursor = page.next)
+                    }
                 }
                 base = rows
                 loaded = true
@@ -215,17 +219,19 @@ class HomeViewModel
             viewModelScope.launch {
                 try {
                     val newsPage = if (news) repository.newsPage(key == EPISODES, row.newsCursor, PAGE) else null
-                    val more = newsPage?.items ?: repository.page(filter!!, PAGE, row.items.size)
+                    val catalogPage = filter?.let { repository.page(it, PAGE, checkNotNull(row.catalogCursor)) }
+                    val more = newsPage?.items ?: checkNotNull(catalogPage).items
                     base =
                         base.map {
-                            if (it.key != key) {
+                            if (it !== row) {
                                 it
                             } else {
                                 val known = it.items.mapTo(HashSet()) { c -> c.id }
                                 it.copy(
                                     items = it.items + more.filter { c -> c.id !in known },
-                                    endReached = newsPage?.endReached ?: (more.size < PAGE),
-                                    newsCursor = newsPage?.cursor ?: it.newsCursor,
+                                    endReached = newsPage?.endReached ?: (catalogPage?.next == null),
+                                    newsCursor = newsPage?.cursor,
+                                    catalogCursor = catalogPage?.next,
                                 )
                             }
                         }

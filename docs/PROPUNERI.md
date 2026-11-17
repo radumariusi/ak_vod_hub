@@ -117,10 +117,10 @@ APK 🟢, viteză 🟢. E doar reorganizare de ecrane.
 
 | # | Ce | Efect |
 |---|----|-------|
-| 14.1 | **Derulare rapidă în grile mari** (paginare după cheie în loc de `OFFSET`): la 90k filme, paginile din fund se încarcă la fel de repede ca primele | 🟢 vizibil la „Toate filmele” |
-| 14.2 | **Postere cu memorie pe jumătate** (format RGB565, plafon la cache-ul de imagini pe disc) | 🟢 mai puțin RAM pe TV |
-| 14.3 | **Baseline Profile** (pornire și derulare mai fluide) | 🟡 ~50–100 KB; cere un emulator în CI, deci build mai lung o dată |
-| 14.4 | **APK pe arhitectură** (doar ARM pentru TV) | 🟡 7,5 MB → ~4–5 MB; updater-ul trebuie să aleagă APK-ul potrivit. Câștig mic, nu e prioritar |
+| 14.1 | **Paginare după cheie** pentru grile și rânduri de catalog | Implementată. Validarea Android este în așteptare. |
+| 14.2 | **RGB565 pentru postere JPEG TMDB și plafon Coil de 64 MiB** | Implementate. Consumul de memorie și aspectul pe TV rămân de verificat. |
+| 14.3 | **Baseline Profile pentru pornire și grilă** | Generatorul și verificarea sunt configurate. Profilul trebuie generat și validat în CI. |
+| 14.4 | **APK universal și APK pe arhitectură** | Selecția și verificările de release sunt configurate. APK-urile semnate rămân de construit și verificat. |
 
 ---
 
@@ -148,4 +148,4 @@ Detalii în `docs/PLAN.md` → „Idei suplimentare”.
 4. **Etapa 13** (setări noi, adună opțiunile din 10–12).
 5. **Etapa 14** oricând, e mică.
 
-Toate etapele 10–14 împreună: **0 biblioteci noi**, APK estimat +0,3–0,6 MB, bază de date +5–8 MB.
+Estimările inițiale ale etapelor 10–14 preced implementarea. Etapa 14 include AndroidX ProfileInstaller pentru instalarea profilului la distribuția prin GitHub Releases. Dimensiunea APK rămâne de măsurat după build.

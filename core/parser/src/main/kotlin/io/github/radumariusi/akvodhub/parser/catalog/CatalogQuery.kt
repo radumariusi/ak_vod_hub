@@ -66,13 +66,26 @@ data class SqlQuery(
     val args: List<Any>,
 )
 
+/** Segmentele urmăresc ordinea SQLite, inclusiv valorile NULL și prioritatea prefixului în căutare. */
+enum class CatalogPageSection(val prefixMatch: Boolean?, val nullValues: Boolean) {
+    VALUES(null, false),
+    NULLS(null, true),
+    PREFIX_VALUES(true, false),
+    PREFIX_NULLS(true, true),
+    OTHER_VALUES(false, false),
+    OTHER_NULLS(false, true),
+}
+
+/** Valoarea exactă din SQLite, cu ID drept departajare unică. */
+data class CatalogCursor(val section: CatalogPageSection, val value: Any?, val id: Long)
+
 /**
  * Construiește interogările pentru listele din hub (rânduri pe Acasă, grilele Filme / Seriale, Căutare).
  *
  * Coloanele folosite din `title` sunt rezumate precalculate de indexarea catalogului (`sourceCount`, `addedAt`,
  * `bestQuality`, `qualities`, `audioLanguages`), deci nu e nevoie de JOIN cu cele ~100.000 de intrări din
  * playlist. Ordinea „populare”, „recente”, „apreciate” și „alfabetic” folosește indexuri, iar paginarea e
- * cu LIMIT/OFFSET. Căutarea folosește tabelul FTS `title_search` (titlu, titlu original, nume din playlist).
+ * după cheia de sortare și ID. Căutarea folosește tabelul FTS `title_search` (titlu, titlu original, nume din playlist).
  */
 object CatalogQuery {
     const val COLUMNS =
@@ -86,7 +99,8 @@ object CatalogQuery {
     fun page(
         filter: CatalogFilter,
         limit: Int,
-        offset: Int,
+        section: CatalogPageSection = sections(filter).first(),
+        after: CatalogCursor? = null,
     ): SqlQuery {
         val where = mutableListOf("t.sourceCount > 0")
         val args = mutableListOf<Any>()
@@ -131,37 +145,66 @@ object CatalogQuery {
             where += "t.voteCount >= ?"
             args += MIN_VOTES_FOR_RATING
         }
+        section.prefixMatch?.let {
+            where += if (it) "t.name LIKE ?" else "t.name NOT LIKE ?"
+            args += "${filter.text.trim()}%"
+        }
+
+        val column =
+            when (filter.sort) {
+                CatalogSort.POPULAR -> "t.popularity"
+                CatalogSort.RECENT -> "t.addedAt"
+                CatalogSort.RATING -> "t.rating"
+                CatalogSort.TITLE -> "t.name"
+            }
+        val alphabetical = filter.sort == CatalogSort.TITLE
+        if (!alphabetical) where += if (section.nullValues) "$column IS NULL" else "$column IS NOT NULL"
+        if (after != null) {
+            when {
+                section.nullValues -> where += "t.id < ?"
+                alphabetical -> where += "$column >= ? AND ($column > ? OR t.id > ?)"
+                else -> where += "$column <= ? AND ($column < ? OR t.id < ?)"
+            }
+            if (!section.nullValues) {
+                val value = requireNotNull(after.value)
+                args += value
+                args += value
+            }
+            args += after.id
+        }
+
         val order =
             when {
-                // La căutare: întâi titlurile care încep exact cu textul, apoi cele populare.
-                fts != null && filter.sort == CatalogSort.POPULAR -> {
-                    args += "${filter.text.trim()}%"
-                    "(t.name LIKE ?) DESC, t.popularity DESC, t.id DESC"
-                }
-
-                filter.sort == CatalogSort.POPULAR -> {
-                    "t.popularity DESC, t.id DESC"
-                }
-
-                filter.sort == CatalogSort.RECENT -> {
-                    "t.addedAt DESC, t.id DESC"
-                }
-
-                filter.sort == CatalogSort.RATING -> {
-                    "t.rating DESC, t.id DESC"
-                }
-
-                else -> {
-                    "t.name, t.id"
-                }
+                alphabetical -> "$column, t.id"
+                else -> "$column DESC, t.id DESC"
             }
         args += limit
-        args += offset
         return SqlQuery(
-            "SELECT $COLUMNS FROM title t WHERE ${where.joinToString(" AND ")} ORDER BY $order LIMIT ? OFFSET ?",
+            "SELECT $COLUMNS, t.popularity, t.addedAt FROM title t " +
+                "WHERE ${where.joinToString(" AND ")} ORDER BY $order LIMIT ?",
             args,
         )
     }
+
+    fun sections(filter: CatalogFilter): List<CatalogPageSection> =
+        when {
+            filter.sort == CatalogSort.TITLE -> {
+                listOf(CatalogPageSection.VALUES)
+            }
+
+            filter.sort == CatalogSort.POPULAR && ftsQuery(filter.text) != null -> {
+                listOf(
+                    CatalogPageSection.PREFIX_VALUES,
+                    CatalogPageSection.PREFIX_NULLS,
+                    CatalogPageSection.OTHER_VALUES,
+                    CatalogPageSection.OTHER_NULLS,
+                )
+            }
+
+            else -> {
+                listOf(CatalogPageSection.VALUES, CatalogPageSection.NULLS)
+            }
+        }
 
     private val marks = Regex("""\p{M}+""")
     private val separators = Regex("""[^\p{L}\p{N}]+""")

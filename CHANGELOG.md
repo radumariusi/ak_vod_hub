@@ -5,6 +5,11 @@
 - Comenzi compacte, un singur play/pauză la OK pe bară, subtitrări interne și externe și meniuri întunecate.
 - Calitatea și limba necunoscute au etichete distincte. Limbile declarate se completează în fundal, cu Room v14.
 
+## 2026-11-18 — Etapa 14
+- Rândurile și grilele catalogului folosesc paginare după cheie. Cache-ul Coil are plafon de 64 MiB și poate decoda posterele JPEG TMDB în RGB565.
+- Updaterul selectează APK-ul compatibil cu procesorul și păstrează compatibilitatea cu updaterul vechi prin APK-ul universal.
+- Profilele AndroidX de pornire și de derulare provin din rularea pe Android 11 și includ regulile aplicației.
+
 ## 2026-11-17 — Etapa 13
 - Setări în două panouri, opt categorii, telecomandă și touch; valori curente și explicații în română.
 - Preferințe noi funcționale cu backup, statistici SQL în fundal și golire cache imagini. Room v14 neschimbat.

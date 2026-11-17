@@ -1,5 +1,6 @@
 package io.github.radumariusi.akvodhub.data.update
 
+import io.github.radumariusi.akvodhub.parser.update.UpdateApk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -29,6 +30,7 @@ sealed interface UpdateCheckResult {
 class UpdateChecker(
     private val client: OkHttpClient,
     private val repo: String,
+    private val supportedAbis: List<String>,
     private val json: Json = defaultJson,
 ) {
     suspend fun check(currentVersion: String): UpdateCheckResult =
@@ -67,7 +69,9 @@ class UpdateChecker(
         releaseJson: String,
         currentVersion: String,
     ): UpdateCheckResult {
-        val update = parseRelease(releaseJson, json) ?: return UpdateCheckResult.Failed("Release-ul nu conține un APK.")
+        val update =
+            parseRelease(releaseJson, supportedAbis, json)
+                ?: return UpdateCheckResult.Failed("Release-ul nu conține un APK compatibil.")
         return if (AppVersion.isNewer(update.version, currentVersion)) {
             UpdateCheckResult.Available(update)
         } else {
@@ -116,13 +120,17 @@ class UpdateChecker(
 
         fun parseRelease(
             releaseJson: String,
+            supportedAbis: List<String>,
             json: Json = defaultJson,
         ): AppUpdate? {
             val release = json.decodeFromString(GithubRelease.serializer(), releaseJson)
             if (release.draft || release.prerelease) return null
-            val apk = release.assets.firstOrNull { it.name.endsWith(".apk", ignoreCase = true) } ?: return null
+            val version = release.tagName.removePrefix("v")
+            val assets = release.assets.associateBy { it.name }
+            val name = UpdateApk.select(version, supportedAbis, assets.keys) ?: return null
+            val apk = assets.getValue(name)
             return AppUpdate(
-                version = release.tagName.removePrefix("v"),
+                version = version,
                 notes = release.body.orEmpty().trim(),
                 apkUrl = apk.downloadUrl,
                 apkSize = apk.size,

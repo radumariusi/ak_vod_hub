@@ -2,6 +2,7 @@ import java.util.Base64
 
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.baseline.profile)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
@@ -10,6 +11,10 @@ plugins {
 // Versiunea: CI trimite -Pakvod.versionCode=<număr build>; local rămâne 1 / "-dev".
 val versionBase = providers.gradleProperty("akvod.versionBase").getOrElse("0.1")
 val ciVersionCode = providers.gradleProperty("akvod.versionCode").orNull?.toIntOrNull()
+val supportedAbis = listOf("armeabi-v7a", "arm64-v8a", "x86_64")
+val releaseAbi = providers.gradleProperty("akvod.releaseAbi").orNull
+require(releaseAbi == null || releaseAbi in supportedAbis) { "Arhitectură APK necunoscută: $releaseAbi" }
+
 val updateRepo = providers.gradleProperty("akvod.updateRepo").getOrElse("radumariusi/ak_vod_hub")
 
 // Semnare: secretul AK_SIGNING_KEY are forma "<parolă>:<keystore PKCS12 în base64>". Doar în CI.
@@ -36,12 +41,13 @@ android {
         versionName = if (ciVersionCode != null) "$versionBase.$ciVersionCode" else "$versionBase.0-dev"
 
         buildConfigField("String", "UPDATE_REPO", "\"$updateRepo\"")
+        buildConfigField("boolean", "CHECK_UPDATES_ON_STARTUP", "true")
         // Căutarea globală: autoritatea providerului trebuie scrisă și în res/xml/searchable.xml.
         resValue("string", "search_authority", "io.github.radumariusi.akvodhub.search")
 
         // FFmpeg are biblioteci native: doar procesoarele ARM ale TV-urilor (+ x86_64 pentru emulator).
         ndk {
-            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64")
+            abiFilters += releaseAbi?.let(::listOf) ?: supportedAbis
         }
     }
 
@@ -106,7 +112,29 @@ android {
     }
 }
 
+// AndroidX copiază manifestul release când creează varianta de profilare.
+androidComponents {
+    finalizeDsl { extension ->
+        extension.buildTypes
+            .getByName("nonMinifiedRelease")
+            .buildConfigField("boolean", "CHECK_UPDATES_ON_STARTUP", "false")
+        extension.sourceSets
+            .getByName("nonMinifiedRelease")
+            .manifest
+            .srcFile("src/nonMinifiedRelease/AndroidManifest.xml")
+    }
+}
+
+baselineProfile {
+    mergeIntoMain = true
+    automaticGenerationDuringBuild = false
+    filter { include("io.github.radumariusi.akvodhub.**") }
+}
+
 dependencies {
+    baselineProfile(project(":baselineprofile"))
+    implementation(libs.androidx.profileinstaller)
+
     implementation(project(":core:data"))
     implementation(project(":core:player"))
 

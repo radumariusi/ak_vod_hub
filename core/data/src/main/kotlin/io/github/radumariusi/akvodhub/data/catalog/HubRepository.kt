@@ -19,8 +19,10 @@ import io.github.radumariusi.akvodhub.data.playlist.xtream.XtreamClient
 import io.github.radumariusi.akvodhub.data.tmdb.TmdbClient
 import io.github.radumariusi.akvodhub.data.tmdb.TmdbSettings
 import io.github.radumariusi.akvodhub.parser.VodKind
+import io.github.radumariusi.akvodhub.parser.catalog.CatalogCursor
 import io.github.radumariusi.akvodhub.parser.catalog.CatalogFilter
 import io.github.radumariusi.akvodhub.parser.catalog.CatalogQuery
+import io.github.radumariusi.akvodhub.parser.catalog.CatalogSort
 import io.github.radumariusi.akvodhub.parser.catalog.EpisodeEntry
 import io.github.radumariusi.akvodhub.parser.catalog.EpisodeMerge
 import io.github.radumariusi.akvodhub.parser.catalog.Genres
@@ -80,6 +82,8 @@ data class TitleDetails(
     val sources: Map<Long, SourceDetails>,
     val genres: List<String>,
 )
+
+data class CatalogPage(val items: List<TitleCard>, val next: CatalogCursor?)
 
 data class NewsPage(val items: List<TitleCard>, val cursor: NewsCursor?, val endReached: Boolean)
 
@@ -253,10 +257,28 @@ class HubRepository(
     suspend fun page(
         filter: CatalogFilter,
         limit: Int,
-        offset: Int,
-    ): List<TitleCard> {
-        val q = CatalogQuery.page(filter, limit, offset)
-        return dao.cards(SimpleSQLiteQuery(q.sql, q.args.toTypedArray()))
+        after: CatalogCursor? = null,
+    ): CatalogPage {
+        val sections = CatalogQuery.sections(filter)
+        val items = ArrayList<TitleCard>(limit)
+        for (section in sections.dropWhile { after != null && it != after.section }) {
+            val cursor = after?.takeIf { it.section == section }
+            val query = CatalogQuery.page(filter, limit - items.size, section, cursor)
+            val rows = dao.catalogCards(SimpleSQLiteQuery(query.sql, query.args.toTypedArray()))
+            rows.mapTo(items) { it.card }
+            if (items.size == limit) {
+                val last = rows.last()
+                val value =
+                    when (filter.sort) {
+                        CatalogSort.POPULAR -> last.popularity
+                        CatalogSort.RECENT -> last.addedAt
+                        CatalogSort.RATING -> last.card.rating
+                        CatalogSort.TITLE -> last.card.name
+                    }
+                return CatalogPage(items, CatalogCursor(section, value, last.card.id))
+            }
+        }
+        return CatalogPage(items, null)
     }
 
     suspend fun newsPage(episodes: Boolean, after: NewsCursor?, limit: Int): NewsPage {

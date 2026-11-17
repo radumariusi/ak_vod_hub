@@ -8,6 +8,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class UpdateCheckerTest {
+    private val abis = listOf("arm64-v8a", "armeabi-v7a")
+
     private val releaseJson =
         """
         {
@@ -37,7 +39,7 @@ class UpdateCheckerTest {
 
     @Test
     fun parsesReleaseAndPicksApk() {
-        val update = UpdateChecker.parseRelease(releaseJson)!!
+        val update = UpdateChecker.parseRelease(releaseJson, abis)!!
         assertEquals("0.1.12", update.version)
         assertEquals("https://example.com/app.apk", update.apkUrl)
         assertEquals(12345L, update.apkSize)
@@ -46,12 +48,12 @@ class UpdateCheckerTest {
 
     @Test
     fun releaseWithoutApkIsIgnored() {
-        assertNull(UpdateChecker.parseRelease("""{"tag_name": "v1.0.0", "assets": []}"""))
+        assertNull(UpdateChecker.parseRelease("""{"tag_name": "v1.0.0", "assets": []}""", abis))
     }
 
     @Test
     fun evaluateOffersOnlyNewerVersions() {
-        val checker = UpdateChecker(OkHttpClient(), "owner/repo")
+        val checker = UpdateChecker(OkHttpClient(), "owner/repo", abis)
         assertTrue(checker.evaluate(releaseJson, "0.1.5") is UpdateCheckResult.Available)
         assertEquals(UpdateCheckResult.UpToDate, checker.evaluate(releaseJson, "0.1.12"))
     }
