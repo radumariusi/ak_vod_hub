@@ -67,6 +67,19 @@ class PlaybackSettings(
         ).filter { it.length == 2 }
             .distinct()
 
+    fun seriesTrack(key: String, type: String): String? = prefs.getString("series.$key.$type", null)
+
+    fun setSeriesTrack(key: String, type: String, value: String) {
+        val name = "series.$key.$type"
+        if (io.github.radumariusi.akvodhub.parser.player.SeriesPlayback.validSetting(name, value)) {
+            prefs.edit().putString(name, value).apply()
+        }
+    }
+
+    fun clearSeriesTracks(key: String) {
+        prefs.edit().remove("series.$key.audio").remove("series.$key.text").apply()
+    }
+
     fun seriesIntro(key: String): Long = prefs.getString("series.$key.intro", null)?.toLongOrNull() ?: 0L
 
     fun setSeriesIntro(key: String, endMs: Long) {

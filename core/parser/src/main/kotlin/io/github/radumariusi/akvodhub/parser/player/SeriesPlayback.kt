@@ -21,7 +21,13 @@ object SeriesPlayback {
     fun canSkip(positionMs: Long, durationMs: Long, endMs: Long): Boolean =
         validIntro(endMs, durationMs) && positionMs in 0 until endMs
 
-    fun validSetting(key: String, value: String): Boolean =
-        key.matches(Regex("series\.(tmdb_[1-9][0-9]*|local_[0-9a-f]{64})\.intro")) &&
-            value.toLongOrNull()?.let { it in 1_000..MAX_INTRO_MS } == true
+    fun validSetting(key: String, value: String): Boolean {
+        val match = Regex("series[.](tmdb_[1-9][0-9]*|local_[0-9a-f]{64})[.](intro|audio|text)").matchEntire(key) ?: return false
+        return when (match.groupValues[2]) {
+            "intro" -> value.toLongOrNull()?.let { it in 1_000..MAX_INTRO_MS } == true
+            "audio" -> value.matches(Regex("[a-z]{2}"))
+            "text" -> value == "off" || value.matches(Regex("(embedded|addon):[a-z]{2}"))
+            else -> false
+        }
+    }
 }

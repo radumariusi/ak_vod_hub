@@ -404,6 +404,7 @@ private fun Controls(
                 }
             }
             if (state.isSeries) {
+                OutlinedButton(onClick = viewModel::resetSeriesTracks) { Text("Resetează audio/subtitrare serial") }
                 if (SeriesPlayback.canSkip(position, duration, state.introEndMs)) {
                     OutlinedButton(onClick = viewModel::skipIntro) { Text("Sari intro") }
                 }

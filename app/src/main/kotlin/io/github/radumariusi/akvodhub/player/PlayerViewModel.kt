@@ -338,6 +338,7 @@ class PlayerViewModel
             started = false
             retriedSame = false
             embeddedTextLanguages = null
+            player.trackSelectionParameters = PlayerFactory.apply(player.trackSelectionParameters, trackPreferences())
             startPosition = positionMs
             mutableState.update {
                 it.copy(loading = true, sourceLabel = currentLabel(), sources = sourceOptions(), audio = emptyList())
@@ -430,10 +431,27 @@ class PlayerViewModel
                 subtitleDecided = true
                 clearExternal()
             }
+            val language = SubtitleLanguages.toIso1(option.group.getFormat(option.index).language)
+            if (language != null) {
+                seriesKey()?.let { key ->
+                    settings.setSeriesTrack(key, if (option.type == C.TRACK_TYPE_AUDIO) "audio" else "text",
+                        if (option.type == C.TRACK_TYPE_AUDIO) language else "embedded:$language")
+                }
+            }
             TrackOptions.select(player, option)
         }
 
+        fun resetSeriesTracks() {
+            seriesKey()?.let(settings::clearSeriesTracks)
+            clearExternal()
+            player.trackSelectionParameters = PlayerFactory.apply(player.trackSelectionParameters, trackPreferences())
+            subtitleDecided = false
+            autoPickSubtitle()
+            showNotice("Preferințele globale se aplică din nou acestui serial.")
+        }
+
         fun disableSubtitles() {
+            seriesKey()?.let { settings.setSeriesTrack(it, "text", "off") }
             subtitleDecided = true
             clearExternal()
             TrackOptions.disableSubtitles(player)
@@ -519,6 +537,30 @@ class PlayerViewModel
             val embedded = embeddedTextLanguages ?: return
             val found = addonResults ?: return
             subtitleDecided = true
+            val remembered = seriesKey()?.let { settings.seriesTrack(it, "text") }
+            if (remembered == "off") {
+                clearExternal()
+                TrackOptions.disableSubtitles(player)
+                return
+            }
+            val language = remembered?.substringAfter(':')
+            if (remembered?.startsWith("embedded:") == true) {
+                val track = state.value.subtitles.firstOrNull {
+                    it.supported && SubtitleLanguages.toIso1(it.group.getFormat(it.index).language) == language
+                }
+                if (track != null) {
+                    clearExternal()
+                    TrackOptions.select(player, track)
+                    return
+                }
+            }
+            if (language != null) {
+                val pick = found.firstOrNull { it.language == language }
+                if (pick != null) {
+                    loadAddonSubtitle(pick, automatic = true)
+                    return
+                }
+            }
             val prefs = settings.state.value
             if (!prefs.addonSubtitlesAuto) return
             val pick = SubtitleChoice.autoPick(embedded, found, prefs.subtitleLanguages) ?: return
@@ -528,6 +570,9 @@ class PlayerViewModel
         /** Utilizatorul alege o subtitrare din addon-uri în meniu. */
         fun selectAddonSubtitle(option: AddonSubtitleOption) {
             subtitleDecided = true
+            option.subtitle.language?.let { language ->
+                seriesKey()?.let { settings.setSeriesTrack(it, "text", "addon:$language") }
+            }
             loadAddonSubtitle(option.subtitle, automatic = false)
         }
 
@@ -578,11 +623,17 @@ class PlayerViewModel
 
         fun setSubtitleStyle(style: SubtitleStyle) = settings.setSubtitleStyle(style)
 
-        private fun trackPreferences() =
-            TrackPreferences(
-                settings.preferredLanguages(title?.originalLanguage),
-                settings.state.value.subtitleLanguages,
+        private fun trackPreferences(): TrackPreferences {
+            val key = seriesKey()
+            val audio = key?.let { settings.seriesTrack(it, "audio") }
+            val text = key?.let { settings.seriesTrack(it, "text") }
+            return TrackPreferences(
+                listOfNotNull(audio) + settings.preferredLanguages(title?.originalLanguage),
+                if (text == "off") emptyList() else {
+                    listOfNotNull(text?.substringAfter(':')) + settings.state.value.subtitleLanguages
+                },
             )
+        }
 
         /** „Română 1 · OpenSubtitles v3”, „Română 2 · …”, „Engleză 1 · …”. */
         private fun addonLabels(list: List<AddonSubtitle>): List<AddonSubtitleOption> {

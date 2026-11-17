@@ -97,6 +97,7 @@ object PlayerFactory {
         val builder =
             params
                 .buildUpon()
+                .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
                 .setPreferredAudioLanguages(*preferences.audioLanguages.toTypedArray())
         val subtitles = preferences.subtitleLanguages
         if (subtitles.isNotEmpty()) {

@@ -14,5 +14,10 @@ class SeriesPlaybackTest {
         assertTrue(SeriesPlayback.validSetting("series.tmdb_42.intro", "90000"))
         assertFalse(SeriesPlayback.validSetting("series.tmdb_42.intro", "-1"))
         assertFalse(SeriesPlayback.validSetting("arbitrary", "90000"))
+        assertTrue(SeriesPlayback.validSetting("series.tmdb_42.text", "off"))
+        assertTrue(SeriesPlayback.validSetting("series.tmdb_42.text", "addon:ro"))
+        assertTrue(SeriesPlayback.validSetting("series.tmdb_42.audio", "en"))
+        assertFalse(SeriesPlayback.validSetting("series.tmdb_42.text", "https://secret"))
+        assertFalse(SeriesPlayback.validSetting("series.tmdb_42.audio", "999"))
     }
 }
