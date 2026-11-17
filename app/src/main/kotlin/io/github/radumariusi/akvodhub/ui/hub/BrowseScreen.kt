@@ -33,6 +33,7 @@ import io.github.radumariusi.akvodhub.hub.Browser
 import io.github.radumariusi.akvodhub.parser.catalog.CatalogFilter
 import io.github.radumariusi.akvodhub.parser.catalog.CatalogSort
 import io.github.radumariusi.akvodhub.parser.catalog.Genres
+import io.github.radumariusi.akvodhub.parser.catalog.ProductionFilter
 import io.github.radumariusi.akvodhub.parser.catalog.YearRange
 import io.github.radumariusi.akvodhub.parser.match.MediaType
 import io.github.radumariusi.akvodhub.parser.match.SourceGrouping
@@ -224,6 +225,16 @@ private fun FilterBar(
                 )
             })
         }
+        item("production") {
+            FilterButton("Origine", filter.production.takeIf { it != ProductionFilter.ALL }?.label, onClick = {
+                val options = ProductionFilter.entries
+                onChoose(
+                    Choice("Origine", options.map { it.label }, options.indexOf(filter.production)) { index ->
+                        onChange(filter.copy(production = options[index]))
+                    },
+                )
+            })
+        }
         item("original") {
             FilterButton(
                 "Doar în limba originală",
@@ -252,6 +263,7 @@ private fun FilterBar(
                             quality = null,
                             language = null,
                             originalAudioOnly = false,
+                            production = ProductionFilter.ALL,
                         ),
                     )
                 }) { Text("Șterge filtrele") }

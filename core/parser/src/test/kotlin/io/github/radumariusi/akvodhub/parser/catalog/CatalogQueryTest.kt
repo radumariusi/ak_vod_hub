@@ -10,6 +10,33 @@ import org.junit.Test
 
 class CatalogQueryTest {
     @Test
+    fun usProductionUsesOriginCountryAndNeverInfersCountryFromEnglish() {
+        val query = CatalogQuery.page(CatalogFilter(production = ProductionFilter.US), 48, 0)
+        assertTrue(query.sql.contains("t.originCountries LIKE ?"))
+        assertFalse(query.sql.contains("t.originalLanguage ="))
+        assertEquals(listOf<Any>("%,US,%", 48, 0), query.args)
+    }
+
+    @Test
+    fun englishOriginalIsIndependentOfProductionCountryAndAudioFilter() {
+        val filter = CatalogFilter(production = ProductionFilter.ENGLISH, language = "ro", originalAudioOnly = true)
+        val query = CatalogQuery.page(filter, 48, 0)
+        assertTrue(query.sql.contains("t.originalLanguage = ?"))
+        assertTrue(query.sql.contains("t.hasOriginalAudio = 1"))
+        assertFalse(query.sql.contains("t.originCountries LIKE"))
+        assertEquals(listOf<Any>("%,ro,%", "en", 48, 0), query.args)
+    }
+
+    @Test
+    fun productionFilterCanBeResetAndCountsAsAnActiveFilter() {
+        val filter = CatalogFilter(production = ProductionFilter.US)
+        assertTrue(filter.hasFilters)
+        val reset = filter.copy(production = ProductionFilter.ALL)
+        assertFalse(reset.hasFilters)
+        assertFalse(CatalogQuery.page(reset, 48, 0).sql.contains("t.originCountries LIKE"))
+    }
+
+    @Test
     fun originalAudioFilterReadsStoredFlagWithoutJoiningSources() {
         val filter = CatalogFilter(originalAudioOnly = true)
         val query = CatalogQuery.page(filter, 48, 0)

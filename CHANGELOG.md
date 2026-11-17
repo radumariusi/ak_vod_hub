@@ -2,6 +2,9 @@
 
 Intrări noi sus. Una scurtă pentru fiecare PR (dată, etapă, ce s-a schimbat).
 
+## 2026-11-17: etapa 10.3 — filtre de origine
+- Filtre separate „Producții SUA” și „Limba originală engleză”, din metadatele TMDB salvate; fără cereri pe postere sau schimbări de schemă.
+
 ## 2026-11-17: etapa 10.4 — completare TMDB în fundal
 - Completare reluabilă pentru IMDb ID, durată, certificare, țări de origine și tagline; migrare Room 7→8, fără reimport.
 - Loturi paginate după ID și progres salvat; pauză în timpul redării, fără biblioteci sau worker nou.
