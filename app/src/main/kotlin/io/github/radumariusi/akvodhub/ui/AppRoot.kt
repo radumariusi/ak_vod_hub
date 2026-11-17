@@ -8,11 +8,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -21,14 +21,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.NavigationDrawer
 import androidx.tv.material3.Text
 import io.github.radumariusi.akvodhub.R
 import io.github.radumariusi.akvodhub.catalog.TmdbViewModel
@@ -45,7 +46,8 @@ import io.github.radumariusi.akvodhub.ui.hub.ActorScreen
 import io.github.radumariusi.akvodhub.ui.hub.BrowseScreen
 import io.github.radumariusi.akvodhub.ui.hub.DetailsScreen
 import io.github.radumariusi.akvodhub.ui.hub.HomeScreen
-import io.github.radumariusi.akvodhub.ui.touch.NavigationDrawerItem
+import io.github.radumariusi.akvodhub.ui.hub.Message
+import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
 import io.github.radumariusi.akvodhub.update.UpdateViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -57,7 +59,8 @@ enum class Destination(
     HOME("Acasă", R.drawable.ic_home),
     MOVIES("Filme", R.drawable.ic_movie),
     SERIES("Seriale", R.drawable.ic_tv),
-    SEARCH("Căutare", R.drawable.ic_search),
+    WATCHLIST("Lista mea", R.drawable.ic_movie),
+    SEARCH("Caută", R.drawable.ic_search),
     SETTINGS("Setări", R.drawable.ic_settings),
 }
 
@@ -72,7 +75,7 @@ class HubViewModels(
 )
 
 /**
- * Navigarea: meniul lateral (Acasă, Filme, Seriale, Căutare, Setări) și pagina de detalii peste tot ecranul.
+ * Navigarea: filele de sus (Acasă, Filme, Seriale, Lista mea, Caută, Setări) și pagina de detalii peste tot ecranul.
  * La „Înapoi” din detalii, ecranul de dinainte revine cu aceeași derulare, iar focusul pe cardul deschis.
  */
 @Composable
@@ -184,30 +187,26 @@ fun AppRoot(
     } else {
         BackHandler(enabled = current != Destination.HOME) { current = Destination.HOME }
         states.SaveableStateProvider("main") {
-            NavigationDrawer(
-                modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
-                drawerContent = {
-                    Column(
-                        modifier = Modifier.fillMaxHeight().padding(12.dp),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.Start,
-                    ) {
-                        Destination.entries.forEach { destination ->
-                            NavigationDrawerItem(
-                                selected = current == destination,
-                                onClick = { current = destination },
-                                leadingContent = {
-                                    Icon(painter = painterResource(destination.icon), contentDescription = null)
-                                },
-                            ) {
-                                Text(destination.label)
+            Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(horizontal = 32.dp, vertical = 12.dp),
+                ) {
+                    items(Destination.entries, key = { it.name }) { destination ->
+                        val tabModifier =
+                            Modifier.semantics {
+                                selected = current == destination
+                                role = Role.Tab
                             }
-                            Spacer(Modifier.height(4.dp))
+                        OutlinedButton(onClick = { current = destination }, modifier = tabModifier) {
+                            Text(
+                                destination.label,
+                                textDecoration = if (current == destination) TextDecoration.Underline else null,
+                            )
                         }
                     }
-                },
-            ) {
-                Box(Modifier.fillMaxSize().padding(start = 24.dp, top = 28.dp, end = 32.dp, bottom = 8.dp)) {
+                }
+                Box(Modifier.weight(1f).padding(start = 32.dp, top = 8.dp, end = 32.dp, bottom = 8.dp)) {
                     // Fiecare ecran își păstrează derularea când treci prin meniu sau prin detalii.
                     states.SaveableStateProvider(current.name) {
                         when (current) {
@@ -246,6 +245,10 @@ fun AppRoot(
                                     restoreKey,
                                     onRestored,
                                 )
+                            }
+
+                            Destination.WATCHLIST -> {
+                                Message("Lista mea este goală.")
                             }
 
                             Destination.SEARCH -> {

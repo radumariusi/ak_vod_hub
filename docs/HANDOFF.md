@@ -185,3 +185,6 @@ fără force-push, fără ștergere de tag-uri/release-uri/branch-uri, intrare s
 
 ### Etapa 12.2
 Logo-uri TMDB cerute numai pentru hero stabil și fișă. Cache `logo:<tip>:<tmdbId>` în `discover_cache`, 30 zile inclusiv absența, plafon 128. Fără migrare; offline folosește cache-ul vechi sau text. Alegere RO → EN → neutru → original, testată în parser.
+
+### Etapa 12.3
+AppRoot folosește file orizontale sus, cu wrapper-ele touch și stare selectată accesibilă. Păstrează SaveableStateProvider, stiva fișelor și restaurarea cardului. Destinația Lista mea este pregătită pentru 12.4.
