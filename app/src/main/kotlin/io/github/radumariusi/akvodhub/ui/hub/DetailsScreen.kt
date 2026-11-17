@@ -43,10 +43,12 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ExperimentalTvMaterial3Api
+import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
@@ -294,8 +296,8 @@ private fun DetailsContent(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Distribuție", style = MaterialTheme.typography.titleMedium)
                     LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(20.dp),
+                        contentPadding = PaddingValues(12.dp),
                     ) {
                         items(cast) { person ->
                             Surface(onClick = {
@@ -306,7 +308,7 @@ private fun DetailsContent(
                                 }
                             }, modifier = Modifier.width(132.dp)) {
                                 Column(
-                                    Modifier.padding(10.dp),
+                                    Modifier.fillMaxWidth().padding(10.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.spacedBy(4.dp),
                                 ) {
@@ -323,18 +325,22 @@ private fun DetailsContent(
                                     Text(
                                         person.name,
                                         style = MaterialTheme.typography.labelLarge,
-                                        maxLines = 1,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        minLines = 2,
+                                        maxLines = 2,
                                         overflow = TextOverflow.Ellipsis,
                                     )
-                                    person.role?.let {
-                                        Text(
-                                            it,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                    }
+                                    Text(
+                                        person.role.orEmpty(),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = LocalContentColor.current.copy(alpha = 0.9f),
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        minLines = 2,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
                                 }
                             }
                         }
