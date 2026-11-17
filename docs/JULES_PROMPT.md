@@ -33,4 +33,13 @@ available in your environment, run at least `./gradlew :core:parser:test` and sa
 a PR description listing what was done, what was not done, how it was tested, and any impact on APK size / DB size / speed;
 and an update of `docs/PROPUNERI.md` marking the item as done.
 
+**Working style, so the owner can review everything on Thursday (keep / fix / revert per PR):**
+- Small, focused PRs: one stage item per PR, no unrelated changes mixed in.
+- No mass refactors, renames, moves or reformatting of existing code. Follow the existing architecture, package layout and conventions; extend, don't rewrite.
+- PR description sections: **Ce** (what), **De ce** (why), **Fișiere** (main files touched), **Cum am testat**, **Impact** (APK / DB / speed), **Nefăcut / riscuri**.
+- Every PR updates `CHANGELOG.md` and, if something structural changed (new table, module, worker, setting), the relevant section of `docs/HANDOFF.md`.
+- Room schema only grows: new version number + additive `Migration` (new columns with defaults, new tables). Never drop/rename columns with user data.
+- `versionCode` / version must keep increasing; it is computed automatically from the commit count on `main`, so don't touch it.
+- If a PR turns out wrong, open a new PR that reverts or fixes it; never rewrite history.
+
 If something is unclear or would require breaking a rule above, stop and write the question in the PR description instead of guessing.
