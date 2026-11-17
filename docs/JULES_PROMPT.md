@@ -43,3 +43,11 @@ and an update of `docs/PROPUNERI.md` marking the item as done.
 - If a PR turns out wrong, open a new PR that reverts or fixes it; never rewrite history.
 
 If something is unclear or would require breaking a rule above, stop and write the question in the PR description instead of guessing.
+
+### Actualizare autorizată de Radu, 2026-11-17
+
+Livrarea etapelor complete este prin release semnat și update în aplicația TV. Agentul poate porni Release
+la cererea lui Radu, după CI verde. Se păstrează permanent release-ul v0.1.14 și tagul ei, plus cea mai nouă
+altă versiune; celelalte pot fi curățate automat. Excepția pentru workflow privește numai protejarea bazei
+în curățare. Semnarea, secretele și schema de versiuni rămân interzise modificării. Protecțiile pentru
+claude-handoff-2026-11-17 și claude-snapshot rămân valabile. Vezi docs/RELEASES.md.

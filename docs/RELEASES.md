@@ -5,11 +5,16 @@
 1. Un PR trece de CI (`.github/workflows/ci.yml`: ktlint, teste, lint, build debug) și e mergeuit în `main`. Asta **nu** mai publică un APK.
 2. Când vrem un APK nou, pornim manual `.github/workflows/release.yml` ([Actions → Release → Run workflow](https://github.com/radumariusi/ak_vod_hub/actions/workflows/release.yml)). Construiește APK-ul de release din `main`, semnat cu cheia din secretul `AK_SIGNING_KEY`.
 3. APK-ul e publicat în [GitHub Releases](https://github.com/radumariusi/ak_vod_hub/releases) ca `ak-vod-hub-<versiune>.apk`, cu lista de schimbări (titlurile commit-urilor).
-4. Se păstrează doar **ultimele 2** release-uri; cele vechi și tag-urile lor se șterg.
+4. Se păstrează permanent **v0.1.14 și tagul ei** (baza testată), plus **cea mai nouă altă versiune**. Celelalte release-uri și tag-urile lor pot fi eliminate automat. Tagul `claude-handoff-2026-11-17` și branch-ul `claude-snapshot` rămân protejate.
 
 Versiunea e `<akvod.versionBase>.<număr de commit-uri pe main>` (ex. `0.1.3`), iar `versionCode` e numărul de commit-uri. Ambele cresc la fiecare merge, deci un release făcut mai târziu e mereu „mai nou” decât cel instalat.
 
 De ce manual: din etapa 4, Radu a cerut ca etapele rămase (4–9) să fie făcute una după alta, cu un singur APK la final, nu câte unul după fiecare merge.
+
+**Instrucțiune Radu, 2026-11-17:** livrarea etapelor complete se face prin update în aplicația de pe TV.
+Agentul este autorizat să pornească workflow-ul Release pentru această livrare după CI verde și merge.
+Excepția autorizată la interdicția modificării workflow-urilor privește exclusiv protejarea bazei v0.1.14
+în curățare; semnarea, secretele și schema de versiuni nu se modifică.
 
 ## Update în aplicație
 

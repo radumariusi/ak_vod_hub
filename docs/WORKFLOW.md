@@ -20,7 +20,7 @@ Regulile astea se aplică în fiecare etapă. Scopul: muncă ordonată pe etape 
 | Branch-uri | Se șterg după merge (setarea „Automatically delete head branches” activă). Branch-urile vechi nefolosite se șterg. |
 | Artefacte CI | `retention-days: 3`. APK-ul se urcă ca artefact doar la rulare manuală, nu la fiecare push. |
 | Rulări CI vechi, cache-uri | Șterse automat săptămânal de `.github/workflows/cleanup.yml` (artefacte > 3 zile, rulări > 14 zile, cache-uri nefolosite > 7 zile). |
-| Release-uri | Păstrăm doar **ultimele 2** release-uri cu APK. Cele vechi (și tag-urile lor) se șterg. |
+| Release-uri | Păstrăm permanent **v0.1.14 și tagul ei**, plus cea mai nouă altă versiune. Celelalte se pot curăța automat, la autorizarea lui Radu (2026-11-17). |
 | Istoric | Commit-uri mici și clare. PR-urile se pot face squash la merge, ca istoria să rămână curată. |
 | CI | Rulează doar pe PR și pe `main`, cu `concurrency` (anulează rulările vechi) și timeout. |
 
@@ -32,7 +32,7 @@ Regulile astea se aplică în fiecare etapă. Scopul: muncă ordonată pe etape 
 ## Merge și livrare
 
 - Claude face merge la PR-uri când CI e verde (aprobat de Radu), apoi șterge branch-ul.
-- APK-urile ajung la Radu prin GitHub Releases și update-ul din aplicație. Release-ul se pornește **manual** (Actions → Release → Run workflow), nu la fiecare merge; vezi [RELEASES.md](RELEASES.md).
+- APK-urile ajung la Radu prin GitHub Releases și update-ul din aplicație. Release-ul se pornește **manual**, inclusiv de agent la cererea lui Radu pentru etapa completă (2026-11-17), nu la fiecare merge; vezi [RELEASES.md](RELEASES.md).
 
 ## Cod
 
