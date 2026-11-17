@@ -39,11 +39,14 @@ import io.github.radumariusi.akvodhub.hub.DetailsViewModel
 import io.github.radumariusi.akvodhub.hub.HomeViewModel
 import io.github.radumariusi.akvodhub.player.PlaybackSettingsViewModel
 import io.github.radumariusi.akvodhub.playlist.PlaylistsViewModel
+import io.github.radumariusi.akvodhub.remote.PhoneSetupViewModel
+import io.github.radumariusi.akvodhub.tv.NavRequest
 import io.github.radumariusi.akvodhub.ui.hub.BrowseScreen
 import io.github.radumariusi.akvodhub.ui.hub.DetailsScreen
 import io.github.radumariusi.akvodhub.ui.hub.HomeScreen
 import io.github.radumariusi.akvodhub.update.UpdateViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 
 enum class Destination(
     val label: String,
@@ -62,6 +65,7 @@ class HubViewModels(
     val browse: BrowseViewModel,
     val details: DetailsViewModel,
     val playback: PlaybackSettingsViewModel,
+    val phoneSetup: PhoneSetupViewModel,
 )
 
 /**
@@ -74,6 +78,7 @@ fun AppRoot(
     playlistsViewModel: PlaylistsViewModel,
     tmdbViewModel: TmdbViewModel,
     hub: HubViewModels,
+    navRequests: MutableStateFlow<NavRequest?>,
 ) {
     var current by rememberSaveable { mutableStateOf(Destination.HOME) }
     var openTitle by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -94,6 +99,41 @@ fun AppRoot(
         openTitle = card.id
     }
     val onRestored = { restoreKey = null }
+
+    // Din afara aplicației: fișa unui titlu (ecranul principal, căutarea globală) sau o căutare (vocală).
+    val navRequest by navRequests.collectAsState()
+    LaunchedEffect(navRequest) {
+        when (val request = navRequest) {
+            null -> {
+                return@LaunchedEffect
+            }
+
+            is NavRequest.OpenTitle -> {
+                titleStack = LongArray(0)
+                openedFrom = null
+                openTitle = request.titleId
+            }
+
+            // Redarea o pornește MainActivity; aici rămâne doar fișa dedesubt.
+            is NavRequest.Play -> {
+                titleStack = LongArray(0)
+                openedFrom = null
+                openTitle = request.titleId
+            }
+
+            is NavRequest.Search -> {
+                openTitle = null
+                titleStack = LongArray(0)
+                current = Destination.SEARCH
+                val search = hub.browse.search
+                search.setFilter(
+                    search.state.value.filter
+                        .copy(text = request.text),
+                )
+            }
+        }
+        navRequests.value = null
+    }
     // Dacă cardul nu mai e pe ecran (listă reîncărcată), nu „furăm” focusul mai târziu.
     LaunchedEffect(restoreKey) {
         if (restoreKey != null) {
@@ -206,6 +246,7 @@ fun AppRoot(
                                     playlistsViewModel,
                                     tmdbViewModel,
                                     hub.playback,
+                                    hub.phoneSetup,
                                 )
                             }
                         }

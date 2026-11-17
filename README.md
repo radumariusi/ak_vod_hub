@@ -30,4 +30,4 @@ Module: `app` (UI TV), `core:parser` (Kotlin pur), `core:data` (rețea, date, up
 
 ## Stare
 
-Etapele 0–4 gata: schelet Android TV, CI, update din aplicație, import de playlist-uri (M3U link/fișier, Xtream) doar cu filme și seriale, parser de titluri, potrivire TMDB cu unirea duplicatelor și gruparea surselor pe calitate și limbă. Urmează etapa 5 (hub-ul: Home, Detalii, Căutare).
+Toate etapele (0–9) sunt gata: import de playlist-uri (M3U link/fișier, Xtream) doar cu filme și seriale, parser de titluri, potrivire TMDB cu unirea duplicatelor și gruparea surselor pe calitate și limbă, hub-ul (Acasă, Filme, Seriale, Căutare, Detalii), player propriu (Media3 + FFmpeg audio) cu trecere automată între surse, subtitrări din addon-uri Stremio, recomandări doar din playlist, rândul Watch Next și un canal pe ecranul principal Android TV, căutare globală / vocală și configurare de pe telefon (cod QR) cu backup al setărilor.

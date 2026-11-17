@@ -15,6 +15,7 @@ import io.github.radumariusi.akvodhub.data.security.SecretCipher
 import io.github.radumariusi.akvodhub.parser.VodKind
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.serialization.Serializable
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 /** Ce vede utilizatorul despre un playlist în Setări. */
@@ -33,6 +34,16 @@ data class PlaylistSummary(
     val lastDurationMs: Long,
     /** Import în curs: null = nu; altfel progresul (sau progres null dacă doar așteaptă). */
     val activity: ImportActivity?,
+)
+
+/** Un playlist în fișierul de backup (link și cont în clar: fișierul trebuie păstrat ca o parolă). */
+@Serializable
+data class PlaylistBackup(
+    val name: String,
+    val type: String,
+    val location: String,
+    val username: String? = null,
+    val password: String? = null,
 )
 
 data class LibraryTotals(
@@ -180,6 +191,38 @@ class PlaylistRepository(
         if (dao.sources().isEmpty()) scheduler.cancelPeriodic()
         // Titlurile playlist-ului șters dispar din hub.
         indexer.refresh()
+    }
+
+    /** Playlist-urile pentru backup, cu datele decriptate (fișierele locale nu se pot muta pe alt TV). */
+    suspend fun backup(): List<PlaylistBackup> =
+        dao.sources().filter { it.type != PlaylistType.M3U_FILE }.map { s ->
+            PlaylistBackup(
+                name = s.name,
+                type = s.type.name,
+                location = cipher.decrypt(s.location),
+                username = s.username?.let(cipher::decrypt),
+                password = s.password?.let(cipher::decrypt),
+            )
+        }
+
+    /**
+     * Adaugă un playlist din backup, dacă nu există deja (același link și utilizator). Contul Xtream nu se
+     * verifică acum: dacă serverul nu răspunde, importul spune de ce, iar playlist-ul rămâne de reîmprospătat.
+     */
+    suspend fun restore(backup: PlaylistBackup): Boolean {
+        val type =
+            PlaylistType.entries.firstOrNull { it.name == backup.type && it != PlaylistType.M3U_FILE }
+                ?: return false
+        val existing =
+            dao.sources().any { s ->
+                s.type == type &&
+                    runCatching { cipher.decrypt(s.location) }.getOrNull() == backup.location &&
+                    s.username?.let { runCatching { cipher.decrypt(it) }.getOrNull() } == backup.username
+            }
+        if (existing) return false
+        val host = backup.location.toHttpUrlOrNull()?.host ?: return false
+        add(backup.name, type, host, backup.location, backup.username, backup.password)
+        return true
     }
 
     /** Episoadele unui serial (la Xtream se cer de la server la prima deschidere). */

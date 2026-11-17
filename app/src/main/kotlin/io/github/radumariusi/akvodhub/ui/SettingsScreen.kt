@@ -21,6 +21,7 @@ import androidx.tv.material3.Text
 import io.github.radumariusi.akvodhub.catalog.TmdbViewModel
 import io.github.radumariusi.akvodhub.player.PlaybackSettingsViewModel
 import io.github.radumariusi.akvodhub.playlist.PlaylistsViewModel
+import io.github.radumariusi.akvodhub.remote.PhoneSetupViewModel
 import io.github.radumariusi.akvodhub.update.UpdateState
 import io.github.radumariusi.akvodhub.update.UpdateViewModel
 
@@ -31,8 +32,10 @@ fun SettingsScreen(
     playlistsViewModel: PlaylistsViewModel,
     tmdbViewModel: TmdbViewModel,
     playbackViewModel: PlaybackSettingsViewModel,
+    phoneSetupViewModel: PhoneSetupViewModel,
 ) {
     var adding by rememberSaveable { mutableStateOf(false) }
+    var phoneSetup by rememberSaveable { mutableStateOf(false) }
     val playlists by playlistsViewModel.playlists.collectAsState()
     val addState by playlistsViewModel.addState.collectAsState()
     val matchStatus by tmdbViewModel.status.collectAsState()
@@ -52,11 +55,25 @@ fun SettingsScreen(
         return
     }
 
+    if (phoneSetup) {
+        PhoneSetupScreen(phoneSetupViewModel, onClose = { phoneSetup = false })
+        return
+    }
+
     Column(
         verticalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier.widthIn(max = 720.dp).verticalScroll(rememberScrollState()),
     ) {
         Text("Setări", style = MaterialTheme.typography.headlineMedium)
+
+        Text("Configurare de pe telefon", style = MaterialTheme.typography.titleLarge)
+        Text(
+            "Scanezi un cod QR și lipești de pe telefon linkuri M3U, conturi Xtream, cheia TMDB sau addon-uri, " +
+                "fără tastat cu telecomanda. Tot acolo: backup și restaurare setări.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Button(onClick = { phoneSetup = true }) { Text("Configurează de pe telefon") }
 
         PlaylistsSection(
             playlists = playlists,

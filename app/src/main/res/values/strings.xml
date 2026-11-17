@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
   <string name="app_name">AK VOD Hub</string>
+  <string name="search_hint">Caută în playlist-uri</string>
+  <string name="search_settings">Filme și seriale din playlist-urile tale</string>
+  <string name="channel_name">AK VOD Hub: adăugate recent</string>
 </resources>

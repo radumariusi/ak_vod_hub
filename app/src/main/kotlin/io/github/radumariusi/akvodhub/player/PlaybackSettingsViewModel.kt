@@ -7,14 +7,11 @@ import io.github.radumariusi.akvodhub.data.catalog.HubRepository
 import io.github.radumariusi.akvodhub.data.player.PlaybackPrefs
 import io.github.radumariusi.akvodhub.data.player.PlaybackSettings
 import io.github.radumariusi.akvodhub.data.player.SubtitleStyle
+import io.github.radumariusi.akvodhub.data.stremio.AddonInstaller
 import io.github.radumariusi.akvodhub.data.stremio.StremioAddon
 import io.github.radumariusi.akvodhub.data.stremio.StremioAddons
-import io.github.radumariusi.akvodhub.data.stremio.StremioClient
-import io.github.radumariusi.akvodhub.data.stremio.SubtitleRepository
 import io.github.radumariusi.akvodhub.parser.player.SourceProfile
 import io.github.radumariusi.akvodhub.parser.player.SourceRule
-import io.github.radumariusi.akvodhub.parser.stremio.StremioIds
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -44,7 +41,7 @@ class PlaybackSettingsViewModel
         private val settings: PlaybackSettings,
         private val repository: HubRepository,
         private val stremioAddons: StremioAddons,
-        private val stremio: StremioClient,
+        private val installer: AddonInstaller,
     ) : ViewModel() {
         val prefs: StateFlow<PlaybackPrefs> = settings.state
 
@@ -113,28 +110,13 @@ class PlaybackSettingsViewModel
 
         /** Verifică manifestul și adaugă addon-ul (trebuie să dea subtitrări sau cataloage). */
         fun addAddon(input: String) {
-            val url = StremioIds.normalizeManifestUrl(input)
-            if (url == null) {
-                mutableAddState.value =
-                    AddonAddState.Error("Adresa nu pare corectă. Exemplu: https://opensubtitles-v3.strem.io")
-                return
-            }
             mutableAddState.value = AddonAddState.Checking
             viewModelScope.launch {
                 mutableAddState.value =
                     try {
-                        val manifest = stremio.manifest(url)
-                        val resources = manifest.resources.map { it.name }.distinct()
-                        if ("subtitles" !in resources && "catalog" !in resources) {
-                            AddonAddState.Error("„${manifest.name}” nu oferă subtitrări sau cataloage.")
-                        } else {
-                            stremioAddons.add(StremioAddon(url, manifest.name, resources))
-                            AddonAddState.Added(manifest.name)
-                        }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        AddonAddState.Error("Addon-ul nu se poate citi: ${SubtitleRepository.reason(e)}.")
+                        AddonAddState.Added(installer.install(input).name)
+                    } catch (e: IllegalArgumentException) {
+                        AddonAddState.Error(e.message ?: "Addon-ul nu se poate adăuga.")
                     }
             }
         }

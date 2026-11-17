@@ -3,6 +3,7 @@ package io.github.radumariusi.akvodhub.data.catalog
 import androidx.room.withTransaction
 import androidx.sqlite.db.SimpleSQLiteQuery
 import io.github.radumariusi.akvodhub.data.db.AkVodDatabase
+import io.github.radumariusi.akvodhub.data.db.ContinueItem
 import io.github.radumariusi.akvodhub.data.db.PlaylistType
 import io.github.radumariusi.akvodhub.data.db.RawEntryEntity
 import io.github.radumariusi.akvodhub.data.db.TitleCard
@@ -154,6 +155,9 @@ class HubRepository(
     }
 
     suspend fun continueWatching(limit: Int = 20): List<TitleCard> = dao.continueWatching(limit)
+
+    /** „Continuă vizionarea” cu poziția și episodul (rândul Watch Next de pe ecranul principal Android TV). */
+    suspend fun continueItems(limit: Int): List<ContinueItem> = dao.continueItems(limit)
 
     /** Limbile audio din playlist-uri, cele mai frecvente primele (ISO 639-1, `mul` = mai multe). */
     suspend fun languages(): List<String> =

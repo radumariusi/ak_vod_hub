@@ -36,6 +36,8 @@ android {
         versionName = if (ciVersionCode != null) "$versionBase.$ciVersionCode" else "$versionBase.0-dev"
 
         buildConfigField("String", "UPDATE_REPO", "\"$updateRepo\"")
+        // Căutarea globală: autoritatea providerului trebuie scrisă și în res/xml/searchable.xml.
+        resValue("string", "search_authority", "io.github.radumariusi.akvodhub.search")
 
         // FFmpeg are biblioteci native: doar procesoarele ARM ale TV-urilor (+ x86_64 pentru emulator).
         ndk {
@@ -72,6 +74,7 @@ android {
         }
         debug {
             applicationIdSuffix = ".debug"
+            resValue("string", "search_authority", "io.github.radumariusi.akvodhub.debug.search")
             versionNameSuffix = "-debug"
         }
     }
@@ -79,6 +82,7 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        resValues = true
     }
 
     compileOptions {
@@ -115,6 +119,7 @@ dependencies {
     implementation(libs.androidx.tv.material)
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+    implementation(libs.qrcodegen)
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

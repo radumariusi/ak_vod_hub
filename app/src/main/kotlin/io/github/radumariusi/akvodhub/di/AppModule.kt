@@ -7,6 +7,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import io.github.radumariusi.akvodhub.BuildConfig
+import io.github.radumariusi.akvodhub.data.backup.SettingsBackup
 import io.github.radumariusi.akvodhub.data.catalog.CatalogIndexer
 import io.github.radumariusi.akvodhub.data.catalog.CatalogRepository
 import io.github.radumariusi.akvodhub.data.catalog.HubRepository
@@ -20,8 +21,10 @@ import io.github.radumariusi.akvodhub.data.playlist.PlaylistRepository
 import io.github.radumariusi.akvodhub.data.playlist.PlaylistScheduler
 import io.github.radumariusi.akvodhub.data.playlist.PlaylistWorkerFactory
 import io.github.radumariusi.akvodhub.data.playlist.xtream.XtreamClient
+import io.github.radumariusi.akvodhub.data.remote.PhoneSetupServer
 import io.github.radumariusi.akvodhub.data.security.KeystoreSecretCipher
 import io.github.radumariusi.akvodhub.data.security.SecretCipher
+import io.github.radumariusi.akvodhub.data.stremio.AddonInstaller
 import io.github.radumariusi.akvodhub.data.stremio.StremioAddons
 import io.github.radumariusi.akvodhub.data.stremio.StremioClient
 import io.github.radumariusi.akvodhub.data.stremio.SubtitleRepository
@@ -184,4 +187,29 @@ object AppModule {
         stremio: StremioClient,
         addons: StremioAddons,
     ): DiscoverRepository = DiscoverRepository(db, tmdb, settings, stremio, addons)
+
+    @Provides
+    @Singleton
+    fun addonInstaller(
+        client: StremioClient,
+        addons: StremioAddons,
+    ): AddonInstaller = AddonInstaller(client, addons)
+
+    @Provides
+    @Singleton
+    fun settingsBackup(
+        playlists: PlaylistRepository,
+        catalog: CatalogRepository,
+        addons: StremioAddons,
+        playback: PlaybackSettings,
+    ): SettingsBackup = SettingsBackup(playlists, catalog, addons, playback)
+
+    @Provides
+    @Singleton
+    fun phoneSetupServer(
+        playlists: PlaylistRepository,
+        catalog: CatalogRepository,
+        installer: AddonInstaller,
+        backup: SettingsBackup,
+    ): PhoneSetupServer = PhoneSetupServer(playlists, catalog, installer, backup)
 }

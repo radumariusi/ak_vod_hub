@@ -134,6 +134,14 @@ interface CatalogDao {
     )
     suspend fun continueWatching(limit: Int): List<TitleCard>
 
+    /** „Continuă vizionarea” cu poziția și episodul (pentru rândul Watch Next de pe ecranul principal). */
+    @Query(
+        "SELECT t.id AS titleId, t.mediaType, t.name, t.year, t.posterPath, t.backdropPath, t.overview, " +
+            "w.season, w.episode, w.positionMs, w.durationMs, w.updatedAt FROM watch_state w " +
+            "JOIN title t ON t.id = w.titleId WHERE t.sourceCount > 0 ORDER BY w.updatedAt DESC LIMIT :limit",
+    )
+    suspend fun continueItems(limit: Int): List<ContinueItem>
+
     @Query("SELECT * FROM raw_entry WHERE id = :id")
     suspend fun entry(id: Long): RawEntryEntity?
 

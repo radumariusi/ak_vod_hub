@@ -80,6 +80,28 @@ class PlaybackSettings(
         mutableState.value = read()
     }
 
+    /** Preferințele salvate, ca text (pentru backup). Cheile lipsă = valorile implicite. */
+    fun backup(): Map<String, String> =
+        buildMap {
+            prefs.getString(PROFILE, null)?.let { put(PROFILE, it) }
+            prefs.getString(SUBTITLES, null)?.let { put(SUBTITLES, it) }
+            if (prefs.contains(ADDON_AUTO)) put(ADDON_AUTO, prefs.getBoolean(ADDON_AUTO, true).toString())
+            if (prefs.contains(SCALE)) put(SCALE, prefs.getInt(SCALE, 100).toString())
+            prefs.getString(STYLE, null)?.let { put(STYLE, it) }
+        }
+
+    /** Restaurare din backup: doar cheile cunoscute, cu valori verificate la citire. */
+    fun restore(values: Map<String, String>) {
+        val edit = prefs.edit()
+        values[PROFILE]?.let { edit.putString(PROFILE, it) }
+        values[SUBTITLES]?.let { edit.putString(SUBTITLES, it) }
+        values[ADDON_AUTO]?.toBooleanStrictOrNull()?.let { edit.putBoolean(ADDON_AUTO, it) }
+        values[SCALE]?.toIntOrNull()?.let { edit.putInt(SCALE, it.coerceIn(MIN_SCALE, MAX_SCALE)) }
+        values[STYLE]?.let { edit.putString(STYLE, it) }
+        edit.apply()
+        mutableState.value = read()
+    }
+
     private fun read(): PlaybackPrefs {
         // Până la etapa 7 se salva o singură limbă („ro”); acum o listă („ro,en”), compatibilă.
         val subtitles =
