@@ -99,7 +99,7 @@ class DetailsViewModel
                         it.copy(loading = false, details = details, recommended = recommended, watch = watch)
                     }
                     if (details == null) return@launch
-                    launch overview@ {
+                    launch overview@{
                         val localized = repository.romanianOverview(titleId) ?: return@overview
                         mutableState.update { state ->
                             if (state.titleId ==
