@@ -325,3 +325,11 @@ data class ImdbRatingStage(
     val votes: Int,
     val badge: String? = null,
 )
+
+/** Filmografia cerută pentru o persoană, doar referințe TMDB; disponibilitatea vine din JOIN cu title. */
+@Entity(tableName = "person_credit", primaryKeys = ["personId", "mediaType", "tmdbId"])
+data class PersonCreditEntity(
+    val personId: Long,
+    val mediaType: MediaType,
+    val tmdbId: Long,
+)

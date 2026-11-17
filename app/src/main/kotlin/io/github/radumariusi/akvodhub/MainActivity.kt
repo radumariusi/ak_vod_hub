@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.tv.material3.MaterialTheme
 import dagger.hilt.android.AndroidEntryPoint
 import io.github.radumariusi.akvodhub.catalog.TmdbViewModel
+import io.github.radumariusi.akvodhub.hub.ActorViewModel
 import io.github.radumariusi.akvodhub.hub.BrowseViewModel
 import io.github.radumariusi.akvodhub.hub.DetailsViewModel
 import io.github.radumariusi.akvodhub.hub.HomeViewModel
@@ -38,6 +39,7 @@ class MainActivity : ComponentActivity() {
     private val playlistsViewModel: PlaylistsViewModel by viewModels()
     private val tmdbViewModel: TmdbViewModel by viewModels()
     private val homeViewModel: HomeViewModel by viewModels()
+    private val actorViewModel: ActorViewModel by viewModels()
     private val browseViewModel: BrowseViewModel by viewModels()
     private val detailsViewModel: DetailsViewModel by viewModels()
     private val playbackViewModel: PlaybackSettingsViewModel by viewModels()
@@ -72,6 +74,7 @@ class MainActivity : ComponentActivity() {
                                 detailsViewModel,
                                 playbackViewModel,
                                 phoneSetupViewModel,
+                                actorViewModel,
                             ),
                             navRequests,
                         )

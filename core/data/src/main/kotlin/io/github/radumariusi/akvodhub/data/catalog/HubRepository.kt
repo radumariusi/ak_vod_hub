@@ -45,6 +45,7 @@ data class Person(
     val name: String,
     val role: String?,
     val profilePath: String?,
+    val id: Long = 0,
 )
 
 data class Credits(
@@ -264,7 +265,7 @@ class HubRepository(
                         .map { it.name }
                         .distinct()
                         .take(3),
-                cast = credits.cast.take(MAX_CAST).map { Person(it.name, it.role, it.profilePath) },
+                cast = credits.cast.take(MAX_CAST).map { Person(it.name, it.role, it.profilePath, it.id) },
             )
         creditsCache[title.id] = result
         return result

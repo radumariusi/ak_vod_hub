@@ -8,6 +8,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import io.github.radumariusi.akvodhub.BuildConfig
 import io.github.radumariusi.akvodhub.data.backup.SettingsBackup
+import io.github.radumariusi.akvodhub.data.catalog.ActorRepository
 import io.github.radumariusi.akvodhub.data.catalog.CatalogIndexer
 import io.github.radumariusi.akvodhub.data.catalog.CatalogRepository
 import io.github.radumariusi.akvodhub.data.catalog.HubRepository
@@ -181,6 +182,11 @@ object AppModule {
         @ApplicationContext context: Context,
         db: AkVodDatabase,
     ): CatalogIndexer = CatalogIndexer(context, db)
+
+    @Provides
+    @Singleton
+    fun actorRepository(db: AkVodDatabase, tmdb: TmdbClient, settings: TmdbSettings): ActorRepository =
+        ActorRepository(db, tmdb, settings)
 
     @Provides
     @Singleton
