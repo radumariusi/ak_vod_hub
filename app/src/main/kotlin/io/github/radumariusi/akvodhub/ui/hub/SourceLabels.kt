@@ -11,7 +11,7 @@ fun sourceTags(
 ): String {
     val entry = info?.entry
     return listOfNotNull(
-        source.languages.joinToString("+") { SourceGrouping.languageLabel(it) }.ifEmpty { "?" },
+        source.languages.joinToString("+") { SourceGrouping.languageLabel(it) }.ifEmpty { SourceGrouping.languageLabel(null) },
         source.hdr?.name?.replace('_', ' '),
         entry?.codec?.name,
         entry?.containerExt?.uppercase(),
@@ -32,4 +32,4 @@ fun sourceLabel(
 /** Ex. „4K EN” (pentru mesajele scurte ale playerului). */
 fun sourceShortLabel(source: SourceInfo) =
     "${SourceGrouping.qualityLabel(source.quality)} " +
-        source.languages.joinToString("+") { SourceGrouping.languageLabel(it) }.ifEmpty { "?" }
+        source.languages.joinToString("+") { SourceGrouping.languageLabel(it) }.ifEmpty { SourceGrouping.languageLabel(null) }

@@ -82,6 +82,8 @@ object TitleParser {
     private val extension =
         Regex("""(?i)\.(mkv|mp4|avi|m4v|mov|wmv|mpg|mpeg|flv|webm|divx|ts|m3u8)$""")
     private val codecDot = Regex("""(?i)\b([hx])\.(26[45])\b""")
+    private val multiSubtitle = Regex("""(?i)\bMULTI[-. ]SUBS?\b""")
+    private val declaredAudioChannels = Regex("""(?i)\b(EN|ENG)([ .-]+)5\.1\b""")
     private val audioDot = Regex("""\b(\d)\.(\d)\b""")
     private val spaces = Regex("""\s+""")
 
@@ -97,6 +99,8 @@ object TitleParser {
         }
         var s = extension.replace(sb.toString().trim(), "")
         s = codecDot.replace(s, "$1$2")
+        s = multiSubtitle.replace(s, "MULTISUB")
+        s = declaredAudioChannels.replace(s, "$1$2AUDIO51")
         s = audioDot.replace(s, "$1 $2")
         // Nume „scene” (The.Matrix.1999.1080p): punctele sunt separatori.
         if (' ' !in s && s.count { it == '.' } >= 2) s = s.replace('.', ' ')
@@ -162,6 +166,7 @@ object TitleParser {
         val hasLower = token.any { it.isLowerCase() }
         val isDigits = token.all { it.isDigit() }
         if (isDigits && context == Context.TAIL) return null
+        if (up == "AUDIO51") return Tag.Noise
         TitleTags.quality[up]?.let {
             if (!isDigits || context != Context.GROUP) return Tag.Quality(it)
         }
@@ -552,7 +557,7 @@ object TitleParser {
             title = "",
             quality = info.quality,
             hdr = info.hdr,
-            languages = info.languages.filter { it != ParsedTitle.MULTI },
+            languages = info.languages,
         )
     }
 }

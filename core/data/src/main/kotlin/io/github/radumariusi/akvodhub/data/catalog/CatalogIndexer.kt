@@ -1,6 +1,7 @@
 package io.github.radumariusi.akvodhub.data.catalog
 
 import android.content.Context
+import android.os.SystemClock
 import android.util.Log
 import androidx.room.withTransaction
 import io.github.radumariusi.akvodhub.data.db.AkVodDatabase
@@ -11,6 +12,7 @@ import io.github.radumariusi.akvodhub.parser.catalog.DubLabel
 import io.github.radumariusi.akvodhub.parser.catalog.PosterBadges
 import io.github.radumariusi.akvodhub.parser.match.MediaType
 import io.github.radumariusi.akvodhub.parser.match.TitleSimilarity
+import io.github.radumariusi.akvodhub.parser.player.PlaybackActivityState
 import io.github.radumariusi.akvodhub.parser.title.TitleParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -91,6 +93,36 @@ class CatalogIndexer(
                     .apply()
                 mutableVersion.value = clock()
                 Log.i(TAG, "Catalog reindexat în ${clock() - start} ms")
+            }
+        }
+
+    /** Actualizează doar limbile din intrările existente, fără a relega titlurile sau episoadele. */
+    suspend fun refreshSourceLanguages(): Boolean =
+        mutex.withLock {
+            withContext(Dispatchers.IO) {
+                val key = "source_languages_v1_after_id"
+                var after = prefs.getLong(key, 0L)
+                if (after < 0L) return@withContext true
+                val playlist = db.playlistDao()
+                val deadline = SystemClock.elapsedRealtime() + 60_000L
+                while (!PlaybackActivityState.active && SystemClock.elapsedRealtime() < deadline) {
+                    val lastId =
+                        db.withTransaction {
+                            val batch = playlist.sourceMetadataBatch(after, 500)
+                            for (entry in batch) {
+                                val parsed = entry.parsed()
+                                if (parsed.languages != entry.languages || parsed.subtitles != entry.subtitles) {
+                                    playlist.updateSourceLanguages(entry.id, parsed.languages, parsed.subtitles)
+                                }
+                            }
+                            batch.lastOrNull()?.id ?: -1L
+                        }
+                    // Cursorul poate rămâne în urmă la întrerupere. Repetarea lotului este idempotentă.
+                    prefs.edit().putLong(key, lastId).remove(FINGERPRINT).apply()
+                    if (lastId < 0L) return@withContext true
+                    after = lastId
+                }
+                false
             }
         }
 
