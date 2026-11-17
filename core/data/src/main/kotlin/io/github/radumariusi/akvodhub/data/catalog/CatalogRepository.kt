@@ -52,6 +52,17 @@ class CatalogRepository(
             )
         }
 
+    /** Cheia salvată (pentru backup). */
+    fun tmdbKey(): String? = settings.apiKey()
+
+    /** Cheia din backup, fără verificare (TMDB poate fi indisponibil chiar atunci); potrivirea pornește. */
+    fun restoreTmdbKey(key: String) {
+        val clean = key.trim()
+        if (clean.length < 16) return
+        settings.saveKey(clean)
+        scheduler.enqueue()
+    }
+
     /** Verifică cheia la TMDB, o salvează și pornește potrivirea. Aruncă excepție cu mesaj dacă nu e bună. */
     suspend fun saveTmdbKey(key: String) {
         val clean = key.trim()

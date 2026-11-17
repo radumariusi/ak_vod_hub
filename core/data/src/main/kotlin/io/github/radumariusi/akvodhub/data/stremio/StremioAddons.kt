@@ -46,6 +46,11 @@ class StremioAddons(
         save(list)
     }
 
+    /** Înlocuiește toată lista (restaurare din backup). */
+    fun replaceAll(list: List<StremioAddon>) {
+        save(list.distinctBy { it.manifestUrl })
+    }
+
     private fun save(list: List<StremioAddon>) {
         prefs.edit().putString(KEY, json.encodeToString(list)).apply()
         mutable.value = list

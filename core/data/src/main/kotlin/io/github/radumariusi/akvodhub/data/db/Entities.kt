@@ -204,6 +204,22 @@ data class TitleCard(
     val overview: String?,
 )
 
+/** Un titlu din „Continuă vizionarea”, cu locul unde a rămas utilizatorul. */
+data class ContinueItem(
+    val titleId: Long,
+    val mediaType: MediaType,
+    val name: String,
+    val year: Int?,
+    val posterPath: String?,
+    val backdropPath: String?,
+    val overview: String?,
+    val season: Int?,
+    val episode: Int?,
+    val positionMs: Long,
+    val durationMs: Long,
+    val updatedAt: Long,
+)
+
 /**
  * Unde a rămas utilizatorul cu un titlu (pentru „Continuă vizionarea”). Scris de player (etapa 6);
  * la seriale, [season]/[episode] arată episodul curent.

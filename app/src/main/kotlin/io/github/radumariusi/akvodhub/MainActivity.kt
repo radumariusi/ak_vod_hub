@@ -1,5 +1,6 @@
 package io.github.radumariusi.akvodhub
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -9,12 +10,18 @@ import io.github.radumariusi.akvodhub.catalog.TmdbViewModel
 import io.github.radumariusi.akvodhub.hub.BrowseViewModel
 import io.github.radumariusi.akvodhub.hub.DetailsViewModel
 import io.github.radumariusi.akvodhub.hub.HomeViewModel
+import io.github.radumariusi.akvodhub.player.PlayRequest
 import io.github.radumariusi.akvodhub.player.PlaybackSettingsViewModel
+import io.github.radumariusi.akvodhub.player.PlayerActivity
 import io.github.radumariusi.akvodhub.playlist.PlaylistsViewModel
+import io.github.radumariusi.akvodhub.remote.PhoneSetupViewModel
+import io.github.radumariusi.akvodhub.tv.DeepLinks
+import io.github.radumariusi.akvodhub.tv.NavRequest
 import io.github.radumariusi.akvodhub.ui.AppRoot
 import io.github.radumariusi.akvodhub.ui.HubViewModels
 import io.github.radumariusi.akvodhub.ui.theme.AkVodHubTheme
 import io.github.radumariusi.akvodhub.update.UpdateViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -25,18 +32,56 @@ class MainActivity : ComponentActivity() {
     private val browseViewModel: BrowseViewModel by viewModels()
     private val detailsViewModel: DetailsViewModel by viewModels()
     private val playbackViewModel: PlaybackSettingsViewModel by viewModels()
+    private val phoneSetupViewModel: PhoneSetupViewModel by viewModels()
+
+    /** Cererea venită din afară (ecranul principal, căutarea globală), consumată de [AppRoot]. */
+    private val navRequests = MutableStateFlow<NavRequest?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (savedInstanceState == null) updateViewModel.checkOnStartup()
+        if (savedInstanceState == null) {
+            updateViewModel.checkOnStartup()
+            handle(intent)
+        }
         setContent {
             AkVodHubTheme {
                 AppRoot(
                     updateViewModel,
                     playlistsViewModel,
                     tmdbViewModel,
-                    HubViewModels(homeViewModel, browseViewModel, detailsViewModel, playbackViewModel),
+                    HubViewModels(
+                        homeViewModel,
+                        browseViewModel,
+                        detailsViewModel,
+                        playbackViewModel,
+                        phoneSetupViewModel,
+                    ),
+                    navRequests,
                 )
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handle(intent)
+    }
+
+    private fun handle(intent: Intent?) {
+        when (val request = DeepLinks.parse(intent)) {
+            null -> {
+                Unit
+            }
+
+            is NavRequest.Play -> {
+                // Din „Watch Next”: fișa titlului rămâne dedesubt, iar playerul pornește de unde ai rămas.
+                navRequests.value = NavRequest.OpenTitle(request.titleId)
+                startActivity(PlayerActivity.intent(this, PlayRequest(request.titleId, resume = true)))
+            }
+
+            else -> {
+                navRequests.value = request
             }
         }
     }

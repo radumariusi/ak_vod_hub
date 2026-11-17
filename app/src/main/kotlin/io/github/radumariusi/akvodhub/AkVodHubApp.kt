@@ -9,6 +9,10 @@ import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.crossfade
 import dagger.hilt.android.HiltAndroidApp
 import io.github.radumariusi.akvodhub.data.playlist.PlaylistWorkerFactory
+import io.github.radumariusi.akvodhub.tv.HomeScreenPublisher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import okhttp3.OkHttpClient
 import javax.inject.Inject
 
@@ -20,6 +24,16 @@ class AkVodHubApp :
     @Inject lateinit var workerFactory: PlaylistWorkerFactory
 
     @Inject lateinit var okHttpClient: OkHttpClient
+
+    @Inject lateinit var homeScreen: HomeScreenPublisher
+
+    /** Lucrări care țin cât procesul: ecranul principal Android TV (Watch Next, canalul aplicației). */
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    override fun onCreate() {
+        super.onCreate()
+        homeScreen.start(appScope)
+    }
 
     // WorkManager se inițializează la prima folosire, cu fabrica noastră de worker-e (vezi AndroidManifest).
     override val workManagerConfiguration: Configuration

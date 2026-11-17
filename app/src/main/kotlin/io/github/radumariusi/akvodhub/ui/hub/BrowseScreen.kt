@@ -97,13 +97,16 @@ fun BrowseScreen(
             )
         }
         if (search) {
-            TvTextField(
-                value = filter.text,
-                onValueChange = { browser.setFilter(filter.copy(text = it)) },
-                label = "Caută în playlist-uri",
-                placeholder = "Titlu, și în altă limbă (ex. „Der Pate”)",
-                imeAction = ImeAction.Search,
-            )
+            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                TvTextField(
+                    value = filter.text,
+                    onValueChange = { browser.setFilter(filter.copy(text = it)) },
+                    label = "Caută în playlist-uri",
+                    placeholder = "Titlu, și în altă limbă (ex. „Der Pate”)",
+                    imeAction = ImeAction.Search,
+                )
+                VoiceSearchButton { browser.setFilter(filter.copy(text = it)) }
+            }
         }
         FilterBar(filter, languages, search, onChange = browser::setFilter, onChoose = { choice = it })
 
