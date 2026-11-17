@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
@@ -35,18 +36,23 @@ import io.github.radumariusi.akvodhub.data.db.TitleCard
 import io.github.radumariusi.akvodhub.data.tmdb.TmdbClient
 import io.github.radumariusi.akvodhub.parser.catalog.PosterBadge
 import io.github.radumariusi.akvodhub.parser.catalog.PosterBadges
+import io.github.radumariusi.akvodhub.parser.catalog.PosterSize
 import io.github.radumariusi.akvodhub.parser.match.SourceGrouping
 import io.github.radumariusi.akvodhub.parser.title.VideoQuality
 import io.github.radumariusi.akvodhub.ui.touch.Card
 
 val LocalPosterBadges = staticCompositionLocalOf { PosterBadges.defaults }
 
-val PosterWidth = 112.dp
-val PosterHeight = 168.dp
+val LocalPosterSize = staticCompositionLocalOf { PosterSize.MEDIUM }
+
+val PosterWidth: Dp
+    @Composable get() = LocalPosterSize.current.widthDp.dp
+val PosterHeight: Dp
+    @Composable get() = LocalPosterSize.current.heightDp.dp
 
 /** URL-uri de imagini TMDB. Titlurile locale au deja un URL complet (logo-ul din playlist). */
 object Images {
-    fun poster(path: String?) = url(path, "w342")
+    fun poster(path: String?, size: PosterSize = PosterSize.MEDIUM) = url(path, size.imageSize)
 
     fun logo(path: String?) = url(path, "w500")
 
@@ -112,7 +118,7 @@ fun PosterCard(
             scale = CardDefaults.scale(focusedScale = 1.08f),
         ) {
             Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant)) {
-                val poster = Images.poster(card.posterPath)
+                val poster = Images.poster(card.posterPath, LocalPosterSize.current)
                 if (poster == null) {
                     Text(
                         card.name,

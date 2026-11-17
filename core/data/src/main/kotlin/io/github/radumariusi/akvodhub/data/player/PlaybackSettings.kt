@@ -1,9 +1,11 @@
 package io.github.radumariusi.akvodhub.data.player
 
 import android.content.Context
+import io.github.radumariusi.akvodhub.parser.catalog.AccentColor
 import io.github.radumariusi.akvodhub.parser.catalog.OriginalLanguage
 import io.github.radumariusi.akvodhub.parser.catalog.PosterBadge
 import io.github.radumariusi.akvodhub.parser.catalog.PosterBadges
+import io.github.radumariusi.akvodhub.parser.catalog.PosterSize
 import io.github.radumariusi.akvodhub.parser.player.SourceProfile
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,6 +33,8 @@ data class PlaybackPrefs(
     val subtitleStyle: SubtitleStyle = SubtitleStyle.WHITE_OUTLINE,
     val preferOriginalLanguage: Boolean = false,
     val posterBadges: Set<PosterBadge> = PosterBadges.defaults,
+    val posterSize: PosterSize = PosterSize.MEDIUM,
+    val accentColor: AccentColor = AccentColor.RED,
 ) {
     /** Prima limbă a subtitrărilor (pentru pistele încorporate), null = oprite. */
     val subtitleLanguage: String? get() = subtitleLanguages.firstOrNull()
@@ -59,6 +63,16 @@ class PlaybackSettings(
                 state.value.profile.languages + listOfNotNull(systemLanguage) + "en"
         ).filter { it.length == 2 }
             .distinct()
+
+    fun setPosterSize(size: PosterSize) {
+        prefs.edit().putString(POSTER_SIZE, size.name).apply()
+        mutableState.value = read()
+    }
+
+    fun setAccentColor(color: AccentColor) {
+        prefs.edit().putString(ACCENT, color.name).apply()
+        mutableState.value = read()
+    }
 
     fun togglePosterBadge(badge: PosterBadge) {
         val current = state.value.posterBadges
@@ -104,6 +118,8 @@ class PlaybackSettings(
         buildMap {
             prefs.getString(PROFILE, null)?.let { put(PROFILE, it) }
             prefs.getString(BADGES, null)?.let { put(BADGES, it) }
+            prefs.getString(POSTER_SIZE, null)?.let { put(POSTER_SIZE, it) }
+            prefs.getString(ACCENT, null)?.let { put(ACCENT, it) }
             prefs.getString(SUBTITLES, null)?.let { put(SUBTITLES, it) }
             if (prefs.contains(ORIGINAL)) put(ORIGINAL, prefs.getBoolean(ORIGINAL, false).toString())
             if (prefs.contains(ADDON_AUTO)) put(ADDON_AUTO, prefs.getBoolean(ADDON_AUTO, true).toString())
@@ -114,6 +130,8 @@ class PlaybackSettings(
     /** Restaurare din backup: doar cheile cunoscute, cu valori verificate la citire. */
     fun restore(values: Map<String, String>) {
         val edit = prefs.edit()
+        values[POSTER_SIZE]?.let { edit.putString(POSTER_SIZE, PosterSize.decode(it).name) }
+        values[ACCENT]?.let { edit.putString(ACCENT, AccentColor.decode(it).name) }
         values[PROFILE]?.let { edit.putString(PROFILE, it) }
         values[BADGES]?.let { edit.putString(BADGES, PosterBadges.encode(PosterBadges.decode(it))) }
         values[SUBTITLES]?.let { edit.putString(SUBTITLES, it) }
@@ -154,6 +172,8 @@ class PlaybackSettings(
         return PlaybackPrefs(
             preferOriginalLanguage = prefs.getBoolean(ORIGINAL, false),
             posterBadges = PosterBadges.decode(prefs.getString(BADGES, null)),
+            posterSize = PosterSize.decode(prefs.getString(POSTER_SIZE, null)),
+            accentColor = AccentColor.decode(prefs.getString(ACCENT, null)),
             profile = SourceProfile.decode(prefs.getString(PROFILE, null)),
             subtitleLanguages = subtitles,
             addonSubtitlesAuto = prefs.getBoolean(ADDON_AUTO, true),
@@ -165,6 +185,8 @@ class PlaybackSettings(
     }
 
     companion object {
+        private const val POSTER_SIZE = "poster_size"
+        private const val ACCENT = "accent_color"
         private const val BADGES = "poster_badges"
         private const val ORIGINAL = "prefer_original_language"
         private const val PROFILE = "profile"

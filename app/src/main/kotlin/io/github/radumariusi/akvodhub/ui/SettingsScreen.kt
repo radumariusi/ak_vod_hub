@@ -133,6 +133,8 @@ fun SettingsScreen(
         }
         OutlinedButton(onClick = tmdbViewModel::refreshImdb, enabled = !imdb.running) { Text("Actualizează acum") }
 
+        AppearanceSection(playbackViewModel)
+
         PosterBadgesSection(playbackViewModel)
 
         PlaybackSection(playbackViewModel)

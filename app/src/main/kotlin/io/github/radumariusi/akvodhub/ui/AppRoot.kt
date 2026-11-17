@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
@@ -21,7 +23,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
@@ -201,10 +205,23 @@ fun AppRoot(
                                 role = Role.Tab
                             }
                         OutlinedButton(onClick = { current = destination }, modifier = tabModifier) {
-                            Text(
-                                destination.label,
-                                textDecoration = if (current == destination) TextDecoration.Underline else null,
-                            )
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    destination.label,
+                                    textDecoration = if (current == destination) TextDecoration.Underline else null,
+                                )
+                                Box(
+                                    Modifier.width(32.dp).height(3.dp).background(
+                                        if (current ==
+                                            destination
+                                        ) {
+                                            MaterialTheme.colorScheme.primary
+                                        } else {
+                                            Color.Transparent
+                                        },
+                                    ),
+                                )
+                            }
                         }
                     }
                 }

@@ -1,14 +1,16 @@
 package io.github.radumariusi.akvodhub.ui.theme
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.darkColorScheme
+import io.github.radumariusi.akvodhub.parser.catalog.AccentColor
 
-private val colors =
+private fun colors(accent: AccentColor) =
     darkColorScheme(
-        primary = Color(0xFFE50914),
-        onPrimary = Color.White,
+        primary = Color(accent.argb),
+        onPrimary = Color(accent.onArgb),
         secondary = Color(0xFF8AB4F8),
         background = Color(0xFF0F1115),
         onBackground = Color(0xFFE8EAED),
@@ -20,6 +22,7 @@ private val colors =
 
 /** Temă întunecată, potrivită pentru TV. */
 @Composable
-fun AkVodHubTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = colors, content = content)
+fun AkVodHubTheme(accent: AccentColor = AccentColor.RED, content: @Composable () -> Unit) {
+    val scheme = remember(accent) { colors(accent) }
+    MaterialTheme(colorScheme = scheme, content = content)
 }

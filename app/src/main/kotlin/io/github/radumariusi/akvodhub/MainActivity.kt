@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.tv.material3.MaterialTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -30,6 +31,7 @@ import io.github.radumariusi.akvodhub.tv.NavRequest
 import io.github.radumariusi.akvodhub.ui.AppRoot
 import io.github.radumariusi.akvodhub.ui.HubViewModels
 import io.github.radumariusi.akvodhub.ui.hub.LocalPosterBadges
+import io.github.radumariusi.akvodhub.ui.hub.LocalPosterSize
 import io.github.radumariusi.akvodhub.ui.theme.AkVodHubTheme
 import io.github.radumariusi.akvodhub.update.UpdateViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -57,14 +59,13 @@ class MainActivity : ComponentActivity() {
             handle(intent)
         }
         setContent {
-            AkVodHubTheme {
+            val prefs by playbackViewModel.prefs.collectAsState()
+            AkVodHubTheme(prefs.accentColor) {
                 // Pe telefon conținutul nu intră sub barele sistemului / tastatură; pe TV marginile sunt 0.
                 Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).safeDrawingPadding()) {
                     CompositionLocalProvider(
-                        LocalPosterBadges provides
-                            playbackViewModel.prefs
-                                .collectAsState()
-                                .value.posterBadges,
+                        LocalPosterBadges provides prefs.posterBadges,
+                        LocalPosterSize provides prefs.posterSize,
                     ) {
                         AppRoot(
                             updateViewModel,
