@@ -7,9 +7,10 @@ import kotlin.math.round
 object FrameRateMatch {
     fun choose(frameRate: Float, rates: List<Float>): Int? {
         if (!frameRate.isFinite() || frameRate < 10f || frameRate > 120f) return null
-        return rates.indices.filter { i ->
-            val multiple = rates[i] / frameRate
-            multiple >= 0.99f && abs(multiple - round(multiple)) < 0.005f
-        }.minByOrNull { rates[it] }
+        return rates.indices
+            .filter { i ->
+                val multiple = rates[i] / frameRate
+                multiple >= 0.99f && abs(multiple - round(multiple)) < 0.0005f
+            }.minByOrNull { rates[it] }
     }
 }

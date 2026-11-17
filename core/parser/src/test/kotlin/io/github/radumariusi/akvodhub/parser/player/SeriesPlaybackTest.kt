@@ -1,6 +1,9 @@
 package io.github.radumariusi.akvodhub.parser.player
 
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SeriesPlaybackTest {
@@ -19,5 +22,16 @@ class SeriesPlaybackTest {
         assertTrue(SeriesPlayback.validSetting("series.tmdb_42.audio", "en"))
         assertFalse(SeriesPlayback.validSetting("series.tmdb_42.text", "https://secret"))
         assertFalse(SeriesPlayback.validSetting("series.tmdb_42.audio", "999"))
+    }
+
+    @Test
+    fun rememberedTracksRespectOffAndFallBackWhenUnavailable() {
+        assertEquals("off", SeriesPlayback.subtitleChoice("off", setOf("ro"), setOf("ro")))
+        assertEquals("embedded:ro", SeriesPlayback.subtitleChoice("embedded:ro", setOf("ro"), setOf("ro")))
+        assertEquals("addon:ro", SeriesPlayback.subtitleChoice("addon:ro", setOf("ro"), setOf("ro")))
+        assertEquals("embedded:ro", SeriesPlayback.subtitleChoice("addon:ro", setOf("ro"), emptySet()))
+        assertNull(SeriesPlayback.subtitleChoice("addon:ro", setOf("en"), setOf("en")))
+        assertEquals(listOf("ro", "en"), SeriesPlayback.audioLanguages("ro", listOf("en", "ro")))
+        assertEquals(listOf("en"), SeriesPlayback.audioLanguages(null, listOf("en")))
     }
 }

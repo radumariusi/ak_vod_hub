@@ -9,7 +9,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
@@ -25,7 +29,10 @@ import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
 fun JumpToMinuteDialog(viewModel: PlayerViewModel, onClose: () -> Unit) {
     var minute by remember { mutableStateOf("") }
     Dialog(onDismissRequest = onClose) {
-        Column(Modifier.background(Color(0xFF202020)).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(
+            Modifier.background(Color(0xFF202020)).padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
             Text("Salt la minut (de la început)")
             BasicTextField(
                 value = minute,

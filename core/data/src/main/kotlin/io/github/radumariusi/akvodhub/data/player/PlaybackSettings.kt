@@ -6,8 +6,8 @@ import io.github.radumariusi.akvodhub.parser.catalog.OriginalLanguage
 import io.github.radumariusi.akvodhub.parser.catalog.PosterBadge
 import io.github.radumariusi.akvodhub.parser.catalog.PosterBadges
 import io.github.radumariusi.akvodhub.parser.catalog.PosterSize
-import io.github.radumariusi.akvodhub.parser.player.SourceProfile
 import io.github.radumariusi.akvodhub.parser.player.BufferPreset
+import io.github.radumariusi.akvodhub.parser.player.SourceProfile
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -73,21 +73,30 @@ class PlaybackSettings(
 
     fun setSeriesTrack(key: String, type: String, value: String) {
         val name = "series.$key.$type"
-        if (io.github.radumariusi.akvodhub.parser.player.SeriesPlayback.validSetting(name, value)) {
+        if (io.github.radumariusi.akvodhub.parser.player.SeriesPlayback
+                .validSetting(name, value)
+        ) {
             prefs.edit().putString(name, value).apply()
         }
     }
 
     fun clearSeriesTracks(key: String) {
-        prefs.edit().remove("series.$key.audio").remove("series.$key.text").apply()
+        prefs
+            .edit()
+            .remove("series.$key.audio")
+            .remove("series.$key.text")
+            .apply()
     }
 
     fun seriesIntro(key: String): Long = prefs.getString("series.$key.intro", null)?.toLongOrNull() ?: 0L
 
     fun setSeriesIntro(key: String, endMs: Long) {
         val name = "series.$key.intro"
-        if (endMs == 0L) prefs.edit().remove(name).apply()
-        else if (io.github.radumariusi.akvodhub.parser.player.SeriesPlayback.validSetting(name, endMs.toString())) {
+        if (endMs == 0L) {
+            prefs.edit().remove(name).apply()
+        } else if (io.github.radumariusi.akvodhub.parser.player.SeriesPlayback
+                .validSetting(name, endMs.toString())
+        ) {
             prefs.edit().putString(name, endMs.toString()).apply()
         }
     }
@@ -165,7 +174,12 @@ class PlaybackSettings(
     fun backup(): Map<String, String> =
         buildMap {
             prefs.all.forEach { (key, value) ->
-                if (value is String && io.github.radumariusi.akvodhub.parser.player.SeriesPlayback.validSetting(key, value)) put(key, value)
+                if (value is String &&
+                    io.github.radumariusi.akvodhub.parser.player.SeriesPlayback
+                        .validSetting(key, value)
+                ) {
+                    put(key, value)
+                }
             }
             put(BUFFER, state.value.bufferPreset.name)
             put(NIGHT, state.value.nightMode.toString())
@@ -187,7 +201,13 @@ class PlaybackSettings(
         val edit = prefs.edit()
         values[BUFFER]?.let { edit.putString(BUFFER, BufferPreset.decode(it).name) }
         values.forEach { (key, value) ->
-            if (io.github.radumariusi.akvodhub.parser.player.SeriesPlayback.validSetting(key, value)) edit.putString(key, value)
+            if (io.github.radumariusi.akvodhub.parser.player.SeriesPlayback.validSetting(
+                    key,
+                    value,
+                )
+            ) {
+                edit.putString(key, value)
+            }
         }
         values[NIGHT]?.toBooleanStrictOrNull()?.let { edit.putBoolean(NIGHT, it) }
         values[PASSTHROUGH]?.toBooleanStrictOrNull()?.let { edit.putBoolean(PASSTHROUGH, it) }

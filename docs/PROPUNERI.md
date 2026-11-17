@@ -51,23 +51,31 @@ Nota IMDb cere IMDb ID-ul fiecărui titlu, pe care acum îl avem doar pentru o p
 
 ---
 
-## Etapa 11: Player
+## ✅ Etapa 11: Player
 
 | # | Funcție | Inspirat din | APK | Viteză |
 |---|---------|--------------|-----|--------|
-| 11.1 | **Potrivire frecvență ecran** (23,976 / 24 / 25 / 50 Hz): elimină sacadarea la filme. Android 11 o suportă | Kodi, Infuse, Plex | 🟢 0 | 🟢 (opțiune, unele TV-uri clipesc 1–2 s la schimbare) |
-| 11.2 | **Passthrough audio** AC3 / E-AC3 / DTS către soundbar/receiver | Kodi, Plex, Jellyfin | 🟢 0 | 🟢 |
-| 11.3 | **Mod noapte / dialog mai clar** (compresor de volum) | Plex, Infuse | 🟢 câțiva KB | 🟢 |
-| 11.4 | **Format imagine**: potrivit / zoom / întins; **viteză** 0,75×–2× | VLC, MX Player, TiviMate | 🟢 0 | 🟢 |
-| 11.5 | **Sari peste intro**: marchezi o dată sfârșitul introului la un serial, butonul „Sari intro” apare apoi la toate episoadele | Netflix, Plex, Jellyfin Intro Skipper | 🟢 | 🟢 (un tabel mic) |
-| 11.6 | **Ține minte audio + subtitrarea per serial** (nu doar global) | Plex | 🟢 | 🟢 |
-| 11.7 | **Derulare accelerată** când ții apăsat (10 s → 30 s → 1 min → 5 min) și salt la minut | Kodi, TiviMate | 🟢 | 🟢 |
-| 11.8 | **Info tehnic** (codec, rezoluție, bitrate, cadre pierdute, buffer) | Kodi („o”), Stremio | 🟢 | 🟢 |
-| 11.9 | **Timer de somn** (30/60/90 min, sfârșitul episodului) | TiviMate, Plex | 🟢 | 🟢 |
-| 11.10 | **Buffer configurabil** pentru furnizori lenți (mic / normal / mare) | Kodi cache, TiviMate | 🟢 | 🟡 „mare” folosește mai mult RAM pe TV |
+| ✅ 11.1 | **Potrivire frecvență ecran** (23,976 / 24 / 25 / 50 Hz): elimină sacadarea la filme. Android 11 o suportă | Kodi, Infuse, Plex | 🟢 0 | 🟢 (opțiune, unele TV-uri clipesc 1–2 s la schimbare) |
+| ✅ 11.2 | **Passthrough audio** AC3 / E-AC3 / DTS către soundbar/receiver | Kodi, Plex, Jellyfin | 🟢 0 | 🟢 |
+| ✅ 11.3 | **Mod noapte / dialog mai clar** (compresor de volum) | Plex, Infuse | 🟢 câțiva KB | 🟢 |
+| ✅ 11.4 | **Format imagine**: potrivit / zoom / întins; **viteză** 0,75×–2× | VLC, MX Player, TiviMate | 🟢 0 | 🟢 |
+| ✅ 11.5 | **Sari peste intro**: marchezi o dată sfârșitul introului la un serial, butonul „Sari intro” apare apoi la toate episoadele | Netflix, Plex, Jellyfin Intro Skipper | 🟢 | 🟢 (un tabel mic) |
+| ✅ 11.6 | **Ține minte audio + subtitrarea per serial** (nu doar global) | Plex | 🟢 | 🟢 |
+| ✅ 11.7 | **Derulare accelerată** când ții apăsat (10 s → 30 s → 1 min → 5 min) și salt la minut | Kodi, TiviMate | 🟢 | 🟢 |
+| ✅ 11.8 | **Info tehnic** (codec, rezoluție, bitrate, cadre pierdute, buffer) | Kodi („o”), Stremio | 🟢 | 🟢 |
+| ✅ 11.9 | **Timer de somn** (30/60/90 min, sfârșitul episodului) | TiviMate, Plex | 🟢 | 🟢 |
+| ✅ 11.10 | **Buffer configurabil** pentru furnizori lenți (mic / normal / mare) | Kodi cache, TiviMate | 🟢 | 🟡 „mare” folosește mai mult RAM pe TV |
 | 11.11 | ❌ Previzualizare imagini la derulare (trickplay) | Plex, Jellyfin | – | 🔴 IPTV nu dă miniaturi; generarea lor ar descărca filmul. Nu recomand |
 
-**Verdict greutate:** totul e în Media3 deja inclus. Zero biblioteci noi.
+**Implementare 11.1–11.10:** opțiuni în comenzile playerului; fără trickplay, dependențe noi sau migrare DB (Room v14).
+Frecvența este opțională, numai la aceeași rezoluție, cu restaurarea modului inițial. Passthrough folosește
+capabilitățile ieșirii Media3; modul noapte comprimă PCM și suspendă passthrough. Passthrough/mod noapte/buffer
+se aplică la redeschiderea playerului. Formatul/viteza și timerul sunt pentru sesiunea curentă.
+Intro manual (1 s–10 min) și limbi audio/subtitrare, inclusiv oprite, per serial; backup fără URL-uri de subtitrări.
+Memoria păstrează limba și tipul subtitrării, nu indexul pistei dintre surse/episoade. Preferințele globale sunt fallback.
+Testarea pe TV/hardware rămâne în sarcina proprietarului.
+
+**Verdict greutate:** Media3 existent și procesor PCM propriu. Zero biblioteci noi.
 
 ---
 

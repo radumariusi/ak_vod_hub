@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-17 — Etapa 11: player
+- Frecvență ecran, passthrough și mod noapte opționale; format imagine și viteză.
+- Intro și limbi audio/subtitrare per serial, derulare accelerată, salt la minut, info tehnic, timer și buffer configurabil.
+- Preferințe persistente incluse în backup; fără dependențe sau migrare Room. Necesită testarea proprietarului pe TV.
+
 ## 2026-11-17 — Etapa 12.8
 - Aspect: postere mici/medii/mari și cinci culori de accent, cu salvare și backup; etapa 12 completă pentru testarea pe TV.
 

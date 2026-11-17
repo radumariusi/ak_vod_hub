@@ -39,8 +39,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.nativeKeyEvent
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.nativeKeyEvent
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
@@ -50,14 +50,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.Player
-import androidx.media3.ui.PlayerView
 import androidx.media3.ui.AspectRatioFrameLayout
+import androidx.media3.ui.PlayerView
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import io.github.radumariusi.akvodhub.parser.player.SeekNavigation
 import io.github.radumariusi.akvodhub.parser.player.BufferPreset
 import io.github.radumariusi.akvodhub.parser.player.Resume
+import io.github.radumariusi.akvodhub.parser.player.SeekNavigation
 import io.github.radumariusi.akvodhub.parser.player.SeriesPlayback
 import io.github.radumariusi.akvodhub.player.PlayerFactory
 import io.github.radumariusi.akvodhub.player.PlayerUiState
@@ -202,11 +202,12 @@ fun PlayerScreen(
             },
             update = { view ->
                 SubtitleLook.applyTo(view, prefs.subtitleScale, prefs.subtitleStyle)
-                view.resizeMode = when (state.pictureMode) {
-                    1 -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-                    2 -> AspectRatioFrameLayout.RESIZE_MODE_FILL
-                    else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
-                }
+                view.resizeMode =
+                    when (state.pictureMode) {
+                        1 -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                        2 -> AspectRatioFrameLayout.RESIZE_MODE_FILL
+                        else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+                    }
             },
             onRelease = { it.player = null },
             modifier = Modifier.fillMaxSize(),
@@ -318,6 +319,7 @@ private fun Controls(
     onTechnical: () -> Unit,
     modifier: Modifier,
 ) {
+    val playbackPrefs by viewModel.prefs.collectAsState()
     Column(
         modifier =
             modifier
@@ -366,33 +368,72 @@ private fun Controls(
             OutlinedButton(onClick = { viewModel.seekBy(-PlayerFactory.SEEK_MS) }) { Text("−10 s") }
             OutlinedButton(onClick = { viewModel.seekBy(PlayerFactory.SEEK_MS) }) { Text("+10 s") }
             OutlinedButton(onClick = {
-                onChoice(Choice("Frecvență ecran · poate clipi la schimbare", listOf("Dezactivată", "Potrivește cu filmul"), null) {
-                    viewModel.setMatchFrameRate(it == 1)
-                })
+                onChoice(
+                    Choice(
+                        "Frecvență ecran · poate clipi la schimbare",
+                        listOf("Dezactivată", "Potrivește cu filmul"),
+                        if (playbackPrefs.matchFrameRate) 1 else 0,
+                    ) {
+                        viewModel.setMatchFrameRate(it == 1)
+                    },
+                )
             }) { Text("Frecvență ecran") }
             OutlinedButton(onClick = {
-                onChoice(Choice("Passthrough · la redeschiderea playerului", listOf("Dezactivat · PCM", "Automat · ieșire compatibilă"), null) {
-                    viewModel.setAudioPassthrough(it == 1)
-                })
+                onChoice(
+                    Choice(
+                        "Passthrough · la redeschiderea playerului",
+                        listOf("Dezactivat · PCM", "Automat · ieșire compatibilă"),
+                        if (playbackPrefs.audioPassthrough) 1 else 0,
+                    ) {
+                        viewModel.setAudioPassthrough(it == 1)
+                    },
+                )
             }) { Text("Passthrough") }
             OutlinedButton(onClick = {
-                onChoice(Choice("Mod noapte · la redeschidere, fără passthrough", listOf("Dezactivat", "Dialog mai clar · compresie PCM"), null) {
-                    viewModel.setNightMode(it == 1)
-                })
+                onChoice(
+                    Choice(
+                        "Mod noapte · la redeschidere, fără passthrough",
+                        listOf("Dezactivat", "Dialog mai clar · compresie PCM"),
+                        if (playbackPrefs.nightMode) 1 else 0,
+                    ) {
+                        viewModel.setNightMode(it == 1)
+                    },
+                )
             }) { Text("Mod noapte") }
             OutlinedButton(onClick = {
-                onChoice(Choice("Format imagine", listOf("Potrivit", "Zoom", "Întins"), state.pictureMode, viewModel::setPictureMode))
+                onChoice(
+                    Choice(
+                        "Format imagine",
+                        listOf("Potrivit", "Zoom", "Întins"),
+                        state.pictureMode,
+                        viewModel::setPictureMode,
+                    ),
+                )
             }) { Text("Format imagine") }
             OutlinedButton(onClick = {
                 val speeds = listOf(0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
-                onChoice(Choice("Viteză de redare", listOf("0,75×", "1×", "1,25×", "1,5×", "1,75×", "2×"), speeds.indexOf(state.speed)) {
-                    viewModel.setSpeed(speeds[it])
-                })
+                onChoice(
+                    Choice(
+                        "Viteză de redare",
+                        listOf("0,75×", "1×", "1,25×", "1,5×", "1,75×", "2×"),
+                        speeds.indexOf(state.speed),
+                    ) {
+                        viewModel.setSpeed(speeds[it])
+                    },
+                )
             }) { Text("Viteză ${state.speed}×") }
             OutlinedButton(onClick = {
-                onChoice(Choice("Buffer · la redeschiderea playerului", BufferPreset.entries.map { it.label }, null) {
-                    viewModel.setBufferPreset(BufferPreset.entries[it])
-                })
+                onChoice(
+                    Choice(
+                        "Buffer · la redeschiderea playerului",
+                        BufferPreset.entries.map {
+                            it.label
+                        },
+                        BufferPreset.entries.indexOf(playbackPrefs.bufferPreset),
+                    ) {
+                        viewModel.setBufferPreset(BufferPreset.entries[it])
+                    },
+                )
             }) { Text("Buffer") }
             if (state.audio.isNotEmpty()) {
                 OutlinedButton(onClick = {
@@ -419,9 +460,16 @@ private fun Controls(
             }
             OutlinedButton(onClick = {
                 val minutes = if (state.isSeries) listOf(0, 30, 60, 90, -1) else listOf(0, 30, 60, 90)
-                val labels = listOf("Oprit", "30 minute", "60 minute", "90 minute") +
-                    if (state.isSeries) listOf("Sfârșitul episodului") else emptyList()
-                onChoice(Choice("Timer de somn · ${state.sleepLabel}", labels, null) { viewModel.setSleepTimer(minutes[it]) })
+                val labels =
+                    listOf("Oprit", "30 minute", "60 minute", "90 minute") +
+                        if (state.isSeries) listOf("Sfârșitul episodului") else emptyList()
+                onChoice(
+                    Choice(
+                        "Timer de somn · ${state.sleepLabel}",
+                        labels,
+                        null,
+                    ) { viewModel.setSleepTimer(minutes[it]) },
+                )
             }) { Text("Somn: ${state.sleepLabel}") }
             OutlinedButton(onClick = onTechnical) { Text("Info tehnic") }
             OutlinedButton(onClick = onJump) { Text("Salt la minut") }
@@ -431,9 +479,15 @@ private fun Controls(
                     OutlinedButton(onClick = viewModel::skipIntro) { Text("Sari intro") }
                 }
                 OutlinedButton(onClick = {
-                    onChoice(Choice("Intro pentru acest serial", listOf("Marchează sfârșitul aici", "Șterge marcajul"), null) {
-                        if (it == 0) viewModel.markIntro() else viewModel.clearIntro()
-                    })
+                    onChoice(
+                        Choice(
+                            "Intro pentru acest serial",
+                            listOf("Marchează sfârșitul aici", "Șterge marcajul"),
+                            null,
+                        ) {
+                            if (it == 0) viewModel.markIntro() else viewModel.clearIntro()
+                        },
+                    )
                 }) { Text("Intro serial") }
             }
             if (state.next != null) {
