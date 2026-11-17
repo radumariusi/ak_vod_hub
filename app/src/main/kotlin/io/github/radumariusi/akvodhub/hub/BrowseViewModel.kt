@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.radumariusi.akvodhub.data.catalog.HubRepository
 import io.github.radumariusi.akvodhub.data.db.TitleCard
+import io.github.radumariusi.akvodhub.parser.catalog.CatalogCursor
 import io.github.radumariusi.akvodhub.parser.catalog.CatalogFilter
 import io.github.radumariusi.akvodhub.parser.match.MediaType
 import kotlinx.coroutines.CoroutineScope
@@ -40,6 +41,8 @@ class Browser(
     val state: StateFlow<BrowseState> = mutableState.asStateFlow()
     private var job: Job? = null
     private var started = false
+    private var cursor: CatalogCursor? = null
+    private val loadedIds = mutableSetOf<Long>()
 
     /** Prima încărcare, când ecranul apare. */
     fun start() {
@@ -85,8 +88,12 @@ class Browser(
             scope.launch {
                 if (debounce) delay(TYPING_DELAY_MS)
                 val empty = needsInput && filter.text.isBlank() && !filter.hasFilters
-                val items = if (empty) emptyList() else repository.page(filter, PAGE, 0)
-                mutableState.value = BrowseState(filter, items, loading = false, endReached = items.size < PAGE)
+                val page = if (empty) null else repository.page(filter, PAGE)
+                val items = page?.items.orEmpty()
+                cursor = page?.next
+                loadedIds.clear()
+                items.mapTo(loadedIds) { it.id }
+                mutableState.value = BrowseState(filter, items, loading = false, endReached = cursor == null)
             }
     }
 
@@ -97,15 +104,14 @@ class Browser(
         mutableState.update { it.copy(loading = true) }
         job =
             scope.launch {
-                val more = repository.page(s.filter, PAGE, s.items.size)
+                val page = repository.page(s.filter, PAGE, checkNotNull(cursor))
                 val current = mutableState.value
-                val known = current.items.mapTo(HashSet()) { it.id }
+                cursor = page.next
                 mutableState.value =
                     current.copy(
-                        items = current.items + more.filter { it.id !in known },
+                        items = current.items + page.items.filter { loadedIds.add(it.id) },
                         loading = false,
-                        endReached =
-                            more.size < PAGE,
+                        endReached = cursor == null,
                     )
             }
     }

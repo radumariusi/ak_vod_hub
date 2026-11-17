@@ -76,11 +76,22 @@ fun BrowseScreen(
     }
     LaunchedEffect(grid, browser) {
         snapshotFlow {
-            grid.layoutInfo.visibleItemsInfo
-                .lastOrNull()
-                ?.index ?: -1
+            val lastVisible =
+                grid.layoutInfo.visibleItemsInfo
+                    .lastOrNull()
+                    ?.index ?: -1
+            lastVisible to state.items.size
         }.distinctUntilChanged()
-            .collect { browser.onVisible(it) }
+            .collect { (index, _) -> browser.onVisible(index) }
+    }
+    LaunchedEffect(restoreKey, state.items) {
+        val id = restoreKey?.takeIf { it.startsWith("browse:$screenKey:") }?.substringAfterLast(':')?.toLongOrNull()
+        if (id != null) {
+            val index = state.items.indexOfFirst { it.id == id }
+            if (index >= 0 && grid.layoutInfo.visibleItemsInfo.none { it.key == id }) {
+                grid.scrollToItem(index)
+            }
+        }
     }
 
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {

@@ -141,7 +141,7 @@ class HomeScreenPublisher
 
         @RequiresApi(Build.VERSION_CODES.O)
         private suspend fun syncChannel() {
-            val cards = repository.page(CatalogFilter(sort = CatalogSort.RECENT), MAX_CHANNEL, 0)
+            val cards = repository.page(CatalogFilter(sort = CatalogSort.RECENT), MAX_CHANNEL).items
             val resolver = context.contentResolver
             val channelId = channel(resolver, create = cards.isNotEmpty()) ?: return
             val programsUri = TvContract.buildPreviewProgramsUriForChannel(channelId)

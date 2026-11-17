@@ -53,7 +53,11 @@ class SearchProvider : ContentProvider() {
         val repository = EntryPointAccessors.fromApplication(context, Deps::class.java).hubRepository()
         val cards =
             runCatching {
-                runBlocking { withTimeoutOrNull(TIMEOUT_MS) { repository.page(CatalogFilter(text = text), limit, 0) } }
+                runBlocking {
+                    withTimeoutOrNull(
+                        TIMEOUT_MS,
+                    ) { repository.page(CatalogFilter(text = text), limit).items }
+                }
             }.getOrNull().orEmpty()
         for (card in cards) {
             cursor.addRow(

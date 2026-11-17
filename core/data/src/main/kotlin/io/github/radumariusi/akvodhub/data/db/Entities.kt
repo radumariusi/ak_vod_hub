@@ -1,6 +1,7 @@
 package io.github.radumariusi.akvodhub.data.db
 
 import androidx.room.ColumnInfo
+import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -236,6 +237,13 @@ data class TitleCard(
     val hdrBadge: String? = null,
     val isNew: Boolean = false,
     val watchProgress: Double = 0.0,
+)
+
+/** Proiecție pentru paginare; câmpurile de sortare în plus nu fac parte din cardul UI. */
+data class CatalogCard(
+    @Embedded val card: TitleCard,
+    val popularity: Double?,
+    val addedAt: Long?,
 )
 
 /** Un titlu din „Continuă vizionarea”, cu locul unde a rămas utilizatorul. */

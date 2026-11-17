@@ -186,6 +186,9 @@ interface CatalogDao {
     suspend fun cards(query: SupportSQLiteQuery): List<TitleCard>
 
     @RawQuery
+    suspend fun catalogCards(query: SupportSQLiteQuery): List<CatalogCard>
+
+    @RawQuery
     suspend fun newsCards(query: SupportSQLiteQuery): List<NewsCard>
 
     @Query(
