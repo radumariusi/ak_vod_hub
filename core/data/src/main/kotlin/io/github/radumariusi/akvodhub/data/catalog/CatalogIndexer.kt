@@ -7,6 +7,7 @@ import io.github.radumariusi.akvodhub.data.db.AkVodDatabase
 import io.github.radumariusi.akvodhub.data.db.PendingEntry
 import io.github.radumariusi.akvodhub.data.db.TitleEntity
 import io.github.radumariusi.akvodhub.parser.VodKind
+import io.github.radumariusi.akvodhub.parser.catalog.DubLabel
 import io.github.radumariusi.akvodhub.parser.match.MediaType
 import io.github.radumariusi.akvodhub.parser.match.TitleSimilarity
 import io.github.radumariusi.akvodhub.parser.title.TitleParser
@@ -52,6 +53,7 @@ class CatalogIndexer(
                 db.playlistDao().inheritSeriesTitles()
                 db.withTransaction {
                     dao.updateSummaries()
+                    updateDubLabels()
                     dao.deleteEmptyLocalTitles()
                     rebuildSearchIndex()
                 }
@@ -94,6 +96,41 @@ class CatalogIndexer(
                 }
             }
         }
+    }
+
+    /** Un singur parcurs după cheia titlului; nici liste complete, nici interogări pe poster. */
+    private fun updateDubLabels() {
+        val sql = db.openHelper.writableDatabase
+        val update = sql.compileStatement("UPDATE title SET dubLabel = ? WHERE id = ?")
+        update.use {
+            sql
+                .query(
+                    "SELECT t.id, t.originalLanguage, r.languages FROM title t " +
+                        "JOIN raw_entry r ON r.titleId = t.id ORDER BY t.id",
+                ).use { cursor ->
+                    var titleId = -1L
+                    var label: DubLabel? = null
+
+                    fun save() {
+                        if (titleId < 0) return
+                        val value = label?.label()
+                        if (value == null) update.bindNull(1) else update.bindString(1, value)
+                        update.bindLong(2, titleId)
+                        update.executeUpdateDelete()
+                    }
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getLong(0)
+                        if (id != titleId) {
+                            save()
+                            titleId = id
+                            label = DubLabel(cursor.getString(1))
+                        }
+                        label?.addSource(cursor.getString(2))
+                    }
+                    save()
+                }
+        }
+        sql.execSQL("UPDATE title SET dubLabel = NULL WHERE sourceCount = 0")
     }
 
     private fun rebuildSearchIndex() {
@@ -139,7 +176,7 @@ class CatalogIndexer(
 
     companion object {
         private const val TAG = "CatalogIndexer"
-        private const val FINGERPRINT = "fingerprint"
+        private const val FINGERPRINT = "fingerprint_v6"
         private const val BATCH = 2_000
     }
 }

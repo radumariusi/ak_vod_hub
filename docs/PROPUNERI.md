@@ -1,6 +1,6 @@
 # Propuneri: funcționalități noi, aplicația rămâne „slim”
 
-Status: **propunere**, nimic implementat. Radu alege ce intră și în ce ordine.
+Status: în implementare; elementele terminate sunt marcate cu ✅.
 
 Punct de plecare (v0.1.14): APK **7,5 MB** (cu FFmpeg pentru 3 arhitecturi), 7 biblioteci mari
 (Compose TV, Media3, Room, Hilt, WorkManager, OkHttp, Coil). Playlist-ul lui Radu: ~90.800 filme +
@@ -18,7 +18,7 @@ asupra derulării / pornirii · 🟢 neglijabil · 🟡 de urmărit · 🔴 greu
 
 | # | Funcție | Inspirat din | APK | DB | Viteză |
 |---|---------|--------------|-----|----|--------|
-| 10.1 | **Etichetă „DUB”** pe titlurile care au doar surse în altă limbă decât cea originală (ex. film american doar în germană → „DUB DE”) | Stremio (Torrentio flags), TiviMate | 🟢 0 | 🟢 +1 coloană | 🟢 |
+| ✅ 10.1 | **Etichetă „DUB”** pe titlurile care au doar surse în altă limbă decât cea originală (ex. film american doar în germană → „DUB DE”) | Stremio (Torrentio flags), TiviMate | 🟢 0 | 🟢 +1 coloană | 🟢 |
 | 10.2 | **Preferă limba originală** (setare): sursele în limba originală trec primele la „Redă”; filtru „Doar în limba originală” în Filme/Seriale | Plex (audio original), Infuse | 🟢 0 | 🟢 | 🟢 |
 | 10.3 | **Filtru „Producții SUA”** / limba originală engleză (US) | Jellyfin filtre | 🟢 0 | 🟢 +1 coloană | 🟢 |
 | 10.4 | **Completare detalii TMDB în fundal** pentru toate titlurile: IMDb ID, durată, certificare (PG-13…), țara de origine, tagline | NuvioTV, Plex | 🟢 0 | 🟡 +3–5 MB | 🟡 o singură dată ~1 h în fundal |

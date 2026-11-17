@@ -186,6 +186,8 @@ data class TitleEntity(
     val qualities: String? = null,
     /** Limbile audio ale surselor, cu virgule la capete: `,en,de,ro,`. */
     val audioLanguages: String? = null,
+    /** Etichetă calculată la indexare; null dacă audio original există sau limba e necunoscută. */
+    val dubLabel: String? = null,
 )
 
 /** Titlu local (din playlist, fără potrivire TMDB). */
@@ -202,6 +204,7 @@ data class TitleCard(
     val rating: Double?,
     val bestQuality: Int?,
     val overview: String?,
+    val dubLabel: String? = null,
 )
 
 /** Un titlu din „Continuă vizionarea”, cu locul unde a rămas utilizatorul. */
