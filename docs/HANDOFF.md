@@ -99,7 +99,7 @@ fără OFFSET și fără catalog complet în memorie; 6 cereri în paralel, limi
 Un răspuns fără câmpuri opționale este tot marcat procesat (nu se cere zilnic). Jobul pornește și la
 pornirea procesului; continuările păstrează progresul în DB. `PlaybackActivityState` suspendă lucrul
 cât e vizibil PlayerActivity; jobul reîncearcă după 60 s, fără buclă rapidă sau retry-uri consumate.
-Cererile deja pornite pot termina. Cererile TMDB au plafon de 30 s, lotul respectă bugetul rămas.
+Cererile deja pornite pot termina. La detalii, numai 404 înseamnă titlu inexistent; alte 4xx sunt erori și păstrează legăturile. Cererile TMDB au plafon de 30 s, lotul respectă bugetul rămas.
 Certificare: RO, apoi US, apoi origine/altele; preferă lansarea cinematografică, prefixează țara.
 Durata, certificarea și tagline apar în fișă; pagina deschisă se actualizează după reindexare.
 10.4 precedă 10.3 deoarece filtrul SUA cere țările de origine (nu deducem țara din limba engleză).
