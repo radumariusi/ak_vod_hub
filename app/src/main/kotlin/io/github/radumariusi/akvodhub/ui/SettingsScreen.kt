@@ -19,6 +19,7 @@ import androidx.compose.ui.input.key.*
 import io.github.radumariusi.akvodhub.ui.touch.ListItem
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -125,6 +126,11 @@ fun SettingsScreen(
                     3 -> AudioSection(playbackViewModel)
                     4 -> SubtitlesSection(playbackViewModel)
                     5 -> {
+                        val statistics by playbackViewModel.statistics.collectAsState()
+                        LaunchedEffect(Unit) { playbackViewModel.loadStatistics() }
+                        Text("Statistici bibliotecă", style = MaterialTheme.typography.titleLarge)
+                        Text(statistics)
+                        Text("Titluri unice după grupare; numărul surselor audio poate include aceeași sursă în mai multe limbi.")
         PlaylistsSection(
             playlists = playlists,
             onAdd = {

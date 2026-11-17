@@ -47,6 +47,14 @@ class PlaybackSettingsViewModel
         private val installer: AddonInstaller,
     ) : ViewModel() {
         val prefs: StateFlow<PlaybackPrefs> = settings.state
+        private val mutableStatistics = MutableStateFlow("Se calculează…")
+        val statistics = mutableStatistics.asStateFlow()
+
+        fun loadStatistics() {
+            viewModelScope.launch {
+                mutableStatistics.value = repository.statistics()
+            }
+        }
 
         private val mutableLanguages = MutableStateFlow<List<String>>(emptyList())
 
