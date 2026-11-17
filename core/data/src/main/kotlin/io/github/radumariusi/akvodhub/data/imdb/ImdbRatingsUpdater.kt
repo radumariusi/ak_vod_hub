@@ -5,6 +5,7 @@ import io.github.radumariusi.akvodhub.data.catalog.CatalogIndexer
 import io.github.radumariusi.akvodhub.data.db.AkVodDatabase
 import io.github.radumariusi.akvodhub.data.db.ImdbRatingStage
 import io.github.radumariusi.akvodhub.parser.catalog.ImdbRatings
+import io.github.radumariusi.akvodhub.parser.catalog.PosterBadges
 import io.github.radumariusi.akvodhub.parser.player.PlaybackActivityState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -59,7 +60,16 @@ class ImdbRatingsUpdater(
                                 val available = dao.availableImdbIds(batch.map { it.imdbId }).toHashSet()
                                 val matched = batch.filter { it.imdbId in available }
                                 if (matched.isNotEmpty()) {
-                                    dao.putImdbStage(matched.map { ImdbRatingStage(it.imdbId, it.rating, it.votes) })
+                                    dao.putImdbStage(
+                                        matched.map {
+                                            ImdbRatingStage(
+                                                it.imdbId,
+                                                it.rating,
+                                                it.votes,
+                                                PosterBadges.rating("IMDb", it.rating),
+                                            )
+                                        },
+                                    )
                                 }
                             }
                         }

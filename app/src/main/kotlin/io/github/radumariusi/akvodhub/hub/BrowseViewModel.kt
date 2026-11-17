@@ -52,6 +52,23 @@ class Browser(
         if (started) load(mutableState.value.filter, debounce = false)
     }
 
+    /** Schimbă doar cardul deja încărcat, fără resetarea paginării sau a focusului. */
+    fun updateProgress(titleId: Long, progress: Double) {
+        mutableState.update { state ->
+            val index = state.items.indexOfFirst { it.id == titleId }
+            if (index < 0) {
+                state
+            } else {
+                state.copy(
+                    items =
+                        state.items.toMutableList().apply {
+                            this[index] = this[index].copy(watchProgress = progress)
+                        },
+                )
+            }
+        }
+    }
+
     fun setFilter(filter: CatalogFilter) {
         val old = mutableState.value.filter
         if (filter == old) return
@@ -81,10 +98,11 @@ class Browser(
         job =
             scope.launch {
                 val more = repository.page(s.filter, PAGE, s.items.size)
-                val known = s.items.mapTo(HashSet()) { it.id }
+                val current = mutableState.value
+                val known = current.items.mapTo(HashSet()) { it.id }
                 mutableState.value =
-                    s.copy(
-                        items = s.items + more.filter { it.id !in known },
+                    current.copy(
+                        items = current.items + more.filter { it.id !in known },
                         loading = false,
                         endReached =
                             more.size < PAGE,
@@ -117,6 +135,13 @@ class BrowseViewModel
 
         init {
             viewModelScope.launch { mutableLanguages.value = repository.languages() }
+            viewModelScope.launch {
+                repository.posterProgress.collect { value ->
+                    value?.let { (id, progress) ->
+                        listOf(movies, series, search).forEach { it.updateProgress(id, progress) }
+                    }
+                }
+            }
             viewModelScope.launch {
                 repository.catalogVersion.drop(1).collect {
                     mutableLanguages.value = repository.languages()

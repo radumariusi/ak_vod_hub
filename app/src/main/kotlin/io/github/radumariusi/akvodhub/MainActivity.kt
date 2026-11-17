@@ -9,6 +9,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.tv.material3.MaterialTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -25,6 +27,7 @@ import io.github.radumariusi.akvodhub.tv.DeepLinks
 import io.github.radumariusi.akvodhub.tv.NavRequest
 import io.github.radumariusi.akvodhub.ui.AppRoot
 import io.github.radumariusi.akvodhub.ui.HubViewModels
+import io.github.radumariusi.akvodhub.ui.hub.LocalPosterBadges
 import io.github.radumariusi.akvodhub.ui.theme.AkVodHubTheme
 import io.github.radumariusi.akvodhub.update.UpdateViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -53,19 +56,26 @@ class MainActivity : ComponentActivity() {
             AkVodHubTheme {
                 // Pe telefon conținutul nu intră sub barele sistemului / tastatură; pe TV marginile sunt 0.
                 Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).safeDrawingPadding()) {
-                    AppRoot(
-                        updateViewModel,
-                        playlistsViewModel,
-                        tmdbViewModel,
-                        HubViewModels(
-                            homeViewModel,
-                            browseViewModel,
-                            detailsViewModel,
-                            playbackViewModel,
-                            phoneSetupViewModel,
-                        ),
-                        navRequests,
-                    )
+                    CompositionLocalProvider(
+                        LocalPosterBadges provides
+                            playbackViewModel.prefs
+                                .collectAsState()
+                                .value.posterBadges,
+                    ) {
+                        AppRoot(
+                            updateViewModel,
+                            playlistsViewModel,
+                            tmdbViewModel,
+                            HubViewModels(
+                                homeViewModel,
+                                browseViewModel,
+                                detailsViewModel,
+                                playbackViewModel,
+                                phoneSetupViewModel,
+                            ),
+                            navRequests,
+                        )
+                    }
                 }
             }
         }

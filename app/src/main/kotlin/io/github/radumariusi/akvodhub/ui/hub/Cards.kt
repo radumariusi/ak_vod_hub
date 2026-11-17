@@ -3,9 +3,11 @@
 package io.github.radumariusi.akvodhub.ui.hub
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -13,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -30,9 +33,13 @@ import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import io.github.radumariusi.akvodhub.data.db.TitleCard
 import io.github.radumariusi.akvodhub.data.tmdb.TmdbClient
+import io.github.radumariusi.akvodhub.parser.catalog.PosterBadge
+import io.github.radumariusi.akvodhub.parser.catalog.PosterBadges
 import io.github.radumariusi.akvodhub.parser.match.SourceGrouping
 import io.github.radumariusi.akvodhub.parser.title.VideoQuality
 import io.github.radumariusi.akvodhub.ui.touch.Card
+
+val LocalPosterBadges = staticCompositionLocalOf { PosterBadges.defaults }
 
 val PosterWidth = 112.dp
 val PosterHeight = 168.dp
@@ -82,6 +89,7 @@ fun PosterCard(
     requestFocus: Boolean = false,
     onFocusRequested: () -> Unit = {},
 ) {
+    val badges = LocalPosterBadges.current
     val requester = remember { FocusRequester() }
     if (requestFocus) {
         LaunchedEffect(Unit) {
@@ -118,46 +126,48 @@ fun PosterCard(
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
-                card.imdbRating?.let { rating ->
-                    Text(
-                        "IMDb %.1f".format(rating),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White,
-                        modifier =
-                            Modifier
-                                .align(Alignment.TopStart)
-                                .padding(4.dp)
-                                .background(Color(0xCC000000), MaterialTheme.shapes.extraSmall)
-                                .padding(horizontal = 4.dp, vertical = 1.dp),
-                    )
+                Column(
+                    modifier = Modifier.align(Alignment.TopStart).padding(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    if (PosterBadge.TMDB in badges) card.tmdbBadge?.let { PosterBadgeText(it) }
+                    if (PosterBadge.IMDB in badges) card.imdbBadge?.let { PosterBadgeText(it) }
                 }
-                card.dubLabel?.let { label ->
-                    Text(
-                        label,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier =
-                            Modifier
-                                .align(Alignment.BottomStart)
-                                .padding(4.dp)
-                                .background(Color(0xCC000000), MaterialTheme.shapes.extraSmall)
-                                .padding(horizontal = 4.dp, vertical = 1.dp),
-                    )
+                Column(
+                    modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    horizontalAlignment = Alignment.End,
+                ) {
+                    if (PosterBadge.QUALITY in badges) {
+                        if (card.bestQuality == VideoQuality.UHD.ordinal) PosterBadgeText("4K")
+                        card.hdrBadge?.let { PosterBadgeText(it) }
+                    }
+                    if (PosterBadge.NEW in badges && card.isNew) PosterBadgeText("Nou")
                 }
-                if (card.bestQuality == VideoQuality.UHD.ordinal) {
-                    Text(
-                        "4K",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White,
-                        modifier =
+                if (PosterBadge.DUB in badges) {
+                    card.dubLabel?.let { label ->
+                        PosterBadgeText(
+                            label,
+                            Modifier.align(Alignment.BottomStart).padding(4.dp).padding(bottom = 4.dp),
+                        )
+                    }
+                }
+                if (PosterBadge.PROGRESS in badges && card.watchProgress > 0) {
+                    Box(
+                        Modifier
+                            .align(Alignment.BottomStart)
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .background(Color(0xAA000000)),
+                    ) {
+                        Box(
                             Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(4.dp)
-                                .background(Color(0xCC000000), MaterialTheme.shapes.extraSmall)
-                                .padding(horizontal = 4.dp, vertical = 1.dp),
-                    )
+                                .fillMaxWidth(
+                                    card.watchProgress.toFloat(),
+                                ).height(4.dp)
+                                .background(MaterialTheme.colorScheme.primary),
+                        )
+                    }
                 }
             }
         }
@@ -169,4 +179,19 @@ fun PosterCard(
             modifier = Modifier.padding(top = 6.dp).height(18.dp),
         )
     }
+}
+
+@Composable
+private fun PosterBadgeText(label: String, modifier: Modifier = Modifier) {
+    Text(
+        label,
+        style = MaterialTheme.typography.labelSmall,
+        color = Color.White,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+        modifier =
+            modifier
+                .background(Color(0xCC000000), MaterialTheme.shapes.extraSmall)
+                .padding(horizontal = 4.dp, vertical = 1.dp),
+    )
 }

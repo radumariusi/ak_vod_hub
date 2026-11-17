@@ -126,6 +126,17 @@ arhiva parțială. Plafon cerere 8 minute. Setări arată data, numărul de titl
 Posterele/fișa citesc notele din DB; `notifyCardsChanged()` notifică ecranele fără refacerea rezumatelor/FTS.
 Titlurile care primesc IMDb ID după ultima actualizare primesc note la următoarea actualizare (sau manual).
 
+### Etapa 10.6 (2026-11-17)
+
+Room v10, migrare aditivă 9→10: `tmdbBadge`, `imdbBadge`, `hdrBadge`, `isNew`, `watchProgress` în `title`,
+plus `badge` în cache-ul de lucru IMDb. Același parcurs al indexerului calculează textele și cel mai bun HDR;
+„Nou” = data ultimei adăugări a unei surse în ultimele șapte zile. Amprenta v10 forțează recalcularea inițială.
+Într-o zi nouă se expiră doar insignele vechi în DB, fără reindexarea surselor/FTS. IMDb salvează textul odată cu nota.
+Progresul se completează la migrare din watch_state/history și se actualizează la salvarea vizionării;
+cardurile încărcate primesc actualizarea fără resetarea paginării/focusului și fără cereri pe poster.
+Setări → Insigne pe postere: șase opțiuni, toate active implicit; se pot ascunde toate. Se păstrează în
+preferințele existente și în backup. `LocalPosterBadges` distribuie opțiunile către UI; posterele citesc DB.
+
 ## 6. Ce urmează (din `docs/PROPUNERI.md`)
 
 Ordinea recomandată, **o etapă = un branch + un PR**:

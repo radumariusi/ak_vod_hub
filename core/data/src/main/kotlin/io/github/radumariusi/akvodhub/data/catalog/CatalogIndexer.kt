@@ -8,6 +8,7 @@ import io.github.radumariusi.akvodhub.data.db.PendingEntry
 import io.github.radumariusi.akvodhub.data.db.TitleEntity
 import io.github.radumariusi.akvodhub.parser.VodKind
 import io.github.radumariusi.akvodhub.parser.catalog.DubLabel
+import io.github.radumariusi.akvodhub.parser.catalog.PosterBadges
 import io.github.radumariusi.akvodhub.parser.match.MediaType
 import io.github.radumariusi.akvodhub.parser.match.TitleSimilarity
 import io.github.radumariusi.akvodhub.parser.title.TitleParser
@@ -49,7 +50,14 @@ class CatalogIndexer(
     suspend fun refresh(force: Boolean = false) =
         mutex.withLock {
             withContext(Dispatchers.IO) {
+                val now = clock()
+                val day = now / 86_400_000L
                 if (!force && dao.fingerprint() == prefs.getString(FINGERPRINT, null) && searchIndexReady()) {
+                    if (prefs.getLong("badge_day", -1L) != day) {
+                        val changed = dao.expireNewBadges(now - PosterBadges.NEW_WINDOW_MS, now)
+                        prefs.edit().putLong("badge_day", day).apply()
+                        if (changed > 0) notifyCardsChanged()
+                    }
                     return@withContext
                 }
                 val start = clock()
@@ -61,7 +69,11 @@ class CatalogIndexer(
                     dao.deleteEmptyLocalTitles()
                     rebuildSearchIndex()
                 }
-                prefs.edit().putString(FINGERPRINT, dao.fingerprint()).apply()
+                prefs
+                    .edit()
+                    .putString(FINGERPRINT, dao.fingerprint())
+                    .putLong("badge_day", day)
+                    .apply()
                 mutableVersion.value = clock()
                 Log.i(TAG, "Catalog reindexat în ${clock() - start} ms")
             }
@@ -105,22 +117,39 @@ class CatalogIndexer(
     /** Un singur parcurs după cheia titlului; nici liste complete, nici interogări pe poster. */
     private fun updateDubLabels() {
         val sql = db.openHelper.writableDatabase
-        val update = sql.compileStatement("UPDATE title SET dubLabel = ?, hasOriginalAudio = ? WHERE id = ?")
+        val update =
+            sql.compileStatement(
+                "UPDATE title SET dubLabel = ?, hasOriginalAudio = ?, tmdbBadge = ?, imdbBadge = ?, " +
+                    "hdrBadge = ?, isNew = ? WHERE id = ?",
+            )
         update.use {
             sql
                 .query(
-                    "SELECT t.id, t.originalLanguage, r.languages FROM title t " +
+                    "SELECT t.id, t.originalLanguage, r.languages, t.rating, t.imdbRating, t.addedAt, r.hdr " +
+                        "FROM title t " +
                         "JOIN raw_entry r ON r.titleId = t.id ORDER BY t.id",
                 ).use { cursor ->
                     var titleId = -1L
                     var label: DubLabel? = null
+                    var tmdbBadge: String? = null
+                    var imdbBadge: String? = null
+                    var hdrRank = 0
+                    var isNew = false
+
+                    fun bindText(index: Int, value: String?) {
+                        if (value == null) update.bindNull(index) else update.bindString(index, value)
+                    }
 
                     fun save() {
                         if (titleId < 0) return
                         val value = label?.label()
                         if (value == null) update.bindNull(1) else update.bindString(1, value)
                         update.bindLong(2, if (label?.hasOriginalAudio == true) 1L else 0L)
-                        update.bindLong(3, titleId)
+                        bindText(3, tmdbBadge)
+                        bindText(4, imdbBadge)
+                        bindText(5, PosterBadges.hdrLabel(hdrRank))
+                        update.bindLong(6, if (isNew) 1L else 0L)
+                        update.bindLong(7, titleId)
                         update.executeUpdateDelete()
                     }
                     while (cursor.moveToNext()) {
@@ -129,13 +158,20 @@ class CatalogIndexer(
                             save()
                             titleId = id
                             label = DubLabel(cursor.getString(1))
+                            tmdbBadge = PosterBadges.rating("★", if (cursor.isNull(3)) null else cursor.getDouble(3))
+                            imdbBadge = PosterBadges.rating("IMDb", if (cursor.isNull(4)) null else cursor.getDouble(4))
+                            isNew = PosterBadges.isNew(if (cursor.isNull(5)) null else cursor.getLong(5), clock())
+                            hdrRank = 0
                         }
                         label?.addSource(cursor.getString(2))
+                        hdrRank = maxOf(hdrRank, PosterBadges.hdrRank(cursor.getString(6)))
                     }
                     save()
                 }
         }
-        sql.execSQL("UPDATE title SET dubLabel = NULL, hasOriginalAudio = 0 WHERE sourceCount = 0")
+        sql.execSQL(
+            "UPDATE title SET dubLabel = NULL, hasOriginalAudio = 0, hdrBadge = NULL, isNew = 0 WHERE sourceCount = 0",
+        )
     }
 
     private fun rebuildSearchIndex() {
@@ -181,7 +217,7 @@ class CatalogIndexer(
 
     companion object {
         private const val TAG = "CatalogIndexer"
-        private const val FINGERPRINT = "fingerprint_v7"
+        private const val FINGERPRINT = "fingerprint_v10"
         private const val BATCH = 2_000
     }
 }

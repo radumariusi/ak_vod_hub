@@ -19,7 +19,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ImdbMapEntity::class,
         ImdbRatingStage::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = false,
 )
 abstract class AkVodDatabase : RoomDatabase() {
@@ -42,11 +42,31 @@ abstract class AkVodDatabase : RoomDatabase() {
                     MIGRATION_6_7,
                     MIGRATION_7_8,
                     MIGRATION_8_9,
+                    MIGRATION_9_10,
                 ).addCallback(
                     object : RoomDatabase.Callback() {
                         override fun onOpen(db: SupportSQLiteDatabase) = createSearchTable(db)
                     },
                 ).build()
+
+        /** Etapa 10.6: insigne precalculate și progres, fără interogări pe poster. */
+        val MIGRATION_9_10 =
+            object : Migration(9, 10) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    for (column in listOf("tmdbBadge", "imdbBadge", "hdrBadge")) {
+                        db.execSQL("ALTER TABLE title ADD COLUMN $column TEXT DEFAULT NULL")
+                    }
+                    db.execSQL("ALTER TABLE title ADD COLUMN isNew INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE title ADD COLUMN watchProgress REAL NOT NULL DEFAULT 0.0")
+                    db.execSQL("ALTER TABLE imdb_rating_stage ADD COLUMN badge TEXT DEFAULT NULL")
+                    db.execSQL(
+                        "UPDATE title SET watchProgress = COALESCE((SELECT CASE WHEN w.durationMs > 0 THEN " +
+                            "MIN(1.0, MAX(0.0, w.positionMs * 1.0 / w.durationMs)) ELSE 0.0 END " +
+                            "FROM watch_state w WHERE w.titleId = title.id), " +
+                            "(SELECT MIN(1.0, MAX(0.0, h.progress)) FROM watch_history h WHERE h.titleId = title.id), 0.0)",
+                    )
+                }
+            }
 
         /** Etapa 10.5: note IMDb și cache de lucru pentru aplicare atomică. */
         val MIGRATION_8_9 =

@@ -298,6 +298,7 @@ class TitleMatcher(
                                 imdbId = imdbId,
                                 imdbRating = current.imdbRating.takeIf { imdbId == current.imdbId },
                                 imdbVotes = current.imdbVotes.takeIf { imdbId == current.imdbId },
+                                imdbBadge = current.imdbBadge.takeIf { imdbId == current.imdbId },
                                 runtimeMinutes = item.runtimeMinutes,
                                 certification = item.certification,
                                 originCountries =
