@@ -23,6 +23,7 @@ import io.github.radumariusi.akvodhub.parser.catalog.EpisodeEntry
 import io.github.radumariusi.akvodhub.parser.catalog.EpisodeMerge
 import io.github.radumariusi.akvodhub.parser.catalog.Genres
 import io.github.radumariusi.akvodhub.parser.catalog.MergedSeason
+import io.github.radumariusi.akvodhub.parser.catalog.PosterBadges
 import io.github.radumariusi.akvodhub.parser.match.QualityGroup
 import io.github.radumariusi.akvodhub.parser.match.SourceGrouping
 import io.github.radumariusi.akvodhub.parser.match.SourceInfo
@@ -115,12 +116,18 @@ class HubRepository(
     suspend fun watchState(titleId: Long): WatchStateEntity? = dao.watchState(titleId)
 
     private val watchChanged = MutableStateFlow(0L)
+    private val mutablePosterProgress = MutableStateFlow<Pair<Long, Double>?>(null)
+    val posterProgress = mutablePosterProgress.asStateFlow()
 
     /** Crește după fiecare salvare a progresului (Acasă și Detalii își reîncarcă „Continuă”). */
     val watchVersion: StateFlow<Long> = watchChanged.asStateFlow()
 
     suspend fun saveWatchState(state: WatchStateEntity) {
-        dao.putWatchState(state)
+        db.withTransaction {
+            dao.putWatchState(state)
+            dao.setPosterProgress(state.titleId, PosterBadges.progress(state.positionMs, state.durationMs))
+        }
+        mutablePosterProgress.value = state.titleId to PosterBadges.progress(state.positionMs, state.durationMs)
         watchChanged.update { it + 1 }
     }
 
@@ -136,6 +143,7 @@ class HubRepository(
             // Păstrăm maximul progresului și „terminat”: o revedere parțială nu șterge ce s-a văzut.
             val old = history.history(titleId)
             val value = progress.coerceIn(0.0, 1.0)
+            if (finished) dao.setPosterProgress(titleId, 1.0)
             history.putHistory(
                 WatchHistoryEntity(
                     titleId = titleId,
@@ -145,6 +153,7 @@ class HubRepository(
                 ),
             )
         }
+        if (finished) mutablePosterProgress.value = titleId to 1.0
     }
 
     suspend fun clearWatchState(titleId: Long) {

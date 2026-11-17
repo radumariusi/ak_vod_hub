@@ -28,6 +28,11 @@ data class DiscoverTitle(
     val dubLabel: String?,
     val imdbRating: Double?,
     val imdbVotes: Int?,
+    val tmdbBadge: String?,
+    val imdbBadge: String?,
+    val hdrBadge: String?,
+    val isNew: Boolean,
+    val watchProgress: Double,
 ) {
     fun card() =
         TitleCard(
@@ -43,6 +48,11 @@ data class DiscoverTitle(
             dubLabel,
             imdbRating,
             imdbVotes,
+            tmdbBadge,
+            imdbBadge,
+            hdrBadge,
+            isNew,
+            watchProgress,
         )
 }
 
@@ -61,7 +71,9 @@ data class HistoryTitle(
 
 const val DISCOVER_COLUMNS =
     "t.id, t.mediaType, t.tmdbId, t.name, t.originalName, t.year, t.posterPath, t.backdropPath, t.rating, " +
-        "t.voteCount, t.popularity, t.genreIds, t.bestQuality, t.overview, t.imdbId, t.dubLabel, t.imdbRating, t.imdbVotes"
+        "t.voteCount, t.popularity, t.genreIds, t.bestQuality, t.overview, t.imdbId, t.dubLabel, " +
+        "t.imdbRating, t.imdbVotes, " +
+        "t.tmdbBadge, t.imdbBadge, t.hdrBadge, t.isNew, t.watchProgress"
 
 @Dao
 interface DiscoverDao {

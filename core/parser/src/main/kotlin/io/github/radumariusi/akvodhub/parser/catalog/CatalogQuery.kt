@@ -76,7 +76,9 @@ data class SqlQuery(
  */
 object CatalogQuery {
     const val COLUMNS =
-        "t.id, t.mediaType, t.name, t.year, t.posterPath, t.backdropPath, t.rating, t.bestQuality, t.overview, t.dubLabel, t.imdbRating, t.imdbVotes"
+        "t.id, t.mediaType, t.name, t.year, t.posterPath, t.backdropPath, t.rating, t.bestQuality, " +
+            "t.overview, t.dubLabel, t.imdbRating, t.imdbVotes, " +
+            "t.tmdbBadge, t.imdbBadge, t.hdrBadge, t.isNew, t.watchProgress"
 
     /** Sub acest număr de voturi, nota TMDB nu e relevantă pentru „Cele mai apreciate”. */
     const val MIN_VOTES_FOR_RATING = 100

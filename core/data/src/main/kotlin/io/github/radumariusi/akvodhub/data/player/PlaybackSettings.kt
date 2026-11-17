@@ -2,6 +2,8 @@ package io.github.radumariusi.akvodhub.data.player
 
 import android.content.Context
 import io.github.radumariusi.akvodhub.parser.catalog.OriginalLanguage
+import io.github.radumariusi.akvodhub.parser.catalog.PosterBadge
+import io.github.radumariusi.akvodhub.parser.catalog.PosterBadges
 import io.github.radumariusi.akvodhub.parser.player.SourceProfile
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,6 +30,7 @@ data class PlaybackPrefs(
     val subtitleScale: Int = 100,
     val subtitleStyle: SubtitleStyle = SubtitleStyle.WHITE_OUTLINE,
     val preferOriginalLanguage: Boolean = false,
+    val posterBadges: Set<PosterBadge> = PosterBadges.defaults,
 ) {
     /** Prima limbă a subtitrărilor (pentru pistele încorporate), null = oprite. */
     val subtitleLanguage: String? get() = subtitleLanguages.firstOrNull()
@@ -56,6 +59,13 @@ class PlaybackSettings(
                 state.value.profile.languages + listOfNotNull(systemLanguage) + "en"
         ).filter { it.length == 2 }
             .distinct()
+
+    fun togglePosterBadge(badge: PosterBadge) {
+        val current = state.value.posterBadges
+        val updated = if (badge in current) current - badge else current + badge
+        prefs.edit().putString(BADGES, PosterBadges.encode(updated)).apply()
+        mutableState.value = read()
+    }
 
     fun setPreferOriginalLanguage(enabled: Boolean) {
         prefs.edit().putBoolean(ORIGINAL, enabled).apply()
@@ -93,6 +103,7 @@ class PlaybackSettings(
     fun backup(): Map<String, String> =
         buildMap {
             prefs.getString(PROFILE, null)?.let { put(PROFILE, it) }
+            prefs.getString(BADGES, null)?.let { put(BADGES, it) }
             prefs.getString(SUBTITLES, null)?.let { put(SUBTITLES, it) }
             if (prefs.contains(ORIGINAL)) put(ORIGINAL, prefs.getBoolean(ORIGINAL, false).toString())
             if (prefs.contains(ADDON_AUTO)) put(ADDON_AUTO, prefs.getBoolean(ADDON_AUTO, true).toString())
@@ -104,6 +115,7 @@ class PlaybackSettings(
     fun restore(values: Map<String, String>) {
         val edit = prefs.edit()
         values[PROFILE]?.let { edit.putString(PROFILE, it) }
+        values[BADGES]?.let { edit.putString(BADGES, PosterBadges.encode(PosterBadges.decode(it))) }
         values[SUBTITLES]?.let { edit.putString(SUBTITLES, it) }
         values[ORIGINAL]?.toBooleanStrictOrNull()?.let { edit.putBoolean(ORIGINAL, it) }
         values[ADDON_AUTO]?.toBooleanStrictOrNull()?.let { edit.putBoolean(ADDON_AUTO, it) }
@@ -141,6 +153,7 @@ class PlaybackSettings(
             }
         return PlaybackPrefs(
             preferOriginalLanguage = prefs.getBoolean(ORIGINAL, false),
+            posterBadges = PosterBadges.decode(prefs.getString(BADGES, null)),
             profile = SourceProfile.decode(prefs.getString(PROFILE, null)),
             subtitleLanguages = subtitles,
             addonSubtitlesAuto = prefs.getBoolean(ADDON_AUTO, true),
@@ -152,6 +165,7 @@ class PlaybackSettings(
     }
 
     companion object {
+        private const val BADGES = "poster_badges"
         private const val ORIGINAL = "prefer_original_language"
         private const val PROFILE = "profile"
         private const val SUBTITLES = "subtitles"

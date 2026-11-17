@@ -201,6 +201,11 @@ data class TitleEntity(
     @ColumnInfo(defaultValue = "0") val metadataFetched: Boolean = false,
     val imdbRating: Double? = null,
     val imdbVotes: Int? = null,
+    val tmdbBadge: String? = null,
+    val imdbBadge: String? = null,
+    val hdrBadge: String? = null,
+    @ColumnInfo(defaultValue = "0") val isNew: Boolean = false,
+    @ColumnInfo(defaultValue = "0.0") val watchProgress: Double = 0.0,
 )
 
 /** Titlu local (din playlist, fără potrivire TMDB). */
@@ -220,6 +225,11 @@ data class TitleCard(
     val dubLabel: String? = null,
     val imdbRating: Double? = null,
     val imdbVotes: Int? = null,
+    val tmdbBadge: String? = null,
+    val imdbBadge: String? = null,
+    val hdrBadge: String? = null,
+    val isNew: Boolean = false,
+    val watchProgress: Double = 0.0,
 )
 
 /** Un titlu din „Continuă vizionarea”, cu locul unde a rămas utilizatorul. */
@@ -313,4 +323,5 @@ data class ImdbRatingStage(
     @PrimaryKey val imdbId: String,
     val rating: Double,
     val votes: Int,
+    val badge: String? = null,
 )

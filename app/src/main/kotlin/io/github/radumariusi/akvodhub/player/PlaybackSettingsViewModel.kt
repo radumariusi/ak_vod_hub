@@ -10,6 +10,7 @@ import io.github.radumariusi.akvodhub.data.player.SubtitleStyle
 import io.github.radumariusi.akvodhub.data.stremio.AddonInstaller
 import io.github.radumariusi.akvodhub.data.stremio.StremioAddon
 import io.github.radumariusi.akvodhub.data.stremio.StremioAddons
+import io.github.radumariusi.akvodhub.parser.catalog.PosterBadge
 import io.github.radumariusi.akvodhub.parser.player.SourceProfile
 import io.github.radumariusi.akvodhub.parser.player.SourceRule
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -101,6 +102,8 @@ class PlaybackSettingsViewModel
             }
             settings.setSubtitleLanguages(list.distinct())
         }
+
+        fun togglePosterBadge(badge: PosterBadge) = settings.togglePosterBadge(badge)
 
         fun setPreferOriginalLanguage(enabled: Boolean) = settings.setPreferOriginalLanguage(enabled)
 

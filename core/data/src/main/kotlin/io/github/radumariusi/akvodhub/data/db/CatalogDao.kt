@@ -86,7 +86,7 @@ interface CatalogDao {
     @Query("SELECT * FROM title WHERE id = :id")
     suspend fun titleById(id: Long): TitleEntity?
 
-    @Query("UPDATE title SET imdbId = :imdbId, imdbRating = NULL, imdbVotes = NULL WHERE id = :id")
+    @Query("UPDATE title SET imdbId = :imdbId, imdbRating = NULL, imdbVotes = NULL, imdbBadge = NULL WHERE id = :id")
     suspend fun setImdbId(
         id: Long,
         imdbId: String,
@@ -126,7 +126,8 @@ interface CatalogDao {
     /** Numai după citirea completă: înlocuiește notele și elimină cache-ul vechi absent din setul nou. */
     @Query(
         "UPDATE title SET imdbRating = (SELECT rating FROM imdb_rating_stage s WHERE s.imdbId = title.imdbId), " +
-            "imdbVotes = (SELECT votes FROM imdb_rating_stage s WHERE s.imdbId = title.imdbId) " +
+            "imdbVotes = (SELECT votes FROM imdb_rating_stage s WHERE s.imdbId = title.imdbId), " +
+            "imdbBadge = (SELECT badge FROM imdb_rating_stage s WHERE s.imdbId = title.imdbId) " +
             "WHERE imdbRating IS NOT NULL OR imdbId IN (SELECT imdbId FROM imdb_rating_stage)",
     )
     suspend fun applyImdbRatings(): Int
@@ -155,7 +156,8 @@ interface CatalogDao {
 
     @Query(
         "SELECT t.id, t.mediaType, t.name, t.year, t.posterPath, t.backdropPath, t.rating, t.bestQuality, " +
-            "t.overview, t.dubLabel, t.imdbRating, t.imdbVotes FROM watch_state w JOIN title t ON t.id = w.titleId " +
+            "t.overview, t.dubLabel, t.imdbRating, t.imdbVotes, t.tmdbBadge, t.imdbBadge, t.hdrBadge, t.isNew, " +
+            "t.watchProgress FROM watch_state w JOIN title t ON t.id = w.titleId " +
             "WHERE t.sourceCount > 0 " +
             "ORDER BY w.updatedAt DESC LIMIT :limit",
     )
@@ -179,6 +181,9 @@ interface CatalogDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun putWatchState(state: WatchStateEntity)
+
+    @Query("UPDATE title SET watchProgress = :progress WHERE id = :titleId")
+    suspend fun setPosterProgress(titleId: Long, progress: Double)
 
     @Query("DELETE FROM watch_state WHERE titleId = :titleId")
     suspend fun deleteWatchState(titleId: Long)
@@ -232,6 +237,9 @@ interface CatalogDao {
     /** Titlurile locale rămase fără surse (potrivite între timp pe TMDB sau scoase din playlist). */
     @Query("DELETE FROM title WHERE tmdbId < 0 AND sourceCount = 0")
     suspend fun deleteEmptyLocalTitles(): Int
+
+    @Query("UPDATE title SET isNew = 0 WHERE isNew = 1 AND (addedAt <= :cutoff OR addedAt > :now)")
+    suspend fun expireNewBadges(cutoff: Long, now: Long): Int
 
     /** O „amprentă” ieftină a catalogului: dacă nu s-a schimbat, indexarea nu are ce reface. */
     @Query(

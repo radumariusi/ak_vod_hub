@@ -2,6 +2,10 @@
 
 Intrări noi sus. Una scurtă pentru fiecare PR (dată, etapă, ce s-a schimbat).
 
+## 2026-11-17: etapa 10.6 — insigne configurabile
+- Setări pentru TMDB, IMDb, 4K/HDR, DUB, progres și „Nou”; preferințe incluse în backup.
+- Texte precalculate, progres salvat și migrare aditivă Room 9→10; fără interogări pe poster.
+
 ## 2026-11-17: etapa 10.5 — note IMDb
 - Note și voturi IMDb pe postere/fișă, actualizate săptămânal din arhiva oficială, citită în flux și nesalvată.
 - Migrare Room 8→9; aplicare atomică din cache de lucru limitat la catalog, pauză la redare și actualizare manuală în Setări.
