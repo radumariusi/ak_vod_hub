@@ -15,6 +15,9 @@ import io.github.radumariusi.akvodhub.data.catalog.MatchScheduler
 import io.github.radumariusi.akvodhub.data.catalog.TitleMatcher
 import io.github.radumariusi.akvodhub.data.db.AkVodDatabase
 import io.github.radumariusi.akvodhub.data.discover.DiscoverRepository
+import io.github.radumariusi.akvodhub.data.imdb.ImdbRatingsScheduler
+import io.github.radumariusi.akvodhub.data.imdb.ImdbRatingsSettings
+import io.github.radumariusi.akvodhub.data.imdb.ImdbRatingsUpdater
 import io.github.radumariusi.akvodhub.data.player.PlaybackSettings
 import io.github.radumariusi.akvodhub.data.playlist.PlaylistImporter
 import io.github.radumariusi.akvodhub.data.playlist.PlaylistRepository
@@ -135,7 +138,42 @@ object AppModule {
         matcher: TitleMatcher,
         matchScheduler: MatchScheduler,
         indexer: CatalogIndexer,
-    ): PlaylistWorkerFactory = PlaylistWorkerFactory(importer, db.playlistDao(), matcher, matchScheduler, indexer)
+        imdbUpdater: ImdbRatingsUpdater,
+        imdbSettings: ImdbRatingsSettings,
+        imdbScheduler: ImdbRatingsScheduler,
+    ): PlaylistWorkerFactory =
+        PlaylistWorkerFactory(
+            importer,
+            db.playlistDao(),
+            matcher,
+            matchScheduler,
+            indexer,
+            imdbUpdater,
+            imdbSettings,
+            imdbScheduler,
+        )
+
+    @Provides
+    @Singleton
+    fun imdbRatingsSettings(
+        @ApplicationContext context: Context,
+    ): ImdbRatingsSettings = ImdbRatingsSettings(context)
+
+    @Provides
+    @Singleton
+    fun imdbRatingsScheduler(
+        @ApplicationContext context: Context,
+        settings: ImdbRatingsSettings,
+    ): ImdbRatingsScheduler = ImdbRatingsScheduler(context, settings)
+
+    @Provides
+    @Singleton
+    fun imdbRatingsUpdater(
+        db: AkVodDatabase,
+        http: OkHttpClient,
+        settings: ImdbRatingsSettings,
+        indexer: CatalogIndexer,
+    ): ImdbRatingsUpdater = ImdbRatingsUpdater(db, http, settings, indexer)
 
     @Provides
     @Singleton

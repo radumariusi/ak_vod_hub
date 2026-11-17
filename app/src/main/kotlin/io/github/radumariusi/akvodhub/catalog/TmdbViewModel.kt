@@ -5,11 +5,14 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.radumariusi.akvodhub.data.catalog.CatalogRepository
 import io.github.radumariusi.akvodhub.data.catalog.MatchStatus
+import io.github.radumariusi.akvodhub.data.imdb.ImdbRatingsScheduler
+import io.github.radumariusi.akvodhub.data.imdb.ImdbRatingsSettings
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -29,9 +32,17 @@ class TmdbViewModel
     @Inject
     constructor(
         private val repository: CatalogRepository,
+        private val imdbScheduler: ImdbRatingsScheduler,
+        imdbSettings: ImdbRatingsSettings,
     ) : ViewModel() {
         val status: StateFlow<MatchStatus?> =
             repository.status.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+        val imdb =
+            combine(imdbSettings.state, imdbScheduler.running) { state, running -> state.copy(running = running) }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), imdbSettings.state.value)
+
+        fun refreshImdb() = imdbScheduler.updateNow()
 
         private val mutableKeyState = MutableStateFlow<KeyState>(KeyState.Idle)
         val keyState: StateFlow<KeyState> = mutableKeyState.asStateFlow()

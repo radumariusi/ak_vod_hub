@@ -281,6 +281,7 @@ class TitleMatcher(
                     } else {
                         // Reîncărcăm doar metadatele: rezumatele surselor și datele locale rămân intacte.
                         val current = dao.titleById(title.id) ?: continue
+                        val imdbId = item.imdb ?: current.imdbId
                         dao.updateTitle(
                             current.copy(
                                 name = item.displayTitle.ifBlank { current.name },
@@ -294,7 +295,9 @@ class TitleMatcher(
                                 popularity = item.popularity ?: current.popularity,
                                 genreIds = item.allGenreIds.joinToString(",").ifEmpty { current.genreIds },
                                 originalLanguage = item.originalLanguage ?: current.originalLanguage,
-                                imdbId = item.imdb ?: current.imdbId,
+                                imdbId = imdbId,
+                                imdbRating = current.imdbRating.takeIf { imdbId == current.imdbId },
+                                imdbVotes = current.imdbVotes.takeIf { imdbId == current.imdbId },
                                 runtimeMinutes = item.runtimeMinutes,
                                 certification = item.certification,
                                 originCountries =

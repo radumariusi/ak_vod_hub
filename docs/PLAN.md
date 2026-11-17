@@ -140,6 +140,7 @@ Documentele astea, `.gitignore`, workflow de curățenie automată, reguli de lu
 - ✅ 10.2: preferă audio original la alegerea sursei și pistei; filtru strict din rezumatul salvat, Room v7.
 - ✅ 10.3: filtre separate SUA (inclusiv coproducții) și limbă originală engleză, citite din DB.
 - ✅ 10.4: metadate TMDB opționale, completate o singură dată prin jobul existent (Room v8), cu pauză la redare.
+- ✅ 10.5: note IMDb din setul oficial în flux, aplicare atomică, verificare săptămânală și la cerere (Room v9).
 - Restul etapei: vezi `docs/PROPUNERI.md`.
 
 ## Idei suplimentare

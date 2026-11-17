@@ -65,6 +65,7 @@ fun TitleCard.meta(): String =
         year?.toString(),
         rating?.takeIf { it > 0 }?.let { "★ %.1f".format(it) },
         qualityLabel(bestQuality),
+        imdbRating?.let { "IMDb %.1f".format(it) },
         dubLabel,
     ).joinToString(" · ")
 
@@ -115,6 +116,19 @@ fun PosterCard(
                         contentDescription = card.name,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
+                    )
+                }
+                card.imdbRating?.let { rating ->
+                    Text(
+                        "IMDb %.1f".format(rating),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White,
+                        modifier =
+                            Modifier
+                                .align(Alignment.TopStart)
+                                .padding(4.dp)
+                                .background(Color(0xCC000000), MaterialTheme.shapes.extraSmall)
+                                .padding(horizontal = 4.dp, vertical = 1.dp),
                     )
                 }
                 card.dubLabel?.let { label ->

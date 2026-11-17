@@ -323,6 +323,9 @@ private fun Header(
                     title.dubLabel,
                     title.runtimeMinutes?.let { "$it min" },
                     title.certification,
+                    title.imdbRating?.let { rating ->
+                        "IMDb %.1f".format(rating) + (title.imdbVotes?.let { " ($it voturi)" } ?: "")
+                    },
                     title.rating?.takeIf { it > 0 }?.let {
                         "★ %.1f".format(it) +
                             (title.voteCount?.let { v -> " ($v voturi)" } ?: "")

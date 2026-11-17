@@ -199,6 +199,8 @@ data class TitleEntity(
     val tagline: String? = null,
     /** Cererea completă a fost procesată, chiar dacă unele câmpuri lipsesc la TMDB. */
     @ColumnInfo(defaultValue = "0") val metadataFetched: Boolean = false,
+    val imdbRating: Double? = null,
+    val imdbVotes: Int? = null,
 )
 
 /** Titlu local (din playlist, fără potrivire TMDB). */
@@ -216,6 +218,8 @@ data class TitleCard(
     val bestQuality: Int?,
     val overview: String?,
     val dubLabel: String? = null,
+    val imdbRating: Double? = null,
+    val imdbVotes: Int? = null,
 )
 
 /** Un titlu din „Continuă vizionarea”, cu locul unde a rămas utilizatorul. */
@@ -301,4 +305,12 @@ data class KindCount(
     val sourceId: Long,
     val kind: VodKind,
     val count: Int,
+)
+
+/** Cache de lucru, golit după aplicare; nu conține toate notele IMDb, doar intersecția cu playlist-ul. */
+@Entity(tableName = "imdb_rating_stage")
+data class ImdbRatingStage(
+    @PrimaryKey val imdbId: String,
+    val rating: Double,
+    val votes: Int,
 )

@@ -86,7 +86,7 @@ interface CatalogDao {
     @Query("SELECT * FROM title WHERE id = :id")
     suspend fun titleById(id: Long): TitleEntity?
 
-    @Query("UPDATE title SET imdbId = :imdbId WHERE id = :id")
+    @Query("UPDATE title SET imdbId = :imdbId, imdbRating = NULL, imdbVotes = NULL WHERE id = :id")
     suspend fun setImdbId(
         id: Long,
         imdbId: String,
@@ -110,6 +110,26 @@ interface CatalogDao {
         afterId: Long,
         limit: Int,
     ): List<TitleEntity>
+
+    @Query("SELECT EXISTS(SELECT 1 FROM title WHERE sourceCount > 0 AND imdbId IS NOT NULL)")
+    suspend fun hasImdbTitles(): Boolean
+
+    @Query("SELECT DISTINCT imdbId FROM title WHERE sourceCount > 0 AND imdbId IN (:ids)")
+    suspend fun availableImdbIds(ids: List<String>): List<String>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun putImdbStage(entries: List<ImdbRatingStage>)
+
+    @Query("DELETE FROM imdb_rating_stage")
+    suspend fun clearImdbStage()
+
+    /** Numai după citirea completă: înlocuiește notele și elimină cache-ul vechi absent din setul nou. */
+    @Query(
+        "UPDATE title SET imdbRating = (SELECT rating FROM imdb_rating_stage s WHERE s.imdbId = title.imdbId), " +
+            "imdbVotes = (SELECT votes FROM imdb_rating_stage s WHERE s.imdbId = title.imdbId) " +
+            "WHERE imdbRating IS NOT NULL OR imdbId IN (SELECT imdbId FROM imdb_rating_stage)",
+    )
+    suspend fun applyImdbRatings(): Int
 
     // ------------------------------------------------------------ surse și statistici
 
@@ -135,7 +155,8 @@ interface CatalogDao {
 
     @Query(
         "SELECT t.id, t.mediaType, t.name, t.year, t.posterPath, t.backdropPath, t.rating, t.bestQuality, " +
-            "t.overview, t.dubLabel FROM watch_state w JOIN title t ON t.id = w.titleId WHERE t.sourceCount > 0 " +
+            "t.overview, t.dubLabel, t.imdbRating, t.imdbVotes FROM watch_state w JOIN title t ON t.id = w.titleId " +
+            "WHERE t.sourceCount > 0 " +
             "ORDER BY w.updatedAt DESC LIMIT :limit",
     )
     suspend fun continueWatching(limit: Int): List<TitleCard>

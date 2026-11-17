@@ -111,6 +111,21 @@ Filme/Seriale/Căutare → Origine: „Producții SUA” citește `originCountri
 limba originală cu audio disponibil (filtrul strict din 10.2 rămâne separat). Țara necunoscută nu trece
 filtrul SUA; rezultatele se completează pe măsură ce rulează 10.4. Fără schemă sau setare persistentă nouă.
 
+### Etapa 10.5 (2026-11-17)
+
+Room v9, migrare aditivă 8→9: `title.imdbRating`, `title.imdbVotes` și `imdb_rating_stage` (cache de lucru,
+golit după aplicare/eroare). `ImdbRatingsWorker` este înregistrat în `PlaylistWorkerFactory`; programarea
+se face la pornire și după rundele TMDB. O verificare zilnică descarcă numai după șapte zile de la reușită,
+sau manual din Setări → Note IMDb. Fără titluri disponibile cu IMDb ID nu descarcă nimic.
+Arhiva oficială `datasets.imdbws.com/title.ratings.tsv.gz` este dezarhivată în flux, fără fișier salvat;
+loturi de 500 și interogări după indexul IMDb existent, fără lista completă a ID-urilor în memorie.
+Cache-ul de lucru păstrează numai intersecția cu playlist-ul; notele vizibile se schimbă într-o singură
+tranzacție după EOF valid. Eroarea/anularea păstrează setul anterior. Notele absente din noul set se scot.
+Redarea suspendă actualizarea și programează continuarea după 60 s; descărcarea reîncepe, nu se salvează
+arhiva parțială. Plafon cerere 8 minute. Setări arată data, numărul de titluri, eroarea și „Actualizează acum”.
+Posterele/fișa citesc notele din DB; `notifyCardsChanged()` notifică ecranele fără refacerea rezumatelor/FTS.
+Titlurile care primesc IMDb ID după ultima actualizare primesc note la următoarea actualizare (sau manual).
+
 ## 6. Ce urmează (din `docs/PROPUNERI.md`)
 
 Ordinea recomandată, **o etapă = un branch + un PR**:

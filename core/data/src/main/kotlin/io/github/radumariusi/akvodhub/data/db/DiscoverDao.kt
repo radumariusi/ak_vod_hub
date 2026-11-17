@@ -26,8 +26,24 @@ data class DiscoverTitle(
     val overview: String?,
     val imdbId: String?,
     val dubLabel: String?,
+    val imdbRating: Double?,
+    val imdbVotes: Int?,
 ) {
-    fun card() = TitleCard(id, mediaType, name, year, posterPath, backdropPath, rating, bestQuality, overview, dubLabel)
+    fun card() =
+        TitleCard(
+            id,
+            mediaType,
+            name,
+            year,
+            posterPath,
+            backdropPath,
+            rating,
+            bestQuality,
+            overview,
+            dubLabel,
+            imdbRating,
+            imdbVotes,
+        )
 }
 
 /** Un titlu din istoric, cu fișa lui. */
@@ -45,7 +61,7 @@ data class HistoryTitle(
 
 const val DISCOVER_COLUMNS =
     "t.id, t.mediaType, t.tmdbId, t.name, t.originalName, t.year, t.posterPath, t.backdropPath, t.rating, " +
-        "t.voteCount, t.popularity, t.genreIds, t.bestQuality, t.overview, t.imdbId, t.dubLabel"
+        "t.voteCount, t.popularity, t.genreIds, t.bestQuality, t.overview, t.imdbId, t.dubLabel, t.imdbRating, t.imdbVotes"
 
 @Dao
 interface DiscoverDao {
