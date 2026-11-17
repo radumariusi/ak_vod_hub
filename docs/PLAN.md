@@ -150,6 +150,8 @@ Documentele astea, `.gitignore`, workflow de curățenie automată, reguli de lu
 
 - ✅ 12.1: hero existent extins cu debounce de 300 ms și backdrop TMDB de 780 px; gradient întunecat, fără blur.
 
+- ✅ 12.2: logo TMDB la cerere în hero/fișă, cache 30 zile (inclusiv lipsa), text la eroare.
+
 ## Idei suplimentare
 
 1. **Verificare sănătate surse**: test rapid în fundal al linkurilor; sursele moarte sunt marcate și puse la final.

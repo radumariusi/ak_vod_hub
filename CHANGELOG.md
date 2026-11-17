@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-11-17 — Etapa 12.2
+- Logo TMDB în hero și fișă, la cerere, cu cache limitat și titlu text de rezervă.
+
 ## 2026-11-17 — Etapa 12.1
 - Hero Acasă: fundal la 780 px, încărcat după 300 ms de focus stabil.
 

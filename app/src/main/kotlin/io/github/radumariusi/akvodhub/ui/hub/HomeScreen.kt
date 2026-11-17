@@ -100,7 +100,7 @@ private fun HomeRows(
     val focused = remember { mutableStateOf<TitleCard?>(null) }
 
     Column(Modifier.fillMaxSize()) {
-        Hero(focused, fallback = rows[0].items[0])
+        Hero(focused, fallback = rows[0].items[0], logo = viewModel::logo)
         LazyColumn(
             state = rememberLazyListState(),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -149,6 +149,7 @@ private fun cardKey(
 private fun Hero(
     focused: MutableState<TitleCard?>,
     fallback: TitleCard,
+    logo: suspend (Long) -> String?,
 ) {
     val target = focused.value ?: fallback
     var shown by remember { mutableStateOf(target) }
@@ -156,6 +157,8 @@ private fun Hero(
         delay(HERO_DELAY_MS)
         shown = target
     }
+    var logoPath by remember(shown.id) { mutableStateOf<String?>(null) }
+    LaunchedEffect(shown.id) { logoPath = logo(shown.id) }
     val background = MaterialTheme.colorScheme.background
     Box(Modifier.fillMaxWidth().height(200.dp)) {
         val backdrop = Images.hero(shown.backdropPath)
@@ -182,12 +185,7 @@ private fun Hero(
             modifier = Modifier.widthIn(max = 520.dp).padding(top = 8.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text(
-                shown.name,
-                style = MaterialTheme.typography.headlineMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            TitleHeading(shown.name, logoPath)
             val meta = shown.meta()
             if (meta.isNotEmpty()) {
                 Text(

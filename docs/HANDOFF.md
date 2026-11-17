@@ -182,3 +182,6 @@ fără force-push, fără ștergere de tag-uri/release-uri/branch-uri, intrare s
 - Ce s-a schimbat de la predare: `https://github.com/radumariusi/ak_vod_hub/compare/claude-handoff-2026-11-17...main`
 - Se trec PR-urile lui Jules unul câte unul: păstrăm, corectăm sau facem revert la un PR anume.
 - Dacă totul e stricat: `main` se readuce la tag-ul `claude-handoff-2026-11-17` (îl face Claude, cu acordul lui Radu).
+
+### Etapa 12.2
+Logo-uri TMDB cerute numai pentru hero stabil și fișă. Cache `logo:<tip>:<tmdbId>` în `discover_cache`, 30 zile inclusiv absența, plafon 128. Fără migrare; offline folosește cache-ul vechi sau text. Alegere RO → EN → neutru → original, testată în parser.

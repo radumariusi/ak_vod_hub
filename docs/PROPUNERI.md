@@ -76,7 +76,7 @@ Nota IMDb cere IMDb ID-ul fiecărui titlu, pe care acum îl avem doar pentru o p
 | # | Funcție | Inspirat din | APK | Viteză |
 |---|---------|--------------|-----|--------|
 | ✅ 12.1 | **Acasă cu „hero”**: fundalul (backdrop) și descrierea titlului selectat, sus pe ecran | NuvioTV, Stremio, Netflix | 🟢 | 🟡 o imagine mare (~200 KB) la fiecare focus; o încarc după 300 ms de stat pe titlu, rezoluție 780 px, nu 1280 |
-| 12.2 | **Logo-ul filmului** în loc de text în hero și fișă | NuvioTV, Plex | 🟢 | 🟡 o cerere TMDB în plus per titlu, doar la cerere + cache |
+| ✅ 12.2 | **Logo-ul filmului** în loc de text în hero și fișă | NuvioTV, Plex | 🟢 | 🟡 o cerere TMDB în plus per titlu, doar la cerere + cache |
 | 12.3 | **Meniu sus cu file** (Acasă · Filme · Seriale · Lista mea · Caută · Setări) | Google TV, Stremio | 🟢 | 🟢 |
 | 12.4 | **Lista mea** (watchlist) + „Văzut / nevăzut” manual | Plex, Stremio | 🟢 | 🟢 un tabel mic |
 | 12.5 | **Fișă nouă**: fundal pe tot ecranul, tagline, durată, certificare, genuri, ★ TMDB + IMDb, butoane mari, surse grupate compact, sezoane ca file, distribuție cu poze | Infuse, Plex | 🟢 | 🟢 |

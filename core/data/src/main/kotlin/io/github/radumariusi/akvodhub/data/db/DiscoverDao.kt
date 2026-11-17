@@ -132,6 +132,12 @@ interface DiscoverDao {
     @Query("DELETE FROM discover_cache WHERE fetchedAt < :before")
     suspend fun deleteCacheBefore(before: Long): Int
 
+    @Query(
+        "DELETE FROM discover_cache WHERE cacheKey LIKE 'logo:%' AND cacheKey NOT IN " +
+            "(SELECT cacheKey FROM discover_cache WHERE cacheKey LIKE 'logo:%' ORDER BY fetchedAt DESC, cacheKey LIMIT 128)",
+    )
+    suspend fun trimLogos()
+
     @Query("SELECT * FROM imdb_map WHERE imdbId IN (:ids)")
     suspend fun imdbMap(ids: List<String>): List<ImdbMapEntity>
 
