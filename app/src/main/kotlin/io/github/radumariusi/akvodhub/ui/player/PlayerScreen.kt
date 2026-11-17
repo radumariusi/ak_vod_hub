@@ -56,6 +56,7 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import io.github.radumariusi.akvodhub.parser.player.SeekNavigation
+import io.github.radumariusi.akvodhub.parser.player.BufferPreset
 import io.github.radumariusi.akvodhub.parser.player.Resume
 import io.github.radumariusi.akvodhub.parser.player.SeriesPlayback
 import io.github.radumariusi.akvodhub.player.PlayerFactory
@@ -388,6 +389,11 @@ private fun Controls(
                     viewModel.setSpeed(speeds[it])
                 })
             }) { Text("Viteză ${state.speed}×") }
+            OutlinedButton(onClick = {
+                onChoice(Choice("Buffer · la redeschiderea playerului", BufferPreset.entries.map { it.label }, null) {
+                    viewModel.setBufferPreset(BufferPreset.entries[it])
+                })
+            }) { Text("Buffer") }
             if (state.audio.isNotEmpty()) {
                 OutlinedButton(onClick = {
                     onChoice(

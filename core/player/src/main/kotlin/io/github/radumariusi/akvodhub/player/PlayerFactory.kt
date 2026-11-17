@@ -15,6 +15,8 @@ import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.decoder.ffmpeg.FfmpegLibrary
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.DefaultLoadControl
+import io.github.radumariusi.akvodhub.parser.player.BufferPreset
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 
 /** Ce piste alege playerul singur: limbile audio și ale subtitrărilor, în ordinea preferinței (goală = oprite). */
@@ -37,6 +39,7 @@ object PlayerFactory {
         preferences: TrackPreferences,
         passthrough: Boolean = false,
         nightMode: Boolean = false,
+        buffer: BufferPreset = BufferPreset.NORMAL,
     ): ExoPlayer {
         val http =
             DefaultHttpDataSource
@@ -74,6 +77,11 @@ object PlayerFactory {
         val player =
             ExoPlayer
                 .Builder(context, renderers)
+                .setLoadControl(DefaultLoadControl.Builder()
+                    .setBufferDurationsMs(buffer.minMs, buffer.maxMs, buffer.playMs, buffer.rebufferMs)
+                    .setTargetBufferBytes(buffer.bytes)
+                    .setPrioritizeTimeOverSizeThresholds(false)
+                    .build())
                 .setMediaSourceFactory(DefaultMediaSourceFactory(dataSource))
                 .setAudioAttributes(
                     AudioAttributes

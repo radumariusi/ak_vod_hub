@@ -29,6 +29,7 @@ import io.github.radumariusi.akvodhub.parser.match.SourceInfo
 import io.github.radumariusi.akvodhub.parser.player.EpisodeOrder
 import io.github.radumariusi.akvodhub.parser.player.FallbackQueue
 import io.github.radumariusi.akvodhub.parser.player.SleepTimer
+import io.github.radumariusi.akvodhub.parser.player.BufferPreset
 import io.github.radumariusi.akvodhub.parser.player.Resume
 import io.github.radumariusi.akvodhub.parser.player.SeekNavigation
 import io.github.radumariusi.akvodhub.parser.player.SeriesPlayback
@@ -128,7 +129,7 @@ class PlayerViewModel
     ) : ViewModel() {
         private val passthroughRequested = settings.state.value.audioPassthrough && !settings.state.value.nightMode
         private val nightModeEnabled = settings.state.value.nightMode
-        val player: ExoPlayer = PlayerFactory.create(context, trackPreferences(), settings.state.value.audioPassthrough, settings.state.value.nightMode)
+        val player: ExoPlayer = PlayerFactory.create(context, trackPreferences(), settings.state.value.audioPassthrough, settings.state.value.nightMode, settings.state.value.bufferPreset)
 
         /** Mărimea și stilul subtitrărilor (Setări → Subtitrări; se pot schimba și din player). */
         val prefs: StateFlow<PlaybackPrefs> = settings.state
@@ -652,6 +653,11 @@ class PlayerViewModel
                 counts[language] = n
                 AddonSubtitleOption(sub, "$language $n · ${sub.addon}")
             }
+        }
+
+        fun setBufferPreset(value: BufferPreset) {
+            settings.setBufferPreset(value)
+            showNotice("Buffer ${value.label}: se aplică la redeschiderea playerului.")
         }
 
         fun setNightMode(enabled: Boolean) {

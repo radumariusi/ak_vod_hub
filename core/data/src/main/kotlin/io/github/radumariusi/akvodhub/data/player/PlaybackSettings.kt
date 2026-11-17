@@ -7,6 +7,7 @@ import io.github.radumariusi.akvodhub.parser.catalog.PosterBadge
 import io.github.radumariusi.akvodhub.parser.catalog.PosterBadges
 import io.github.radumariusi.akvodhub.parser.catalog.PosterSize
 import io.github.radumariusi.akvodhub.parser.player.SourceProfile
+import io.github.radumariusi.akvodhub.parser.player.BufferPreset
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,6 +36,7 @@ data class PlaybackPrefs(
     val matchFrameRate: Boolean = false,
     val audioPassthrough: Boolean = false,
     val nightMode: Boolean = false,
+    val bufferPreset: BufferPreset = BufferPreset.NORMAL,
     val posterBadges: Set<PosterBadge> = PosterBadges.defaults,
     val posterSize: PosterSize = PosterSize.MEDIUM,
     val accentColor: AccentColor = AccentColor.RED,
@@ -88,6 +90,11 @@ class PlaybackSettings(
         else if (io.github.radumariusi.akvodhub.parser.player.SeriesPlayback.validSetting(name, endMs.toString())) {
             prefs.edit().putString(name, endMs.toString()).apply()
         }
+    }
+
+    fun setBufferPreset(value: BufferPreset) {
+        prefs.edit().putString(BUFFER, value.name).apply()
+        mutableState.value = read()
     }
 
     fun setNightMode(enabled: Boolean) {
@@ -160,6 +167,7 @@ class PlaybackSettings(
             prefs.all.forEach { (key, value) ->
                 if (value is String && io.github.radumariusi.akvodhub.parser.player.SeriesPlayback.validSetting(key, value)) put(key, value)
             }
+            put(BUFFER, state.value.bufferPreset.name)
             put(NIGHT, state.value.nightMode.toString())
             put(PASSTHROUGH, state.value.audioPassthrough.toString())
             put(FRAME_RATE, state.value.matchFrameRate.toString())
@@ -177,6 +185,7 @@ class PlaybackSettings(
     /** Restaurare din backup: doar cheile cunoscute, cu valori verificate la citire. */
     fun restore(values: Map<String, String>) {
         val edit = prefs.edit()
+        values[BUFFER]?.let { edit.putString(BUFFER, BufferPreset.decode(it).name) }
         values.forEach { (key, value) ->
             if (io.github.radumariusi.akvodhub.parser.player.SeriesPlayback.validSetting(key, value)) edit.putString(key, value)
         }
@@ -223,6 +232,7 @@ class PlaybackSettings(
                 }
             }
         return PlaybackPrefs(
+            bufferPreset = BufferPreset.decode(prefs.getString(BUFFER, null)),
             nightMode = prefs.getBoolean(NIGHT, false),
             audioPassthrough = prefs.getBoolean(PASSTHROUGH, false),
             matchFrameRate = prefs.getBoolean(FRAME_RATE, false),
@@ -241,6 +251,7 @@ class PlaybackSettings(
     }
 
     companion object {
+        private const val BUFFER = "buffer_preset"
         private const val NIGHT = "night_mode"
         private const val PASSTHROUGH = "audio_passthrough"
         private const val FRAME_RATE = "match_frame_rate"
