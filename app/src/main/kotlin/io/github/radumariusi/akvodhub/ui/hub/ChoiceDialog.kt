@@ -46,7 +46,10 @@ fun ChoiceDialog(
         Surface(
             modifier = Modifier.width(520.dp),
             shape = MaterialTheme.shapes.large,
-            colors = SurfaceDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+            colors = SurfaceDefaults.colors(
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+            ),
         ) {
             Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(choice.title, style = MaterialTheme.typography.headlineSmall)

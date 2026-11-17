@@ -1,8 +1,10 @@
 package io.github.radumariusi.akvodhub.ui.theme
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.darkColorScheme
 import io.github.radumariusi.akvodhub.parser.catalog.AccentColor
@@ -24,5 +26,7 @@ private fun colors(accent: AccentColor) =
 @Composable
 fun AkVodHubTheme(accent: AccentColor = AccentColor.RED, content: @Composable () -> Unit) {
     val scheme = remember(accent) { colors(accent) }
-    MaterialTheme(colorScheme = scheme, content = content)
+    MaterialTheme(colorScheme = scheme) {
+        CompositionLocalProvider(LocalContentColor provides scheme.onBackground, content = content)
+    }
 }
