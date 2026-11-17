@@ -46,8 +46,11 @@ data class CatalogFilter(
     val language: String? = null,
     val sort: CatalogSort = CatalogSort.POPULAR,
     val text: String = "",
+    val originalAudioOnly: Boolean = false,
 ) {
-    val hasFilters: Boolean get() = genre != null || years != null || quality != null || language != null
+    val hasFilters: Boolean get() =
+        genre != null || years != null || quality != null || language != null ||
+            originalAudioOnly
 }
 
 /** O interogare SQL cu argumentele ei, gata de trimis la Room (`SimpleSQLiteQuery`). */
@@ -102,6 +105,7 @@ object CatalogQuery {
             where += "t.audioLanguages LIKE ?"
             args += "%,${it.lowercase()},%"
         }
+        if (filter.originalAudioOnly) where += "t.hasOriginalAudio = 1"
         val fts = ftsQuery(filter.text)
         if (fts != null) {
             where += "t.id IN (SELECT docid FROM title_search WHERE title_search MATCH ?)"

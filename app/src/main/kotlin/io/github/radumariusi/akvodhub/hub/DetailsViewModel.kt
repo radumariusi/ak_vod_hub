@@ -52,6 +52,17 @@ class DetailsViewModel
 
         init {
             viewModelScope.launch { repository.watchVersion.drop(1).collect { refreshWatch() } }
+            viewModelScope.launch {
+                repository.sourcePreferences.drop(1).collect {
+                    mutableState.update { state ->
+                        val details = state.details ?: return@update state
+                        val sources = details.groups.flatMap { group -> group.languages.flatMap { it.sources } }
+                        state.copy(
+                            recommended = repository.playOrder(sources, details.title.originalLanguage).firstOrNull(),
+                        )
+                    }
+                }
+            }
         }
 
         fun open(titleId: Long) {
@@ -62,7 +73,7 @@ class DetailsViewModel
                 viewModelScope.launch {
                     val details = repository.details(titleId)
                     val all = details?.groups.orEmpty().flatMap { g -> g.languages.flatMap { it.sources } }
-                    val recommended = repository.playOrder(all).firstOrNull()
+                    val recommended = repository.playOrder(all, details?.title?.originalLanguage).firstOrNull()
                     val watch = repository.watchState(titleId)
                     mutableState.update {
                         it.copy(loading = false, details = details, recommended = recommended, watch = watch)

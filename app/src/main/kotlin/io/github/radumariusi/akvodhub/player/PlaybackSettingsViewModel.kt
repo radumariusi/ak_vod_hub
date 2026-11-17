@@ -102,6 +102,8 @@ class PlaybackSettingsViewModel
             settings.setSubtitleLanguages(list.distinct())
         }
 
+        fun setPreferOriginalLanguage(enabled: Boolean) = settings.setPreferOriginalLanguage(enabled)
+
         fun setAddonSubtitlesAuto(enabled: Boolean) = settings.setAddonSubtitlesAuto(enabled)
 
         fun setSubtitleScale(percent: Int) = settings.setSubtitleScale(percent)

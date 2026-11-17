@@ -1,6 +1,7 @@
 package io.github.radumariusi.akvodhub.data.player
 
 import android.content.Context
+import io.github.radumariusi.akvodhub.parser.catalog.OriginalLanguage
 import io.github.radumariusi.akvodhub.parser.player.SourceProfile
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -26,6 +27,7 @@ data class PlaybackPrefs(
     /** Mărimea subtitrărilor, în procente (100 = normal). */
     val subtitleScale: Int = 100,
     val subtitleStyle: SubtitleStyle = SubtitleStyle.WHITE_OUTLINE,
+    val preferOriginalLanguage: Boolean = false,
 ) {
     /** Prima limbă a subtitrărilor (pentru pistele încorporate), null = oprite. */
     val subtitleLanguage: String? get() = subtitleLanguages.firstOrNull()
@@ -48,10 +50,17 @@ class PlaybackSettings(
             .takeIf { it.length == 2 }
 
     /** Limbile preferate pentru ordonarea surselor și pista audio: profilul, apoi limba sistemului, apoi engleza. */
-    fun preferredLanguages(): List<String> =
-        (state.value.profile.languages + listOfNotNull(systemLanguage) + "en")
-            .filter { it.length == 2 }
+    fun preferredLanguages(originalLanguage: String? = null): List<String> =
+        (
+            listOfNotNull(OriginalLanguage.code(originalLanguage).takeIf { state.value.preferOriginalLanguage }) +
+                state.value.profile.languages + listOfNotNull(systemLanguage) + "en"
+        ).filter { it.length == 2 }
             .distinct()
+
+    fun setPreferOriginalLanguage(enabled: Boolean) {
+        prefs.edit().putBoolean(ORIGINAL, enabled).apply()
+        mutableState.value = read()
+    }
 
     fun setProfile(profile: SourceProfile) {
         prefs.edit().putString(PROFILE, profile.encode()).apply()
@@ -85,6 +94,7 @@ class PlaybackSettings(
         buildMap {
             prefs.getString(PROFILE, null)?.let { put(PROFILE, it) }
             prefs.getString(SUBTITLES, null)?.let { put(SUBTITLES, it) }
+            if (prefs.contains(ORIGINAL)) put(ORIGINAL, prefs.getBoolean(ORIGINAL, false).toString())
             if (prefs.contains(ADDON_AUTO)) put(ADDON_AUTO, prefs.getBoolean(ADDON_AUTO, true).toString())
             if (prefs.contains(SCALE)) put(SCALE, prefs.getInt(SCALE, 100).toString())
             prefs.getString(STYLE, null)?.let { put(STYLE, it) }
@@ -95,6 +105,7 @@ class PlaybackSettings(
         val edit = prefs.edit()
         values[PROFILE]?.let { edit.putString(PROFILE, it) }
         values[SUBTITLES]?.let { edit.putString(SUBTITLES, it) }
+        values[ORIGINAL]?.toBooleanStrictOrNull()?.let { edit.putBoolean(ORIGINAL, it) }
         values[ADDON_AUTO]?.toBooleanStrictOrNull()?.let { edit.putBoolean(ADDON_AUTO, it) }
         values[SCALE]?.toIntOrNull()?.let { edit.putInt(SCALE, it.coerceIn(MIN_SCALE, MAX_SCALE)) }
         values[STYLE]?.let { edit.putString(STYLE, it) }
@@ -129,6 +140,7 @@ class PlaybackSettings(
                 }
             }
         return PlaybackPrefs(
+            preferOriginalLanguage = prefs.getBoolean(ORIGINAL, false),
             profile = SourceProfile.decode(prefs.getString(PROFILE, null)),
             subtitleLanguages = subtitles,
             addonSubtitlesAuto = prefs.getBoolean(ADDON_AUTO, true),
@@ -140,6 +152,7 @@ class PlaybackSettings(
     }
 
     companion object {
+        private const val ORIGINAL = "prefer_original_language"
         private const val PROFILE = "profile"
         private const val SUBTITLES = "subtitles"
         private const val ADDON_AUTO = "subtitles_addon_auto"

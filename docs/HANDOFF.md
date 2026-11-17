@@ -81,6 +81,15 @@ originală TMDB cu fiecare sursă (inclusiv episoade), păstrând doar limbile d
 o limbă necunoscută suprimă eticheta. Posterele și fișa citesc rezultatul salvat. Cheia amprentei v6
 forțează prima recalculare fără reimport; amprenta include și ultima rundă de import pentru schimbările limbilor audio. Eliminat fallback-ul distructiv; migrările 1→6 sunt explicite.
 
+### Etapa 10.2 (2026-11-17)
+
+Room v7: `title.hasOriginalAudio` (boolean, implicit 0), migrare aditivă 6→7. Același parcurs al indexerului
+calculează dacă o sursă declară explicit originalul; `MULTI` singur nu trece filtrul strict. Prima reindexare
+este forțată de amprenta v7. Setări → Redare: „Preferă limba originală” (implicit nu), salvată și în backup.
+Când e activă: original → MULTI → restul, iar profilul existent decide în interiorul fiecărei categorii.
+Se aplică și pistelor audio, episoadelor următoare și rezervelor; sursa aleasă manual are prioritate.
+Filmul/serialul fără limbă originală cunoscută păstrează comportamentul anterior.
+
 ## 6. Ce urmează (din `docs/PROPUNERI.md`)
 
 Ordinea recomandată, **o etapă = un branch + un PR**:

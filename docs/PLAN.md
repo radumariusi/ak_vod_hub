@@ -137,6 +137,7 @@ Documentele astea, `.gitignore`, workflow de curățenie automată, reguli de lu
 ### Etapa 10: limbi și metadate
 
 - ✅ 10.1: etichetă DUB calculată la indexare și salvată în Room v6; fără etichete pentru limbi necunoscute sau surse originale/MULTI.
+- ✅ 10.2: preferă audio original la alegerea sursei și pistei; filtru strict din rezumatul salvat, Room v7.
 - Restul etapei: vezi `docs/PROPUNERI.md`.
 
 ## Idei suplimentare

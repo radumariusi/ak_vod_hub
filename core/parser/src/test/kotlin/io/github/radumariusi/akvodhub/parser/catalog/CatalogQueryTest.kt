@@ -10,6 +10,17 @@ import org.junit.Test
 
 class CatalogQueryTest {
     @Test
+    fun originalAudioFilterReadsStoredFlagWithoutJoiningSources() {
+        val filter = CatalogFilter(originalAudioOnly = true)
+        val query = CatalogQuery.page(filter, 48, 0)
+        assertTrue(filter.hasFilters)
+        assertTrue(query.sql.contains("t.hasOriginalAudio = 1"))
+        assertFalse(query.sql.contains("raw_entry"))
+        assertEquals(listOf<Any>(48, 0), query.args)
+        assertFalse(filter.copy(originalAudioOnly = false).hasFilters)
+    }
+
+    @Test
     fun `fara filtre - doar titluri cu surse, populare, paginat`() {
         val q = CatalogQuery.page(CatalogFilter(), limit = 30, offset = 60)
         assertTrue(q.sql.contains("WHERE t.sourceCount > 0 ORDER BY t.popularity DESC, t.id DESC LIMIT ? OFFSET ?"))

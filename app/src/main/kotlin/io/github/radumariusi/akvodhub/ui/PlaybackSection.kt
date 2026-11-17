@@ -65,6 +65,15 @@ fun PlaybackSection(viewModel: PlaybackSettingsViewModel) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        OutlinedButton(onClick = { viewModel.setPreferOriginalLanguage(!prefs.preferOriginalLanguage) }) {
+            Text("Preferă limba originală: " + if (prefs.preferOriginalLanguage) "da" else "nu")
+        }
+        Text(
+            "Audio original înaintea profilului de surse, apoi MULTI; restul păstrează ordinea profilului. " +
+                "Alegerea manuală a sursei are prioritate.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         rules.forEachIndexed { index, rule ->
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(if (index == 0) "Prima:" else "Altfel:", style = MaterialTheme.typography.bodyLarge)

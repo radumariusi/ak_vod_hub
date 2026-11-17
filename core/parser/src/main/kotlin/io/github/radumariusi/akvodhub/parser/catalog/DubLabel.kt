@@ -8,6 +8,9 @@ class DubLabel(originalLanguage: String?) {
     private val languages = sortedSetOf<String>()
     private var uncertain = original == null
     private var originalAvailable = false
+    private var declaredOriginal = false
+
+    val hasOriginalAudio: Boolean get() = original != null && declaredOriginal
 
     fun addSource(audioLanguages: String?) {
         val tokens = audioLanguages?.split(',').orEmpty()
@@ -15,9 +18,22 @@ class DubLabel(originalLanguage: String?) {
         for (token in tokens) {
             val code = token.trim().lowercase(Locale.ROOT)
             when {
-                code == "mul" || code == original -> originalAvailable = true
-                language(code) == null -> uncertain = true
-                else -> languages += code
+                code == original -> {
+                    originalAvailable = true
+                    declaredOriginal = true
+                }
+
+                code == "mul" -> {
+                    originalAvailable = true
+                }
+
+                language(code) == null -> {
+                    uncertain = true
+                }
+
+                else -> {
+                    languages += code
+                }
             }
         }
     }
@@ -30,9 +46,5 @@ class DubLabel(originalLanguage: String?) {
         }
 
     private fun language(value: String?): String? =
-        value?.trim()?.lowercase(Locale.ROOT)?.takeIf { it in ISO_LANGUAGES }
-
-    private companion object {
-        val ISO_LANGUAGES = Locale.getISOLanguages().toSet()
-    }
+        OriginalLanguage.code(value)
 }

@@ -224,6 +224,14 @@ private fun FilterBar(
                 )
             })
         }
+        item("original") {
+            FilterButton(
+                "Doar în limba originală",
+                if (filter.originalAudioOnly) "Da" else "Nu",
+                active = filter.originalAudioOnly,
+                onClick = { onChange(filter.copy(originalAudioOnly = !filter.originalAudioOnly)) },
+            )
+        }
         item("sort") {
             val sorts = CatalogSort.entries
             FilterButton("Ordine", filter.sort.label, active = false, onClick = {
@@ -237,7 +245,15 @@ private fun FilterBar(
         if (filter.hasFilters) {
             item("reset") {
                 OutlinedButton(onClick = {
-                    onChange(filter.copy(genre = null, years = null, quality = null, language = null))
+                    onChange(
+                        filter.copy(
+                            genre = null,
+                            years = null,
+                            quality = null,
+                            language = null,
+                            originalAudioOnly = false,
+                        ),
+                    )
                 }) { Text("Șterge filtrele") }
             }
         }

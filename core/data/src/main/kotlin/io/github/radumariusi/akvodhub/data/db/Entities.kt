@@ -1,5 +1,6 @@
 package io.github.radumariusi.akvodhub.data.db
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -188,6 +189,8 @@ data class TitleEntity(
     val audioLanguages: String? = null,
     /** Etichetă calculată la indexare; null dacă audio original există sau limba e necunoscută. */
     val dubLabel: String? = null,
+    /** Există cel puțin o sursă care declară explicit limba originală TMDB (MULTI nu confirmă). */
+    @ColumnInfo(defaultValue = "0") val hasOriginalAudio: Boolean = false,
 )
 
 /** Titlu local (din playlist, fără potrivire TMDB). */
