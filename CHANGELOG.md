@@ -2,6 +2,10 @@
 
 Intrări noi sus. Una scurtă pentru fiecare PR (dată, etapă, ce s-a schimbat).
 
+## 2026-11-17: etapa 10.7 — pagina actorului
+- Din distribuție se deschide actorul cu filmele/serialele disponibile în playlist, paginare după ID și întoarcere la fișă.
+- Filmografie doar la cerere, cache pentru 24 de actori, migrare aditivă Room 10→11; fără biblioteci noi.
+
 ## 2026-11-17: etapa 10.6 — insigne configurabile
 - Setări pentru TMDB, IMDb, 4K/HDR, DUB, progres și „Nou”; preferințe incluse în backup.
 - Texte precalculate, progres salvat și migrare aditivă Room 9→10; fără interogări pe poster.

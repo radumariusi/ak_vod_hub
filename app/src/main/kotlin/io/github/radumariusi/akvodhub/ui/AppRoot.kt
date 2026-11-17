@@ -33,6 +33,7 @@ import androidx.tv.material3.Text
 import io.github.radumariusi.akvodhub.R
 import io.github.radumariusi.akvodhub.catalog.TmdbViewModel
 import io.github.radumariusi.akvodhub.data.db.TitleCard
+import io.github.radumariusi.akvodhub.hub.ActorViewModel
 import io.github.radumariusi.akvodhub.hub.BrowseViewModel
 import io.github.radumariusi.akvodhub.hub.DetailsViewModel
 import io.github.radumariusi.akvodhub.hub.HomeViewModel
@@ -40,6 +41,7 @@ import io.github.radumariusi.akvodhub.player.PlaybackSettingsViewModel
 import io.github.radumariusi.akvodhub.playlist.PlaylistsViewModel
 import io.github.radumariusi.akvodhub.remote.PhoneSetupViewModel
 import io.github.radumariusi.akvodhub.tv.NavRequest
+import io.github.radumariusi.akvodhub.ui.hub.ActorScreen
 import io.github.radumariusi.akvodhub.ui.hub.BrowseScreen
 import io.github.radumariusi.akvodhub.ui.hub.DetailsScreen
 import io.github.radumariusi.akvodhub.ui.hub.HomeScreen
@@ -66,6 +68,7 @@ class HubViewModels(
     val details: DetailsViewModel,
     val playback: PlaybackSettingsViewModel,
     val phoneSetup: PhoneSetupViewModel,
+    val actor: ActorViewModel,
 )
 
 /**
@@ -82,6 +85,7 @@ fun AppRoot(
 ) {
     var current by rememberSaveable { mutableStateOf(Destination.HOME) }
     var openTitle by rememberSaveable { mutableStateOf<Long?>(null) }
+    var actors by rememberSaveable { mutableStateOf(arrayListOf<ActorFrame>()) }
 
     // Titlurile deschise din pagina de detalii (recomandate, colecție…): „Înapoi” revine la cel dinainte.
     var titleStack by rememberSaveable { mutableStateOf(LongArray(0)) }
@@ -95,6 +99,7 @@ fun AppRoot(
 
     val open: (TitleCard, String) -> Unit = { card, key ->
         openedFrom = key
+        actors = arrayListOf()
         titleStack = LongArray(0)
         openTitle = card.id
     }
@@ -103,6 +108,7 @@ fun AppRoot(
     // Din afara aplicației: fișa unui titlu (ecranul principal, căutarea globală) sau o căutare (vocală).
     val navRequest by navRequests.collectAsState()
     LaunchedEffect(navRequest) {
+        if (navRequest != null) actors = arrayListOf()
         when (val request = navRequest) {
             null -> {
                 return@LaunchedEffect
@@ -150,14 +156,30 @@ fun AppRoot(
                 titleStack = titleStack.copyOf(titleStack.size - 1)
             } else {
                 openTitle = null
-                restoreKey = openedFrom
+                if (actors.isEmpty()) restoreKey = openedFrom
             }
         }
-        DetailsScreen(hub.details, titleId) { card ->
+        DetailsScreen(hub.details, titleId, onActor = { person ->
+            actors =
+                ArrayList((actors + ActorFrame(person.id, person.name, titleId, titleStack)).takeLast(MAX_TITLE_STACK))
+            titleStack = LongArray(0)
+            openTitle = null
+        }) { card ->
             if (card.id != titleId) {
                 titleStack = (titleStack + titleId).takeLast(MAX_TITLE_STACK).toLongArray()
                 openTitle = card.id
             }
+        }
+    } else if (actors.isNotEmpty()) {
+        val actor = actors.last()
+        val back = {
+            actors = ArrayList(actors.dropLast(1))
+            titleStack = actor.titleStack
+            openTitle = actor.origin
+        }
+        BackHandler(onBack = back)
+        states.SaveableStateProvider("actor:${actor.id}") {
+            ActorScreen(hub.actor, actor.id, actor.name, onBack = back) { card -> openTitle = card.id }
         }
     } else {
         BackHandler(enabled = current != Destination.HOME) { current = Destination.HOME }
@@ -266,3 +288,15 @@ fun AppRoot(
 }
 
 private const val MAX_TITLE_STACK = 20
+
+/** Contextul unei pagini de actor, inclusiv întoarcerea prin fișe/actori deschiși succesiv. */
+private data class ActorFrame(
+    val id: Long,
+    val name: String,
+    val origin: Long,
+    val titleStack: LongArray,
+) : java.io.Serializable {
+    private companion object {
+        const val serialVersionUID = 1L
+    }
+}

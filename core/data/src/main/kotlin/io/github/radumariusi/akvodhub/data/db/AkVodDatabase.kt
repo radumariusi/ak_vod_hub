@@ -18,8 +18,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         DiscoverCacheEntity::class,
         ImdbMapEntity::class,
         ImdbRatingStage::class,
+        PersonCreditEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = false,
 )
 abstract class AkVodDatabase : RoomDatabase() {
@@ -43,11 +44,23 @@ abstract class AkVodDatabase : RoomDatabase() {
                     MIGRATION_7_8,
                     MIGRATION_8_9,
                     MIGRATION_9_10,
+                    MIGRATION_10_11,
                 ).addCallback(
                     object : RoomDatabase.Callback() {
                         override fun onOpen(db: SupportSQLiteDatabase) = createSearchTable(db)
                     },
                 ).build()
+
+        /** Etapa 10.7: cache mic de filmografii, populat numai la cerere. */
+        val MIGRATION_10_11 =
+            object : Migration(10, 11) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS person_credit (personId INTEGER NOT NULL, " +
+                            "mediaType TEXT NOT NULL, tmdbId INTEGER NOT NULL, PRIMARY KEY(personId, mediaType, tmdbId))",
+                    )
+                }
+            }
 
         /** Etapa 10.6: insigne precalculate și progres, fără interogări pe poster. */
         val MIGRATION_9_10 =

@@ -142,6 +142,7 @@ Documentele astea, `.gitignore`, workflow de curățenie automată, reguli de lu
 - ✅ 10.4: metadate TMDB opționale, completate o singură dată prin jobul existent (Room v8), cu pauză la redare.
 - ✅ 10.5: note IMDb din setul oficial în flux, aplicare atomică, verificare săptămânală și la cerere (Room v9).
 - ✅ 10.6: insigne configurabile precalculate și progres pe postere, cu backup al preferințelor (Room v10).
+- ✅ 10.7: pagina actorului, filmografie la cerere intersectată cu playlist-ul, paginare după ID și cache limitat (Room v11).
 - Restul etapei: vezi `docs/PROPUNERI.md`.
 
 ## Idei suplimentare

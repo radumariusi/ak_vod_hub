@@ -40,6 +40,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import io.github.radumariusi.akvodhub.data.catalog.Credits
+import io.github.radumariusi.akvodhub.data.catalog.Person
 import io.github.radumariusi.akvodhub.data.catalog.SourceDetails
 import io.github.radumariusi.akvodhub.data.catalog.TitleDetails
 import io.github.radumariusi.akvodhub.data.db.TitleCard
@@ -68,6 +69,7 @@ import io.github.radumariusi.akvodhub.ui.touch.Surface
 fun DetailsScreen(
     viewModel: DetailsViewModel,
     titleId: Long,
+    onActor: (Person) -> Unit,
     onOpen: (TitleCard) -> Unit,
 ) {
     LaunchedEffect(titleId) { viewModel.open(titleId) }
@@ -87,6 +89,7 @@ fun DetailsScreen(
                     details = details,
                     onPlay = ::play,
                     onSelectSeason = viewModel::selectSeason,
+                    onActor = onActor,
                     onOpen = onOpen,
                 )
             }
@@ -108,6 +111,7 @@ private fun DetailsContent(
     details: TitleDetails,
     onPlay: (PlayRequest) -> Unit,
     onSelectSeason: (Int) -> Unit,
+    onActor: (Person) -> Unit,
     onOpen: (TitleCard) -> Unit,
 ) {
     val title = details.title
@@ -194,7 +198,13 @@ private fun DetailsContent(
                         contentPadding = PaddingValues(vertical = 4.dp),
                     ) {
                         items(cast) { person ->
-                            Surface(onClick = {}, modifier = Modifier.width(132.dp)) {
+                            Surface(onClick = {
+                                if (person.id >
+                                    0
+                                ) {
+                                    onActor(person)
+                                }
+                            }, modifier = Modifier.width(132.dp)) {
                                 Column(
                                     Modifier.padding(10.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally,

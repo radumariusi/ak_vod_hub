@@ -137,6 +137,16 @@ cardurile încărcate primesc actualizarea fără resetarea paginării/focusului
 Setări → Insigne pe postere: șase opțiuni, toate active implicit; se pot ascunde toate. Se păstrează în
 preferințele existente și în backup. `LocalPosterBadges` distribuie opțiunile către UI; posterele citesc DB.
 
+### Etapa 10.7 (2026-11-17)
+
+Room v11, migrare aditivă 10→11: `person_credit` (persoană + tip + ID TMDB), populat numai la deschiderea
+actorului. `ActorRepository` cere combined_credits (numai cast), păstrează referințe, nu distribuția întregului
+catalog; marcajul TTL de 21 zile folosește discover_cache. Cache limitat la 24 de actori, cu date vechi utile offline.
+`ActorViewModel`/`ActorScreen` citesc doar titlurile cu surse prin JOIN pe indexurile TMDB și pagini de 48 după ID,
+fără OFFSET. Titlurile noi din playlist apar automat la următoarea citire dacă sunt în filmografia cache-uită.
+Cardurile distribuției folosesc Surface touch și ID-ul persoanei; navigarea reține contextul actor/fișă,
+inclusiv actori deschiși succesiv, iar grila își reface paginile până la cardul deschis pentru restaurare.
+
 ## 6. Ce urmează (din `docs/PROPUNERI.md`)
 
 Ordinea recomandată, **o etapă = un branch + un PR**:

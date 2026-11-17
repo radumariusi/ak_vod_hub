@@ -132,6 +132,28 @@ interface CatalogDao {
     )
     suspend fun applyImdbRatings(): Int
 
+    @Query("SELECT EXISTS(SELECT 1 FROM person_credit WHERE personId = :personId)")
+    suspend fun hasPersonCredits(personId: Long): Boolean
+
+    @Query(
+        "DELETE FROM person_credit WHERE CAST(personId AS TEXT) NOT IN " +
+            "(SELECT substr(cacheKey, 7) FROM discover_cache WHERE cacheKey LIKE 'actor:%' " +
+            "ORDER BY fetchedAt DESC LIMIT 24)",
+    )
+    suspend fun trimPersonCredits()
+
+    @Query(
+        "DELETE FROM discover_cache WHERE cacheKey LIKE 'actor:%' AND cacheKey NOT IN " +
+            "(SELECT cacheKey FROM discover_cache WHERE cacheKey LIKE 'actor:%' ORDER BY fetchedAt DESC LIMIT 24)",
+    )
+    suspend fun trimPersonCache()
+
+    @Query("DELETE FROM person_credit WHERE personId = :personId")
+    suspend fun clearPersonCredits(personId: Long)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun putPersonCredits(entries: List<PersonCreditEntity>)
+
     // ------------------------------------------------------------ surse și statistici
 
     /** Toate sursele unui titlu, din toate playlist-urile (fără episoade). */
