@@ -82,6 +82,7 @@ fun PlayerScreen(
     var controls by remember { mutableStateOf(false) }
     var lastInput by remember { mutableIntStateOf(0) }
     var choice by remember { mutableStateOf<Choice?>(null) }
+    var technical by remember { mutableStateOf(false) }
     var jumping by remember { mutableStateOf(false) }
     var adjusting by remember { mutableStateOf(false) }
     val prefs by viewModel.prefs.collectAsState()
@@ -109,8 +110,8 @@ fun PlayerScreen(
             delay(500)
         }
     }
-    LaunchedEffect(controls, lastInput, isPlaying, choice, adjusting, jumping) {
-        if (controls && isPlaying && choice == null && !adjusting && !jumping) {
+    LaunchedEffect(controls, lastInput, isPlaying, choice, adjusting, jumping, technical) {
+        if (controls && isPlaying && choice == null && !adjusting && !jumping && !technical) {
             delay(HIDE_AFTER_MS)
             controls = false
         }
@@ -273,6 +274,7 @@ fun PlayerScreen(
                 onChoice = { choice = it },
                 onAdjust = { adjusting = true },
                 onJump = { jumping = true },
+                onTechnical = { technical = true },
                 modifier = Modifier.align(Alignment.BottomStart),
             )
         }
@@ -295,6 +297,7 @@ fun PlayerScreen(
         }
     }
 
+    if (technical) TechnicalInfoDialog(viewModel, onClose = { technical = false })
     if (jumping) JumpToMinuteDialog(viewModel, onClose = { jumping = false })
     choice?.let { ChoiceDialog(it, onDismiss = { choice = null }) }
 }
@@ -311,6 +314,7 @@ private fun Controls(
     onChoice: (Choice) -> Unit,
     onAdjust: () -> Unit,
     onJump: () -> Unit,
+    onTechnical: () -> Unit,
     modifier: Modifier,
 ) {
     Column(
@@ -407,6 +411,7 @@ private fun Controls(
                     Text("Sursă (${state.sources.size})")
                 }
             }
+            OutlinedButton(onClick = onTechnical) { Text("Info tehnic") }
             OutlinedButton(onClick = onJump) { Text("Salt la minut") }
             if (state.isSeries) {
                 OutlinedButton(onClick = viewModel::resetSeriesTracks) { Text("Resetează audio/subtitrare serial") }

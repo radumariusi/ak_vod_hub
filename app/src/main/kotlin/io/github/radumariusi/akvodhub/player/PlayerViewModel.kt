@@ -123,6 +123,8 @@ class PlayerViewModel
         private val subtitleRepository: SubtitleRepository,
         private val addons: StremioAddons,
     ) : ViewModel() {
+        private val passthroughRequested = settings.state.value.audioPassthrough && !settings.state.value.nightMode
+        private val nightModeEnabled = settings.state.value.nightMode
         val player: ExoPlayer = PlayerFactory.create(context, trackPreferences(), settings.state.value.audioPassthrough, settings.state.value.nightMode)
 
         /** Mărimea și stilul subtitrărilor (Setări → Subtitrări; se pot schimba și din player). */
@@ -683,6 +685,31 @@ class PlayerViewModel
         fun skipIntro() {
             val end = state.value.introEndMs
             if (SeriesPlayback.canSkip(player.currentPosition, player.duration, end)) player.seekTo(end)
+        }
+
+        fun technicalInfo(): String {
+            val video = player.videoFormat
+            val audio = player.audioFormat
+            val counters = player.videoDecoderCounters
+            counters?.ensureUpdated()
+            fun bitrate(value: Int?): String = value?.takeIf { it > 0 }?.let { "${it / 1000} kb/s (declarat)" } ?: "necunoscut"
+            val hdr = when (video?.colorInfo?.colorTransfer) {
+                C.COLOR_TRANSFER_ST2084 -> "HDR PQ"
+                C.COLOR_TRANSFER_HLG -> "HDR HLG"
+                else -> "SDR / nespecificat"
+            }
+            return listOf(
+                "Video: ${video?.sampleMimeType ?: "necunoscut"} · ${video?.codecs ?: "codec nespecificat"}",
+                "Rezoluție: ${video?.width?.takeIf { it > 0 } ?: "?"} × ${video?.height?.takeIf { it > 0 } ?: "?"} · $hdr",
+                "Cadre/s: ${video?.frameRate?.takeIf { it > 0 } ?: "?"} · viteză ${player.playbackParameters.speed}×",
+                "Bitrate video: ${bitrate(video?.averageBitrate)}",
+                "Audio: ${audio?.sampleMimeType ?: "necunoscut"} · ${audio?.channelCount?.takeIf { it > 0 } ?: "?"} canale · ${audio?.sampleRate?.takeIf { it > 0 } ?: "?"} Hz",
+                "Bitrate audio: ${bitrate(audio?.averageBitrate)}",
+                "Cadre pierdute: ${counters?.droppedBufferCount ?: 0} (sursa curentă)",
+                "Buffer disponibil: ${player.totalBufferedDuration.coerceAtLeast(0) / 1000} s",
+                "Passthrough solicitat la deschidere: ${if (passthroughRequested) "da, dacă ieșirea permite" else "nu"}",
+                "Compresie PCM: ${if (nightModeEnabled) "mod noapte" else "dezactivată"}",
+            ).joinToString("\n")
         }
 
         fun setPictureMode(mode: Int) {
