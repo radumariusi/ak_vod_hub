@@ -110,6 +110,8 @@ class PlaybackSettingsViewModel
             viewModelScope.launch { repository.prepare() }
         }
 
+        fun setHomeHero(enabled: Boolean) = settings.setHomeHero(enabled)
+
         fun setPosterSize(size: PosterSize) = settings.setPosterSize(size)
 
         fun setAccentColor(color: AccentColor) = settings.setAccentColor(color)

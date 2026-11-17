@@ -100,7 +100,8 @@ private fun HomeRows(
     val focused = remember { mutableStateOf<TitleCard?>(null) }
 
     Column(Modifier.fillMaxSize()) {
-        Hero(focused, fallback = rows[0].items[0], logo = viewModel::logo)
+        val prefs by viewModel.prefs.collectAsState()
+        if (prefs.homeHero) Hero(focused, fallback = rows[0].items[0], logo = viewModel::logo)
         LazyColumn(
             state = rememberLazyListState(),
             verticalArrangement = Arrangement.spacedBy(12.dp),

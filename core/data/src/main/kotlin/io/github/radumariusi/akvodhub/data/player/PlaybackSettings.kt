@@ -32,6 +32,7 @@ data class PlaybackPrefs(
     /** Mărimea subtitrărilor, în procente (100 = normal). */
     val subtitleScale: Int = 100,
     val subtitleStyle: SubtitleStyle = SubtitleStyle.WHITE_OUTLINE,
+    val homeHero: Boolean = true,
     val contentLanguages: String = "",
     val hiddenLanguages: String = "",
     val hiddenCategories: String = "",
@@ -103,6 +104,11 @@ class PlaybackSettings(
         ) {
             prefs.edit().putString(name, endMs.toString()).apply()
         }
+    }
+
+    fun setHomeHero(value: Boolean) {
+        prefs.edit().putBoolean("home_hero", value).apply()
+        mutableState.value = read()
     }
 
     fun setContent(key: String, value: String) {
@@ -192,6 +198,7 @@ class PlaybackSettings(
                     put(key, value)
                 }
             }
+            put("home_hero", state.value.homeHero.toString())
             CONTENT_KEYS.forEach { key -> prefs.getString(key, null)?.let { put(key, it) } }
             put(BUFFER, state.value.bufferPreset.name)
             put(NIGHT, state.value.nightMode.toString())
@@ -210,6 +217,7 @@ class PlaybackSettings(
 
     /** Restaurare din backup: doar cheile cunoscute, cu valori verificate la citire. */
     fun restore(values: Map<String, String>) {
+        values["home_hero"]?.toBooleanStrictOrNull()?.let { setHomeHero(it) }
         CONTENT_KEYS.forEach { key -> values[key]?.let { setContent(key, it) } }
         val edit = prefs.edit()
         values[BUFFER]?.let { edit.putString(BUFFER, BufferPreset.decode(it).name) }
@@ -265,6 +273,7 @@ class PlaybackSettings(
                 }
             }
         return PlaybackPrefs(
+            homeHero = prefs.getBoolean("home_hero", true),
             contentLanguages = prefs.getString("content_languages", "").orEmpty(),
             hiddenLanguages = prefs.getString("hidden_languages", "").orEmpty(),
             hiddenCategories = prefs.getString("hidden_categories", "").orEmpty(),
