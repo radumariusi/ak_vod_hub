@@ -93,7 +93,7 @@ Respinse ca grele: trailere în aplicație, trickplay, descrieri RO pentru tot c
 
 ## 7. Cum se lucrează
 
-Vezi `docs/WORKFLOW.md` și `docs/JULES_PROMPT.md`. Pe scurt: un branch + un PR pe etapă, niciodată push direct pe `main`,
+Vezi `docs/WORKFLOW.md` și `docs/JULES_PROMPT.md`. Pe scurt: un branch + un PR pe etapă, mergeuit de agent doar cu CI verde (ca Radu să poată scoate APK din `main`), niciodată push direct pe `main`,
 fără force-push, fără ștergere de tag-uri/release-uri/branch-uri, intrare scurtă în `CHANGELOG.md` la fiecare PR.
 
 ## 8. Restaurare (pentru Radu, joi)

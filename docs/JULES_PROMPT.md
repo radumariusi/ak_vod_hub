@@ -12,12 +12,12 @@ HANDOFF section 5 ("Capcane importante") lists rules that, if broken, break the 
 
 **Task:** implement the roadmap in `docs/PROPUNERI.md` in the recommended order (stage 10 → 12 → 11 → 13 → 14),
 **one stage (or one numbered item, e.g. 10.1) per branch and per pull request**. Check open PRs and `claude/*` branches first
-so you don't duplicate work already started. Do not start the next item until the previous PR is opened and its CI is green.
+so you don't duplicate work already started. Do not start the next item until the previous PR is merged.
 
 **Hard rules (never break these):**
-1. Never push to `main` directly. Work on a branch named `jules/<stage>-<short-name>` and open a PR to `main`. Do not merge PRs yourself.
+1. Never push to `main` directly. Work on a branch named `jules/<stage>-<short-name>`, open a PR to `main`, and **merge it yourself (squash) only after CI on the PR is green**. One stage/item per PR, so any PR can be reverted on its own.
 2. Never force-push, rewrite history, or delete tags, releases or branches (especially tag `claude-handoff-2026-11-17` and branch `claude-snapshot`).
-3. Never touch signing, secrets, `.github/workflows/*`, the signing config in `app/build.gradle.kts`, or the version scheme. Never run the Release workflow.
+3. Never touch signing, secrets, `.github/workflows/*`, the signing config in `app/build.gradle.kts`, or the version scheme. The owner starts the Release workflow himself to get an APK.
 4. Never commit APKs, build outputs, files > 1 MB, real playlists, API keys or credentials.
 5. Database changes: bump the Room version and add an explicit `Migration`. Never use destructive migration.
 6. Keep the app slim: no new library unless it cannot be done in a few hundred lines; justify every new dependency in the PR. minSdk stays 23; target device is Android 11 TV.
