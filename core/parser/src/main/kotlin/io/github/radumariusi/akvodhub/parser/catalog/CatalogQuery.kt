@@ -13,6 +13,12 @@ enum class CatalogSort(
     TITLE("Alfabetic"),
 }
 
+enum class ProductionFilter(val label: String) {
+    ALL("Toate"),
+    US("Producții SUA"),
+    ENGLISH("Limba originală engleză"),
+}
+
 /** Interval de ani (ex. un deceniu). Capetele null = fără limită. */
 data class YearRange(
     val label: String,
@@ -47,10 +53,11 @@ data class CatalogFilter(
     val sort: CatalogSort = CatalogSort.POPULAR,
     val text: String = "",
     val originalAudioOnly: Boolean = false,
+    val production: ProductionFilter = ProductionFilter.ALL,
 ) {
     val hasFilters: Boolean get() =
         genre != null || years != null || quality != null || language != null ||
-            originalAudioOnly
+            originalAudioOnly || production != ProductionFilter.ALL
 }
 
 /** O interogare SQL cu argumentele ei, gata de trimis la Room (`SimpleSQLiteQuery`). */
@@ -104,6 +111,13 @@ object CatalogQuery {
         filter.language?.let {
             where += "t.audioLanguages LIKE ?"
             args += "%,${it.lowercase()},%"
+        }
+        if (filter.production == ProductionFilter.US) {
+            where += "t.originCountries LIKE ?"
+            args += "%,US,%"
+        } else if (filter.production == ProductionFilter.ENGLISH) {
+            where += "t.originalLanguage = ?"
+            args += "en"
         }
         if (filter.originalAudioOnly) where += "t.hasOriginalAudio = 1"
         val fts = ftsQuery(filter.text)

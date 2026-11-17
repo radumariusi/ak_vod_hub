@@ -20,7 +20,7 @@ asupra derulării / pornirii · 🟢 neglijabil · 🟡 de urmărit · 🔴 greu
 |---|---------|--------------|-----|----|--------|
 | ✅ 10.1 | **Etichetă „DUB”** pe titlurile care au doar surse în altă limbă decât cea originală (ex. film american doar în germană → „DUB DE”) | Stremio (Torrentio flags), TiviMate | 🟢 0 | 🟢 +1 coloană | 🟢 |
 | ✅ 10.2 | **Preferă limba originală** (setare): sursele în limba originală trec primele la „Redă”; filtru „Doar în limba originală” în Filme/Seriale | Plex (audio original), Infuse | 🟢 0 | 🟢 | 🟢 |
-| 10.3 | **Filtru „Producții SUA”** / limba originală engleză (US) | Jellyfin filtre | 🟢 0 | 🟢 +1 coloană | 🟢 |
+| ✅ 10.3 | **Filtru „Producții SUA”** / limba originală engleză (US) | Jellyfin filtre | 🟢 0 | 🟢 +1 coloană | 🟢 |
 | ✅ 10.4 | **Completare detalii TMDB în fundal** pentru toate titlurile: IMDb ID, durată, certificare (PG-13…), țara de origine, tagline | NuvioTV, Plex | 🟢 0 | 🟡 +3–5 MB | 🟡 o singură dată ~1 h în fundal |
 | 10.5 | **Nota IMDb** pe postere și în fișă, din fișierul public IMDb `title.ratings` (descărcat săptămânal, ~8 MB, procesat în flux și aruncat) | Kodi (scrapers), Stremio | 🟢 0 | 🟢 +2 coloane | 🟡 ~15–30 s/săpt. în fundal |
 | 10.6 | **Insigne pe postere** (configurabile): ★ TMDB, IMDb, 4K/HDR, DUB, bară de progres, „Nou” | TiviMate, Plex, NuvioTV | 🟢 | 🟢 | 🟢 dacă sunt text pre-calculat |

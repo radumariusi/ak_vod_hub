@@ -104,6 +104,13 @@ Certificare: RO, apoi US, apoi origine/altele; preferă lansarea cinematografic�
 Durata, certificarea și tagline apar în fișă; pagina deschisă se actualizează după reindexare.
 10.4 precedă 10.3 deoarece filtrul SUA cere țările de origine (nu deducem țara din limba engleză).
 
+### Etapa 10.3 (2026-11-17)
+
+Filme/Seriale/Căutare → Origine: „Producții SUA” citește `originCountries` (inclusiv coproducții),
+„Limba originală engleză” citește `originalLanguage`. Nu confundă limba engleză cu țara SUA și nu confundă
+limba originală cu audio disponibil (filtrul strict din 10.2 rămâne separat). Țara necunoscută nu trece
+filtrul SUA; rezultatele se completează pe măsură ce rulează 10.4. Fără schemă sau setare persistentă nouă.
+
 ## 6. Ce urmează (din `docs/PROPUNERI.md`)
 
 Ordinea recomandată, **o etapă = un branch + un PR**:
