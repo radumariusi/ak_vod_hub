@@ -81,7 +81,7 @@ Nota IMDb cere IMDb ID-ul fiecărui titlu, pe care acum îl avem doar pentru o p
 | ✅ 12.4 | **Lista mea** (watchlist) + „Văzut / nevăzut” manual | Plex, Stremio | 🟢 | 🟢 un tabel mic |
 | ✅ 12.5 | **Fișă nouă**: fundal pe tot ecranul, tagline, durată, certificare, genuri, ★ TMDB + IMDb, butoane mari, surse grupate compact, sezoane ca file, distribuție cu poze | Infuse, Plex | 🟢 | 🟢 |
 | ✅ 12.6 | **Trailer**: deschide aplicația YouTube a TV-ului | Stremio, Plex | 🟢 0 | 🟢 |
-| 12.7 | **Rând „Nou în playlist”** după fiecare reîmprospătare + episoade noi la serialele urmărite | TiviMate, Plex | 🟢 | 🟢 |
+| ✅ 12.7 | **Rând „Nou în playlist”** după fiecare reîmprospătare + episoade noi la serialele urmărite | TiviMate, Plex | 🟢 | 🟢 |
 | 12.8 | **Mărime postere** (mic / mediu / mare) și **culoare de accent** | TiviMate, Kodi skins | 🟢 | 🟢 postere mici = mai multe pe ecran, mai puțină memorie |
 | 12.9 | ❌ Trailer redat automat în fundal (stil Netflix) | Netflix, NuvioTV | 🔴 player YouTube/WebView: +MB și RAM | 🔴 Nu recomand pe TV cu Android 11 |
 | 12.10 | ❌ Efecte blur / sticlă pe fundal | Apple TV | – | 🔴 blur-ul nativ cere Android 12; emularea e lentă. Folosesc gradient întunecat |

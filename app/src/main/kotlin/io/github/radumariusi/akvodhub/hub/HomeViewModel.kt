@@ -10,6 +10,7 @@ import io.github.radumariusi.akvodhub.data.discover.DiscoverRow
 import io.github.radumariusi.akvodhub.parser.catalog.CatalogFilter
 import io.github.radumariusi.akvodhub.parser.catalog.CatalogSort
 import io.github.radumariusi.akvodhub.parser.catalog.Genres
+import io.github.radumariusi.akvodhub.parser.catalog.NewsCursor
 import io.github.radumariusi.akvodhub.parser.match.MediaType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -32,6 +33,7 @@ data class HomeRow(
     val items: List<TitleCard>,
     val filter: CatalogFilter?,
     val endReached: Boolean,
+    val newsCursor: NewsCursor? = null,
 )
 
 data class HomeState(
@@ -67,7 +69,6 @@ class HomeViewModel
 
         private val specs: List<Triple<String, String, CatalogFilter>> =
             listOf(
-                Triple("recent", "Adăugate recent", CatalogFilter(sort = CatalogSort.RECENT)),
                 Triple("movies", "Filme populare", CatalogFilter(type = MediaType.MOVIE)),
                 Triple("series", "Seriale populare", CatalogFilter(type = MediaType.TV)),
                 Triple("rated", "Cele mai apreciate", CatalogFilter(sort = CatalogSort.RATING)),
@@ -85,6 +86,7 @@ class HomeViewModel
             viewModelScope.launch {
                 repository.watchVersion.drop(1).collect {
                     refreshContinueWatching()
+                    refreshEpisodeNews()
                     loadPersonal(delayMs = PERSONAL_DEBOUNCE_MS)
                 }
             }
@@ -102,6 +104,9 @@ class HomeViewModel
                 val watching = repository.continueWatching()
                 if (watching.isNotEmpty()) {
                     rows += HomeRow(CONTINUE, "Continuă vizionarea", watching, null, endReached = true)
+                }
+                for (key in listOf(NEWS, EPISODES)) {
+                    newsRow(key, maxOf(PAGE, keep[key] ?: 0))?.let { rows += it }
                 }
                 for ((key, title, filter) in specs) {
                     // Păstrăm câte titluri erau deja încărcate, ca rândul să nu „sară” sub focus.
@@ -126,6 +131,38 @@ class HomeViewModel
                 val rest = base.filter { it.key != CONTINUE }
                 val row = HomeRow(CONTINUE, "Continuă vizionarea", watching, null, endReached = true)
                 base = if (watching.isEmpty()) rest else listOf(row) + rest
+                publish()
+            }
+        }
+
+        private suspend fun newsRow(key: String, desired: Int): HomeRow? {
+            var cursor: NewsCursor? = null
+            val cards = mutableListOf<TitleCard>()
+            var end: Boolean
+            do {
+                val page = repository.newsPage(key == EPISODES, cursor, PAGE)
+                cards += page.items
+                cursor = page.cursor
+                end = page.endReached
+            } while (!end && cards.size < desired)
+            if (cards.isEmpty()) return null
+            return HomeRow(
+                key,
+                if (key == NEWS) "Nou în playlist" else "Episoade noi la serialele urmărite",
+                cards,
+                null,
+                end,
+                cursor,
+            )
+        }
+
+        private fun refreshEpisodeNews() {
+            viewModelScope.launch {
+                if (!loaded) return@launch
+                val desired = base.firstOrNull { it.key == EPISODES }?.items?.size ?: PAGE
+                val row = newsRow(EPISODES, desired)
+                val rest = base.filter { it.key != EPISODES }
+                base = if (row == null) rest else rest + row
                 publish()
             }
         }
@@ -158,8 +195,9 @@ class HomeViewModel
         /** Ordinea pe Acasă: Continuă, recomandările personale, cataloagele addon-urilor, apoi restul. */
         private fun publish() {
             val cont = base.filter { it.key == CONTINUE }
-            val rest = base.filter { it.key != CONTINUE }
-            mutableState.value = HomeState(loading = !loaded, rows = cont + personal + catalogs + rest)
+            val news = base.filter { it.key == NEWS || it.key == EPISODES }
+            val rest = base.filter { it.key != CONTINUE && it.key != NEWS && it.key != EPISODES }
+            mutableState.value = HomeState(loading = !loaded, rows = cont + news + personal + catalogs + rest)
         }
 
         /** Focusul a ajuns la [index] în rândul [key]: dacă e aproape de capăt, aducem pagina următoare. */
@@ -168,11 +206,14 @@ class HomeViewModel
             index: Int,
         ) {
             val row = base.firstOrNull { it.key == key } ?: return
-            val filter = row.filter ?: return
+            val news = key == NEWS || key == EPISODES
+            val filter = row.filter
+            if (!news && filter == null) return
             if (row.endReached || index < row.items.size - PREFETCH || !loadingMore.add(key)) return
             viewModelScope.launch {
                 try {
-                    val more = repository.page(filter, PAGE, row.items.size)
+                    val newsPage = if (news) repository.newsPage(key == EPISODES, row.newsCursor, PAGE) else null
+                    val more = newsPage?.items ?: repository.page(filter!!, PAGE, row.items.size)
                     base =
                         base.map {
                             if (it.key != key) {
@@ -181,7 +222,8 @@ class HomeViewModel
                                 val known = it.items.mapTo(HashSet()) { c -> c.id }
                                 it.copy(
                                     items = it.items + more.filter { c -> c.id !in known },
-                                    endReached = more.size < PAGE,
+                                    endReached = newsPage?.endReached ?: (more.size < PAGE),
+                                    newsCursor = newsPage?.cursor ?: it.newsCursor,
                                 )
                             }
                         }
@@ -195,6 +237,8 @@ class HomeViewModel
         private fun DiscoverRow.toHomeRow() = HomeRow("d:$key", title, items, null, endReached = true)
 
         companion object {
+            const val NEWS = "news"
+            const val EPISODES = "new-episodes"
             const val CONTINUE = "continue"
             const val PAGE = 24
             const val PREFETCH = 8

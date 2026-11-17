@@ -80,6 +80,32 @@ interface PlaylistDao {
     )
     suspend fun inheritSeriesTitles()
 
+    @Query(
+        "UPDATE raw_entry SET titleId = (SELECT s.titleId FROM raw_entry s WHERE s.sourceId = :sourceId " +
+            "AND s.providerKey = 'series:' || :seriesId) WHERE kind = 'EPISODE' AND matchState = 3 " +
+            "AND sourceId = :sourceId AND seriesId = :seriesId",
+    )
+    suspend fun inheritSeriesTitle(sourceId: Long, seriesId: Long)
+
+    @Query(
+        "SELECT r.* FROM raw_entry r JOIN playlist_source p ON p.id = r.sourceId " +
+            "WHERE p.type = 'XTREAM' AND r.kind = 'SERIES' AND r.streamId IS NOT NULL AND r.id > :afterId " +
+            "AND (EXISTS(SELECT 1 FROM watchlist w WHERE w.titleId = r.titleId) " +
+            "OR EXISTS(SELECT 1 FROM watch_history h WHERE h.titleId = r.titleId) " +
+            "OR EXISTS(SELECT 1 FROM watch_state s WHERE s.titleId = r.titleId)) ORDER BY r.id LIMIT :limit",
+    )
+    suspend fun followedSeries(afterId: Long, limit: Int): List<RawEntryEntity>
+
+    @Query(
+        "SELECT firstSeenAt FROM raw_entry WHERE sourceId = :sourceId AND providerKey = 'series:' || :seriesId LIMIT 1",
+    )
+    suspend fun seriesFirstSeen(sourceId: Long, seriesId: Long): Long?
+
+    @Query(
+        "SELECT EXISTS(SELECT 1 FROM raw_entry WHERE sourceId = :sourceId AND kind = 'EPISODE' AND seriesId = :seriesId)",
+    )
+    suspend fun hasEpisodes(sourceId: Long, seriesId: Long): Boolean
+
     @Query("SELECT * FROM raw_entry WHERE sourceId = :sourceId AND kind = 'EPISODE' AND seriesId = :seriesId")
     suspend fun episodes(
         sourceId: Long,

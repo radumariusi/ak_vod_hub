@@ -11,6 +11,7 @@ import okhttp3.Request
 import okhttp3.Response
 import java.io.IOException
 import java.io.InputStream
+import java.util.concurrent.TimeUnit
 
 /**
  * Client pentru API-ul Xtream Codes (`player_api.php`). Folosim doar VOD:
@@ -83,7 +84,10 @@ class XtreamClient(
         vararg extra: Pair<String, String>,
     ): String =
         withContext(Dispatchers.IO) {
-            execute(apiUrl(account, action, *extra)).use { it.body.string() }
+            execute(
+                apiUrl(account, action, *extra),
+                episodeRequest = action == "get_series_info",
+            ).use { it.body.string() }
         }
 
     private suspend fun <T> stream(
@@ -95,10 +99,12 @@ class XtreamClient(
             execute(apiUrl(account, action)).use { response -> response.body.byteStream().use { block(it) } }
         }
 
-    private fun execute(url: HttpUrl): Response {
+    private fun execute(url: HttpUrl, episodeRequest: Boolean = false): Response {
         val response =
             try {
-                client.newCall(Request.Builder().url(url).build()).execute()
+                val call = client.newCall(Request.Builder().url(url).build())
+                if (episodeRequest) call.timeout().timeout(30, TimeUnit.SECONDS)
+                call.execute()
             } catch (e: IOException) {
                 throw XtreamException("Serverul nu răspunde: ${e.message ?: e.javaClass.simpleName}")
             }

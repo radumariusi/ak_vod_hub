@@ -27,7 +27,9 @@ import io.github.radumariusi.akvodhub.parser.catalog.Genres
 import io.github.radumariusi.akvodhub.parser.catalog.LocalizedOverview
 import io.github.radumariusi.akvodhub.parser.catalog.LogoCandidate
 import io.github.radumariusi.akvodhub.parser.catalog.MergedSeason
+import io.github.radumariusi.akvodhub.parser.catalog.NewsCursor
 import io.github.radumariusi.akvodhub.parser.catalog.PersonalLibrary
+import io.github.radumariusi.akvodhub.parser.catalog.PlaylistNews
 import io.github.radumariusi.akvodhub.parser.catalog.PosterBadges
 import io.github.radumariusi.akvodhub.parser.catalog.TitleLogo
 import io.github.radumariusi.akvodhub.parser.catalog.Trailer
@@ -78,6 +80,8 @@ data class TitleDetails(
     val sources: Map<Long, SourceDetails>,
     val genres: List<String>,
 )
+
+data class NewsPage(val items: List<TitleCard>, val cursor: NewsCursor?, val endReached: Boolean)
 
 data class SeriesEpisodes(
     val seasons: List<MergedSeason>,
@@ -215,6 +219,16 @@ class HubRepository(
     ): List<TitleCard> {
         val q = CatalogQuery.page(filter, limit, offset)
         return dao.cards(SimpleSQLiteQuery(q.sql, q.args.toTypedArray()))
+    }
+
+    suspend fun newsPage(episodes: Boolean, after: NewsCursor?, limit: Int): NewsPage {
+        val query = PlaylistNews.page(episodes, after, limit, System.currentTimeMillis())
+        val rows = dao.newsCards(SimpleSQLiteQuery(query.sql, query.args.toTypedArray()))
+        return NewsPage(
+            rows.map { it.card },
+            rows.lastOrNull()?.let { NewsCursor(it.newsAt, it.card.id) },
+            rows.size < limit,
+        )
     }
 
     suspend fun continueWatching(limit: Int = 20): List<TitleCard> = dao.continueWatching(limit)

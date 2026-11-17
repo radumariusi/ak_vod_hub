@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-11-17 — Etapa 12.7
+- Rânduri Nou în playlist și Episoade noi la serialele urmărite; refresh Xtream limitat în fundal și paginare după dată/ID.
+
 ## 2026-11-17 — Etapa 12.6
 - Trailer din fișă în aplicația YouTube, la cerere, cu cache și tratarea lipsei aplicației/trailerului.
 

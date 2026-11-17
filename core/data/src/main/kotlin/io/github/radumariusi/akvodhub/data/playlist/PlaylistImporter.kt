@@ -62,6 +62,7 @@ class PlaylistImporter(
 ) {
     private val dao = db.playlistDao()
     private val mutex = Mutex()
+    private val episodeMutex = Mutex()
 
     suspend fun import(
         sourceId: Long,
@@ -124,38 +125,46 @@ class PlaylistImporter(
     suspend fun loadXtreamEpisodes(
         sourceId: Long,
         seriesId: Long,
-    ): List<RawEntryEntity> {
-        val source = dao.source(sourceId) ?: return emptyList()
-        if (source.type != PlaylistType.XTREAM) return dao.episodes(sourceId, seriesId)
-        val account = account(source)
-        val now = clock()
-        val writer = BatchWriter(sourceId, run = now)
-        xtream.episodes(account, seriesId).forEach { e ->
-            writer.add(
-                RawEntryEntity(
-                    sourceId = sourceId,
-                    providerKey = "episode:${e.id}",
-                    kind = VodKind.EPISODE,
-                    name = e.title,
-                    groupTitle = null,
-                    url = null,
-                    logo = null,
-                    streamId = e.id,
-                    seriesId = seriesId,
-                    season = e.season,
-                    episode = e.episode,
-                    containerExt = e.containerExtension,
-                    providerAddedAt = e.added,
-                    firstSeenAt = now,
-                    seenRun = now,
-                    matchState = MatchState.INHERITED,
-                ),
-            )
+    ): List<RawEntryEntity> =
+        episodeMutex.withLock {
+            val source = dao.source(sourceId) ?: return@withLock emptyList()
+            if (source.type != PlaylistType.XTREAM) return@withLock dao.episodes(sourceId, seriesId)
+            val account = account(source)
+            val now = clock()
+            val firstSeen =
+                if (dao.hasEpisodes(sourceId, seriesId)) {
+                    now
+                } else {
+                    dao.seriesFirstSeen(sourceId, seriesId)
+                        ?: now
+                }
+            val writer = BatchWriter(sourceId, run = now)
+            xtream.episodes(account, seriesId).forEach { e ->
+                writer.add(
+                    RawEntryEntity(
+                        sourceId = sourceId,
+                        providerKey = "episode:${e.id}",
+                        kind = VodKind.EPISODE,
+                        name = e.title,
+                        groupTitle = null,
+                        url = null,
+                        logo = null,
+                        streamId = e.id,
+                        seriesId = seriesId,
+                        season = e.season,
+                        episode = e.episode,
+                        containerExt = e.containerExtension,
+                        providerAddedAt = e.added,
+                        firstSeenAt = firstSeen,
+                        seenRun = now,
+                        matchState = MatchState.INHERITED,
+                    ),
+                )
+            }
+            writer.flush()
+            dao.inheritSeriesTitle(sourceId, seriesId)
+            return@withLock dao.episodes(sourceId, seriesId)
         }
-        writer.flush()
-        dao.inheritSeriesTitles()
-        return dao.episodes(sourceId, seriesId)
-    }
 
     private suspend fun importM3u(
         source: PlaylistSourceEntity,

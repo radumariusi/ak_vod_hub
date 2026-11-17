@@ -90,7 +90,14 @@ class PlaylistWorkerFactory(
     ): ListenableWorker? =
         when (workerClassName) {
             PlaylistImportWorker::class.java.name -> {
-                PlaylistImportWorker(appContext, workerParameters, importer, dao, matchScheduler::enqueue)
+                PlaylistImportWorker(appContext, workerParameters, importer, dao) {
+                    matchScheduler.enqueue()
+                    PlaylistNewsWorker.enqueue(appContext)
+                }
+            }
+
+            PlaylistNewsWorker::class.java.name -> {
+                PlaylistNewsWorker(appContext, workerParameters, importer, dao, indexer)
             }
 
             MatchWorker::class.java.name -> {
