@@ -234,7 +234,7 @@ class DiscoverRepository(
         resolved.forEach { pool[it.id] = it }
         // Plus cele mai populare titluri din genurile preferate (merge și fără cheie TMDB).
         for (genre in profile.topGenres(MAX_GENRES)) {
-            dao.popularInGenre("%,$genre,%", GENRE_POOL).forEach { pool.putIfAbsent(it.id, it) }
+            dao.popularInGenre("%,$genre,%", GENRE_POOL).forEach { pool.getOrPut(it.id) { it } }
         }
 
         val rows = mutableListOf<DiscoverRow>()
