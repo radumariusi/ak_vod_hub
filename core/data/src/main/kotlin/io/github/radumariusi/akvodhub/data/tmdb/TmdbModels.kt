@@ -195,3 +195,15 @@ data class TmdbLogo(
     @SerialName("iso_639_1") val language: String? = null,
     @SerialName("vote_count") val votes: Int = 0,
 )
+
+@Serializable
+data class TmdbVideos(val results: List<TmdbVideo> = emptyList())
+
+@Serializable
+data class TmdbVideo(
+    val key: String = "",
+    val site: String = "",
+    val type: String = "",
+    val official: Boolean = false,
+    @SerialName("iso_639_1") val language: String? = null,
+)

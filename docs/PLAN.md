@@ -158,6 +158,8 @@ Documentele astea, `.gitignore`, workflow de curățenie automată, reguli de lu
 
 - ✅ 12.5: fișă cu fundal pe tot ecranul, logo/metadate, redare mare, grupuri compacte de surse, sezoane ca file și distribuție cu poze.
 
+- ✅ 12.6: trailer TMDB la apăsare, cache limitat; intent YouTube TV/telefon, apoi aplicația disponibilă.
+
 ## Idei suplimentare
 
 1. **Verificare sănătate surse**: test rapid în fundal al linkurilor; sursele moarte sunt marcate și puse la final.

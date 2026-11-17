@@ -2,6 +2,7 @@
 
 package io.github.radumariusi.akvodhub.ui.hub
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,11 +22,13 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,6 +70,9 @@ import io.github.radumariusi.akvodhub.player.PlayerActivity
 import io.github.radumariusi.akvodhub.ui.touch.Button
 import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
 import io.github.radumariusi.akvodhub.ui.touch.Surface
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 /**
  * Pagina unui film sau serial: fundal, poster, descriere, notă, genuri, distribuție, apoi sursele grupate
@@ -84,6 +90,42 @@ fun DetailsScreen(
     LaunchedEffect(titleId) { viewModel.open(titleId) }
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var loadingTrailer by remember(titleId) { mutableStateOf(false) }
+    val trailerJob = remember(titleId) { mutableStateOf<Job?>(null) }
+    DisposableEffect(titleId) { onDispose { trailerJob.value?.cancel() } }
+    val trailer: () -> Unit = {
+        if (!loadingTrailer) {
+            loadingTrailer = true
+            trailerJob.value =
+                scope.launch {
+                    try {
+                        val id = viewModel.trailer(titleId)
+                        if (id != null) {
+                            openTrailer(context, id)
+                        } else {
+                            Toast
+                                .makeText(
+                                    context,
+                                    "Nu există un trailer YouTube pentru acest titlu.",
+                                    Toast.LENGTH_LONG,
+                                ).show()
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                        Toast
+                            .makeText(
+                                context,
+                                "Trailerul nu a putut fi încărcat. Încearcă din nou.",
+                                Toast.LENGTH_LONG,
+                            ).show()
+                    } finally {
+                        loadingTrailer = false
+                    }
+                }
+        }
+    }
 
     fun play(request: PlayRequest) {
         context.startActivity(PlayerActivity.intent(context, request))
@@ -98,6 +140,8 @@ fun DetailsScreen(
                     details = details,
                     onPlay = ::play,
                     onWatchlist = viewModel::toggleWatchlist,
+                    onTrailer = trailer,
+                    loadingTrailer = loadingTrailer,
                     onWatched = viewModel::toggleWatched,
                     onSelectSeason = viewModel::selectSeason,
                     onActor = onActor,
@@ -122,6 +166,8 @@ private fun DetailsContent(
     details: TitleDetails,
     onPlay: (PlayRequest) -> Unit,
     onWatchlist: () -> Unit,
+    onTrailer: () -> Unit,
+    loadingTrailer: Boolean,
     onWatched: () -> Unit,
     onSelectSeason: (Int) -> Unit,
     onActor: (Person) -> Unit,
@@ -164,6 +210,12 @@ private fun DetailsContent(
             Header(details, state.credits, state.logoPath) {
                 val first = episodes?.let { EpisodeOrder.linear(it.seasons).firstOrNull() }
                 PlayActions(state, title.id, first, playFocus, onPlay)
+            }
+        }
+
+        item("trailer") {
+            OutlinedButton(onClick = onTrailer, enabled = !loadingTrailer && !title.isLocal) {
+                Text(if (loadingTrailer) "Se caută trailerul…" else "Trailer")
             }
         }
 
