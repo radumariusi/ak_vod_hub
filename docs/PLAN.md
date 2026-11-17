@@ -180,6 +180,13 @@ Documentele astea, `.gitignore`, workflow de curățenie automată, reguli de lu
 - ✅ 12.8: postere mic/mediu/mare și cinci culori de accent; preferințe locale și backup, fără biblioteci noi.
 - Etapa 12 completă (12.1–12.8); 12.9/12.10 respinse. Livrare semnată după CI și merge, apoi testarea proprietarului. Etapa 11 nu începe în acest fir.
 
+### ✅ Etapa 13: setări în două panouri
+
+- 13.1 Conținut; 13.2 Aspect; 13.3 Redare; 13.4 Audio; 13.5 Subtitrări;
+  13.6 Surse și playlist-uri; 13.7 Servicii; 13.8 Sistem.
+- Preferințe existente păstrate, opțiuni noi incluse în backup; statistici SQL în fundal, cache imagini golit la cerere.
+- Room v14, fără migrare sau biblioteci noi. Verificarea pe Android 11 TV rămâne de efectuat.
+
 ## Idei suplimentare
 
 1. **Verificare sănătate surse**: test rapid în fundal al linkurilor; sursele moarte sunt marcate și puse la final.

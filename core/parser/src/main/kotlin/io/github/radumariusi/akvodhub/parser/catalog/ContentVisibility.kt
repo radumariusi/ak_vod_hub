@@ -2,8 +2,13 @@ package io.github.radumariusi.akvodhub.parser.catalog
 
 /** Ascunde titlul întreg dacă oricare dintre surse declară o limbă/categorie blocată. */
 object ContentVisibility {
-    fun tokens(value: String): List<String> = value.split(',').map { it.trim().lowercase() }
-        .filter { it.isNotEmpty() }.distinct().take(30)
+    fun tokens(value: String, lowercase: Boolean = true): List<String> =
+        value
+            .split(',')
+            .map { it.trim().let { text -> if (lowercase) text.lowercase() else text } }
+            .filter { it.isNotEmpty() }
+            .distinct()
+            .take(30)
 
     fun hiddenTitles(languages: String, categories: String): SqlQuery {
         val terms = mutableListOf<String>()
@@ -12,8 +17,8 @@ object ContentVisibility {
             terms += "(',' || r.languages || ',') LIKE ?"
             args += "%,$it,%"
         }
-        tokens(categories).forEach {
-            terms += "lower(trim(r.groupTitle)) = ?"
+        tokens(categories, lowercase = false).forEach {
+            terms += "trim(r.groupTitle) = ?"
             args += it
         }
         return SqlQuery(

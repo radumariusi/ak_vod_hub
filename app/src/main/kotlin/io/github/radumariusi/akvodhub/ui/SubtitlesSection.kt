@@ -3,7 +3,7 @@ package io.github.radumariusi.akvodhub.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
@@ -44,7 +44,6 @@ fun SubtitlesSection(viewModel: PlaybackSettingsViewModel) {
     val languages = prefs.subtitleLanguages
     val options = viewModel.subtitleLanguageOptions
 
-
     fun pickLanguage(index: Int) {
         val current = languages.getOrNull(index)
         val list = listOf<String?>(null) + options.filter { it == current || it !in languages }
@@ -69,7 +68,7 @@ fun SubtitlesSection(viewModel: PlaybackSettingsViewModel) {
             style = MaterialTheme.typography.bodyMedium,
             color = colors.onSurfaceVariant,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             languages.forEachIndexed { index, code ->
                 OutlinedButton(onClick = { pickLanguage(index) }) {
                     Text("${index + 1}. ${languageName(code)}")
@@ -81,7 +80,7 @@ fun SubtitlesSection(viewModel: PlaybackSettingsViewModel) {
                 }
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             OutlinedButton(onClick = { viewModel.setAddonSubtitlesAuto(!prefs.addonSubtitlesAuto) }) {
                 Text("Automat din addon-uri: ${if (prefs.addonSubtitlesAuto) "da" else "nu"}")
             }
@@ -103,12 +102,21 @@ fun SubtitlesSection(viewModel: PlaybackSettingsViewModel) {
 
         OutlinedButton(onClick = {
             val offsets = (-20..20).map { it * 100L }
-            choice = Choice("Întârziere implicită addon", offsets.map { "$it ms" }, offsets.indexOf(prefs.subtitleDelayMs).takeIf { it >= 0 }) {
-                viewModel.setSubtitleDelayMs(offsets[it])
-            }
+            choice =
+                Choice(
+                    "Întârziere implicită addon",
+                    offsets.map { "$it ms" },
+                    offsets.indexOf(prefs.subtitleDelayMs).takeIf {
+                        it >=
+                            0
+                    },
+                ) {
+                    viewModel.setSubtitleDelayMs(offsets[it])
+                }
         }) { Text("Întârziere implicită: ${prefs.subtitleDelayMs} ms") }
-        Text("Pentru subtitrările din addon-uri, la fiecare film/episod. Pozitiv = subtitrarea apare mai târziu. Ajustarea din player rămâne pe episod.")
-
+        Text(
+            "Pentru subtitrările din addon-uri, la fiecare film/episod. Pozitiv = subtitrarea apare mai târziu. Ajustarea din player rămâne pe episod.",
+        )
     }
 
     choice?.let { ChoiceDialog(it, onDismiss = { choice = null }) }
@@ -142,9 +150,8 @@ fun StremioSection(viewModel: PlaybackSettingsViewModel) {
                 Text("Niciun addon: subtitrările vin doar din surse.", style = MaterialTheme.typography.bodyMedium)
             }
             addons.forEachIndexed { index, addon ->
-                Row(
+                FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
                         Text(addon.name, style = MaterialTheme.typography.bodyLarge)

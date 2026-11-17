@@ -2,7 +2,12 @@ package io.github.radumariusi.akvodhub.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Text
 import io.github.radumariusi.akvodhub.player.PlaybackSettingsViewModel
@@ -18,18 +23,39 @@ fun AudioSection(viewModel: PlaybackSettingsViewModel) {
         OutlinedButton(onClick = { viewModel.setAudioPassthrough(!prefs.audioPassthrough) }) {
             Text("Passthrough audio: " + if (prefs.audioPassthrough) "da" else "nu")
         }
-        Text("Trimite AC3/E-AC3/DTS către ieșirea compatibilă; altfel decodare PCM. Se aplică la redeschiderea playerului.")
+        Text(
+            "Trimite AC3/E-AC3/DTS către ieșirea compatibilă; altfel decodare PCM. Se aplică la redeschiderea playerului.",
+        )
         OutlinedButton(onClick = { viewModel.setNightMode(!prefs.nightMode) }) {
             Text("Mod noapte / dialog: " + if (prefs.nightMode) "da" else "nu")
         }
         Text("Reduce diferențele de volum în PCM și suspendă passthrough. Se aplică la redeschiderea playerului.")
         OutlinedButton(onClick = {
             val options = listOf("") + viewModel.subtitleLanguageOptions
-            choice = Choice("Limbă audio preferată", options.map { if (it.isEmpty()) "Din profil și conținut" else languageName(it) }, options.indexOf(prefs.audioLanguage)) {
-                viewModel.setContent("audio_language", options[it])
-            }
-        }) { Text("Limbă audio: " + prefs.audioLanguage.takeIf { it.isNotEmpty() }?.let(::languageName).orEmpty().ifEmpty { "Din profil și conținut" }) }
-        Text("Preferința memorată per serial și opțiunea pentru original au prioritate. Dacă pista lipsește, se folosesc limbile globale.")
+            choice =
+                Choice(
+                    "Limbă audio preferată",
+                    options.map {
+                        if (it.isEmpty()) "Din profil și conținut" else languageName(it)
+                    },
+                    options.indexOf(prefs.audioLanguage),
+                ) {
+                    viewModel.setContent("audio_language", options[it])
+                }
+        }) {
+            Text(
+                "Limbă audio: " +
+                    prefs.audioLanguage
+                        .takeIf { it.isNotEmpty() }
+                        ?.let(
+                            ::languageName,
+                        ).orEmpty()
+                        .ifEmpty { "Din profil și conținut" },
+            )
+        }
+        Text(
+            "Preferința memorată per serial și opțiunea pentru original au prioritate. Dacă pista lipsește, se folosesc limbile globale.",
+        )
         Text("Decodor audio software: ${viewModel.ffmpegStatus}")
     }
     choice?.let { ChoiceDialog(it, onDismiss = { choice = null }) }

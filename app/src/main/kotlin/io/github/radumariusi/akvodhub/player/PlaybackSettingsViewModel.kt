@@ -15,11 +15,11 @@ import io.github.radumariusi.akvodhub.parser.catalog.PosterBadge
 import io.github.radumariusi.akvodhub.parser.catalog.PosterSize
 import io.github.radumariusi.akvodhub.parser.player.SourceProfile
 import io.github.radumariusi.akvodhub.parser.player.SourceRule
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -125,12 +125,20 @@ class PlaybackSettingsViewModel
         }
 
         fun setAudioPassthrough(value: Boolean) = settings.setAudioPassthrough(value)
+
         fun setNightMode(value: Boolean) = settings.setNightMode(value)
 
         fun setDefaultSpeed(value: Float) = settings.setDefaultSpeed(value)
+
         fun setAutoNext(value: Boolean) = settings.setAutoNext(value)
+
         fun setMatchFrameRate(value: Boolean) = settings.setMatchFrameRate(value)
-        fun setBufferPreset(value: io.github.radumariusi.akvodhub.parser.player.BufferPreset) = settings.setBufferPreset(value)
+
+        fun setBufferPreset(value: io.github.radumariusi.akvodhub.parser.player.BufferPreset) =
+            settings
+                .setBufferPreset(
+                    value,
+                )
 
         fun setHomeHero(enabled: Boolean) = settings.setHomeHero(enabled)
 

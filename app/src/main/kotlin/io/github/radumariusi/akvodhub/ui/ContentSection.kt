@@ -2,7 +2,12 @@ package io.github.radumariusi.akvodhub.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Text
 import io.github.radumariusi.akvodhub.parser.catalog.PosterBadge
@@ -20,8 +25,15 @@ fun ContentSection(viewModel: PlaybackSettingsViewModel) {
         }
         Text("Original înaintea profilului, apoi MULTI. Sursa aleasă manual are prioritate.")
         ContentText("Limbi ascunse (coduri)", prefs.hiddenLanguages, "hidden_languages", viewModel)
-        ContentText("Categorii ascunse (nume exacte, separate prin virgulă)", prefs.hiddenCategories, "hidden_categories", viewModel)
-        Text("Ascunde titlul întreg dacă o sursă declară o limbă sau categorie blocată. Nu șterge sursele sau istoricul. Lista goală arată tot.")
+        ContentText(
+            "Categorii ascunse (nume exacte, separate prin virgulă)",
+            prefs.hiddenCategories,
+            "hidden_categories",
+            viewModel,
+        )
+        Text(
+            "Ascunde titlul întreg dacă o sursă declară o limbă sau categorie blocată. Nu șterge sursele sau istoricul. Lista goală arată tot.",
+        )
         OutlinedButton(onClick = { viewModel.togglePosterBadge(PosterBadge.DUB) }) {
             Text("Etichete DUB: " + if (PosterBadge.DUB in prefs.posterBadges) "da" else "nu")
         }

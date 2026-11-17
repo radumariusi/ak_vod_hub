@@ -56,7 +56,10 @@ class CatalogIndexer(
                 val hiddenLanguages = contentPrefs.getString("hidden_languages", "").orEmpty()
                 val hiddenCategories = contentPrefs.getString("hidden_categories", "").orEmpty()
                 val visibility = "$hiddenLanguages|$hiddenCategories"
-                if (!force && visibility == prefs.getString("visibility", "") && dao.fingerprint() == prefs.getString(FINGERPRINT, null) && searchIndexReady()) {
+                if (!force && visibility == prefs.getString("visibility", "") &&
+                    dao.fingerprint() == prefs.getString(FINGERPRINT, null) &&
+                    searchIndexReady()
+                ) {
                     if (prefs.getLong("badge_day", -1L) != day) {
                         val changed = dao.expireNewBadges(now - PosterBadges.NEW_WINDOW_MS, now)
                         prefs.edit().putLong("badge_day", day).apply()
@@ -72,9 +75,11 @@ class CatalogIndexer(
                     updateDubLabels()
                     updateEpisodeNews()
                     dao.deleteEmptyLocalTitles()
-                    val hidden = io.github.radumariusi.akvodhub.parser.catalog.ContentVisibility.hiddenTitles(
-                        hiddenLanguages, hiddenCategories,
-                    )
+                    val hidden =
+                        io.github.radumariusi.akvodhub.parser.catalog.ContentVisibility.hiddenTitles(
+                            hiddenLanguages,
+                            hiddenCategories,
+                        )
                     db.openHelper.writableDatabase.execSQL(hidden.sql, hidden.args.toTypedArray())
                     rebuildSearchIndex()
                 }

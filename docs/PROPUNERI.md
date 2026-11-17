@@ -96,18 +96,18 @@ Testarea pe TV/hardware rămâne în sarcina proprietarului.
 
 ---
 
-## Etapa 13: Revamp setări
+## ✅ Etapa 13: Revamp setări
 
 Structură pe două coloane (categorii în stânga, opțiuni în dreapta, fiecare cu valoarea curentă și o frază de explicație), ca setările Android TV și TiviMate:
 
-- **Conținut**: limbi preferate, preferă limba originală, ascunde limbi/categorii nedorite, etichete DUB.
-- **Aspect**: insigne pe postere (bifezi ce vrei), mărime postere, culoare, hero pe Acasă da/nu.
-- **Redare**: profil surse (existent), frecvență ecran, buffer, viteză implicită, episodul următor automat.
-- **Audio**: passthrough, mod noapte, limbă audio preferată.
-- **Subtitrări**: (existent) + mărime, stil, întârziere implicită.
-- **Surse și playlist-uri**: playlist-uri, reîmprospătare, **statistici** (câte filme, câte 4K, pe limbi, cât s-a potrivit).
-- **Servicii**: cheie TMDB, note IMDb (ultima actualizare + „actualizează acum”), addon-uri Stremio.
-- **Sistem**: backup/restaurare, configurare de pe telefon, golire cache imagini, update, despre.
+- ✅ **13.1 Conținut**: limbi preferate, preferă limba originală, ascunde limbi/categorii nedorite, etichete DUB.
+- ✅ **13.2 Aspect**: insigne pe postere (bifezi ce vrei), mărime postere, culoare, hero pe Acasă da/nu.
+- ✅ **13.3 Redare**: profil surse (existent), frecvență ecran, buffer, viteză implicită, episodul următor automat.
+- ✅ **13.4 Audio**: passthrough, mod noapte, limbă audio preferată.
+- ✅ **13.5 Subtitrări**: (existent) + mărime, stil, întârziere implicită.
+- ✅ **13.6 Surse și playlist-uri**: playlist-uri, reîmprospătare, **statistici** (câte filme, câte 4K, pe limbi, cât s-a potrivit).
+- ✅ **13.7 Servicii**: cheie TMDB, note IMDb (ultima actualizare + „actualizează acum”), addon-uri Stremio.
+- ✅ **13.8 Sistem**: backup/restaurare, configurare de pe telefon, golire cache imagini, update, despre.
 
 APK 🟢, viteză 🟢. E doar reorganizare de ecrane.
 
