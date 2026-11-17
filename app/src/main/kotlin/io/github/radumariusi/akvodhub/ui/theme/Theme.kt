@@ -14,6 +14,7 @@ private fun colors(accent: AccentColor) =
         primary = Color(accent.argb),
         onPrimary = Color(accent.onArgb),
         secondary = Color(0xFF8AB4F8),
+        onSecondary = Color(0xFF14243A),
         background = Color(0xFF0F1115),
         onBackground = Color(0xFFE8EAED),
         surface = Color(0xFF181B21),

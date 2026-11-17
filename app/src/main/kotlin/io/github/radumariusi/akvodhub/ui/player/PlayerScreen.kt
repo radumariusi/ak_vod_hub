@@ -69,6 +69,7 @@ import io.github.radumariusi.akvodhub.player.PlayerUiState
 import io.github.radumariusi.akvodhub.player.PlayerViewModel
 import io.github.radumariusi.akvodhub.ui.hub.Choice
 import io.github.radumariusi.akvodhub.ui.hub.ChoiceDialog
+import io.github.radumariusi.akvodhub.ui.theme.ThemedPanel
 import io.github.radumariusi.akvodhub.ui.touch.Button
 import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
 import kotlinx.coroutines.delay
@@ -633,19 +634,13 @@ private fun ErrorPanel(
 ) {
     val focus = remember { FocusRequester() }
     LaunchedEffect(state.error) { runCatching { focus.requestFocus() } }
-    Column(
-        modifier
-            .widthIn(max = 900.dp)
-            .background(Color.Black.copy(alpha = 0.85f), MaterialTheme.shapes.large)
-            .padding(32.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Text(state.error.orEmpty(), style = MaterialTheme.typography.headlineSmall, color = Color.White)
+    ThemedPanel(modifier.padding(20.dp).widthIn(max = 820.dp)) {
+        Text(state.error.orEmpty(), style = MaterialTheme.typography.headlineSmall)
         state.failures.take(MAX_FAILURES_SHOWN).forEach {
             Text(
                 "• $it",
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.8f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -654,7 +649,7 @@ private fun ErrorPanel(
             Text(
                 "… și încă ${state.failures.size - MAX_FAILURES_SHOWN}",
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.8f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -681,19 +676,11 @@ private fun NextPanel(
 ) {
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-    Column(
-        modifier
-            .padding(40.dp)
-            .widthIn(max = 520.dp)
-            .background(Color.Black.copy(alpha = 0.85f), MaterialTheme.shapes.large)
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Text("Urmează în ${state.countdown} s", style = MaterialTheme.typography.titleMedium, color = Color.White)
+    ThemedPanel(modifier.padding(20.dp).widthIn(max = 520.dp)) {
+        Text("Urmează în ${state.countdown} s", style = MaterialTheme.typography.titleMedium)
         Text(
             state.next.orEmpty(),
             style = MaterialTheme.typography.bodyLarge,
-            color = Color.White,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )

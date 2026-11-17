@@ -12,7 +12,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.tv.material3.ButtonDefaults
+import androidx.tv.material3.ListItemColors
+import androidx.tv.material3.ListItemDefaults
+import androidx.tv.material3.ListItemScale
+import androidx.tv.material3.OutlinedButtonDefaults
 import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.CardScale
 import androidx.tv.material3.ExperimentalTvMaterial3Api
@@ -54,7 +57,7 @@ fun OutlinedButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
+    contentPadding: PaddingValues = OutlinedButtonDefaults.ContentPadding,
     content: @Composable RowScope.() -> Unit,
 ) = TvOutlinedButton(
     onClick = onClick,

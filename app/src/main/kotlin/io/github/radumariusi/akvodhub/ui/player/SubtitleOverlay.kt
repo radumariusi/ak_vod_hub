@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -41,6 +43,7 @@ import io.github.radumariusi.akvodhub.data.player.SubtitleStyle
 import io.github.radumariusi.akvodhub.parser.subtitle.SubtitleDocument
 import io.github.radumariusi.akvodhub.player.PlayerUiState
 import io.github.radumariusi.akvodhub.player.PlayerViewModel
+import io.github.radumariusi.akvodhub.ui.theme.ThemedPanel
 import io.github.radumariusi.akvodhub.ui.touch.Button
 import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
 import kotlinx.coroutines.delay
@@ -117,22 +120,14 @@ fun SubtitleAdjustPanel(
 ) {
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-    val secondary = Color.White.copy(alpha = 0.75f)
-    Column(
-        modifier
-            .padding(32.dp)
-            .widthIn(max = 980.dp)
-            .background(Color.Black.copy(alpha = 0.85f), MaterialTheme.shapes.large)
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Text("Ajustează subtitrarea", style = MaterialTheme.typography.titleLarge, color = Color.White)
+    val secondary = MaterialTheme.colorScheme.onSurfaceVariant
+    ThemedPanel(modifier.padding(20.dp).widthIn(max = 740.dp).verticalScroll(rememberScrollState())) {
+        Text("Ajustează subtitrarea", style = MaterialTheme.typography.titleLarge)
         state.externalLabel?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = secondary) }
         if (state.externalSubtitle != null) {
             Text(
                 "Sincronizare: ${formatOffset(state.subtitleOffsetMs)}",
                 style = MaterialTheme.typography.titleMedium,
-                color = Color.White,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedButton(
@@ -156,7 +151,7 @@ fun SubtitleAdjustPanel(
                 color = secondary,
             )
         }
-        Text("Mărime: $scale%", style = MaterialTheme.typography.titleMedium, color = Color.White)
+        Text("Mărime: $scale%", style = MaterialTheme.typography.titleMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             val smaller = PlaybackSettings.SCALES.lastOrNull { it < scale }
             val bigger = PlaybackSettings.SCALES.firstOrNull { it > scale }
@@ -169,7 +164,7 @@ fun SubtitleAdjustPanel(
                 Text("A+")
             }
         }
-        Text("Stil", style = MaterialTheme.typography.titleMedium, color = Color.White)
+        Text("Stil", style = MaterialTheme.typography.titleMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             SubtitleStyle.entries.forEach { s ->
                 if (s == style) {

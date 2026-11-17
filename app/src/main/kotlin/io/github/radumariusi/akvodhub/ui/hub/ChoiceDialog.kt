@@ -24,9 +24,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Surface
-import androidx.tv.material3.SurfaceDefaults
+import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.Text
+import io.github.radumariusi.akvodhub.ui.theme.ThemedPanel
 import io.github.radumariusi.akvodhub.ui.touch.ListItem
 
 /** O alegere dintr-o listă (filtru, sursă de redare), cu focusul pe opțiunea curentă. */
@@ -48,15 +48,17 @@ fun ChoiceDialog(
     val initial = (choice.selected ?: 0).coerceIn(0, (choice.options.size - 1).coerceAtLeast(0))
     Dialog(onDismissRequest = onDismiss) {
         LaunchedEffect(choice) { runCatching { focus.requestFocus() } }
-        Surface(
-            modifier = Modifier.width(520.dp),
-            shape = MaterialTheme.shapes.large,
-            colors = SurfaceDefaults.colors(
-                containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-            ),
-        ) {
-            Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        ThemedPanel(Modifier.width(520.dp)) {
+            val colors = MaterialTheme.colorScheme
+            val itemColors =
+                ListItemDefaults.colors(
+                    selectedContainerColor = colors.surfaceVariant,
+                    selectedContentColor = colors.onSurface,
+                    focusedSelectedContainerColor = colors.secondary,
+                    focusedSelectedContentColor = colors.onSecondary,
+                    pressedSelectedContainerColor = colors.secondary,
+                    pressedSelectedContentColor = colors.onSecondary,
+                )
                 Text(choice.title, style = MaterialTheme.typography.headlineSmall)
                 LazyColumn(
                     state = rememberLazyListState(initialFirstVisibleItemIndex = initial),
@@ -76,6 +78,8 @@ fun ChoiceDialog(
                             }
                             ListItem(
                                 selected = index == choice.selected,
+                                colors = itemColors,
+                                scale = ListItemDefaults.scale(focusedScale = 1f),
                                 onClick = {
                                     choice.onPick(index)
                                     onDismiss()
@@ -96,7 +100,6 @@ fun ChoiceDialog(
                         }
                     }
                 }
-            }
         }
     }
 }
