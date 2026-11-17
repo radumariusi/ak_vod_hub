@@ -18,7 +18,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         DiscoverCacheEntity::class,
         ImdbMapEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = false,
 )
 abstract class AkVodDatabase : RoomDatabase() {
@@ -32,12 +32,31 @@ abstract class AkVodDatabase : RoomDatabase() {
         fun create(context: Context): AkVodDatabase =
             Room
                 .databaseBuilder(context, AkVodDatabase::class.java, "akvodhub.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
-                .addCallback(
+                .addMigrations(
+                    MIGRATION_1_2,
+                    MIGRATION_2_3,
+                    MIGRATION_3_4,
+                    MIGRATION_4_5,
+                    MIGRATION_5_6,
+                    MIGRATION_6_7,
+                    MIGRATION_7_8,
+                ).addCallback(
                     object : RoomDatabase.Callback() {
                         override fun onOpen(db: SupportSQLiteDatabase) = createSearchTable(db)
                     },
                 ).build()
+
+        /** Etapa 10.4: metadate opționale și progresul completării în fundal. */
+        val MIGRATION_7_8 =
+            object : Migration(7, 8) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE title ADD COLUMN runtimeMinutes INTEGER DEFAULT NULL")
+                    db.execSQL("ALTER TABLE title ADD COLUMN certification TEXT DEFAULT NULL")
+                    db.execSQL("ALTER TABLE title ADD COLUMN originCountries TEXT DEFAULT NULL")
+                    db.execSQL("ALTER TABLE title ADD COLUMN tagline TEXT DEFAULT NULL")
+                    db.execSQL("ALTER TABLE title ADD COLUMN metadataFetched INTEGER NOT NULL DEFAULT 0")
+                }
+            }
 
         /** Etapa 10.2: disponibilitatea audio original, completată la reindexare. */
         val MIGRATION_6_7 =

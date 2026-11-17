@@ -191,6 +191,14 @@ data class TitleEntity(
     val dubLabel: String? = null,
     /** Există cel puțin o sursă care declară explicit limba originală TMDB (MULTI nu confirmă). */
     @ColumnInfo(defaultValue = "0") val hasOriginalAudio: Boolean = false,
+    val runtimeMinutes: Int? = null,
+    /** Sistemul de clasificare este inclus în text (ex. „US: PG-13”). */
+    val certification: String? = null,
+    /** Coduri de origine TMDB, cu virgule la capete (ex. `,US,GB,`), nu țările finanțatorilor. */
+    val originCountries: String? = null,
+    val tagline: String? = null,
+    /** Cererea completă a fost procesată, chiar dacă unele câmpuri lipsesc la TMDB. */
+    @ColumnInfo(defaultValue = "0") val metadataFetched: Boolean = false,
 )
 
 /** Titlu local (din playlist, fără potrivire TMDB). */

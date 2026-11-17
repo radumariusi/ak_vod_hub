@@ -11,6 +11,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.IOException
+import java.util.concurrent.TimeUnit
 
 /**
  * Client TMDB (API v3), cu cheia utilizatorului: acceptă atât „API Key” (32 de caractere) cât și
@@ -62,7 +63,10 @@ class TmdbClient(
         val url =
             url(if (type == MediaType.TV) "tv/$tmdbId" else "movie/$tmdbId")
                 .addQueryParameter("language", METADATA_LANGUAGE)
-        if (type == MediaType.TV) url.addQueryParameter("append_to_response", "external_ids")
+        url.addQueryParameter(
+            "append_to_response",
+            if (type == MediaType.TV) "external_ids,content_ratings" else "external_ids,release_dates",
+        )
         val body = get(key, url.build()) ?: return null
         return json.decodeFromString<TmdbItem>(body)
     }
@@ -147,7 +151,9 @@ class TmdbClient(
             val result =
                 try {
                     withContext(Dispatchers.IO) {
-                        http.newCall(request).execute().use { response ->
+                        val call = http.newCall(request)
+                        call.timeout().timeout(30, TimeUnit.SECONDS)
+                        call.execute().use { response ->
                             when {
                                 response.isSuccessful -> {
                                     Result.Body(response.body.string())

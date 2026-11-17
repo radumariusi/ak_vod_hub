@@ -14,6 +14,37 @@ class TmdbModelsTest {
         }
 
     @Test
+    fun readsEnrichedMovieDetailsAndSelectsTheatricalUsCertification() {
+        val item =
+            json.decodeFromString<TmdbItem>(
+                """{"id":603,"title":"The Matrix","runtime":136,"origin_country":["US","AU"],
+            "tagline":"Welcome to the Real World.","imdb_id":"tt0133093",
+            "release_dates":{"results":[{"iso_3166_1":"US","release_dates":[
+            {"type":5,"certification":"NC-17"},{"type":3,"certification":"R"}]}]}}""",
+            )
+        assertEquals(136, item.runtimeMinutes)
+        assertEquals(listOf("US", "AU"), item.countries)
+        assertEquals("US: R", item.certification)
+        assertEquals("tt0133093", item.imdb)
+    }
+
+    @Test
+    fun readsTvContentRatingsAndToleratesMissingMetadata() {
+        val item =
+            json.decodeFromString<TmdbItem>(
+                """{"id":1396,"name":"Breaking Bad","episode_run_time":[0,45],"origin_country":["US"],
+            "external_ids":{"imdb_id":"tt0903747"},"content_ratings":{"results":[
+            {"iso_3166_1":"US","rating":"TV-MA"},{"iso_3166_1":"RO","rating":"15"}]}}""",
+            )
+        assertEquals(45, item.runtimeMinutes)
+        assertEquals("RO: 15", item.certification)
+        val absent = json.decodeFromString<TmdbItem>("""{"id":1,"runtime":null,"origin_country":null}""")
+        assertNull(absent.runtimeMinutes)
+        assertNull(absent.certification)
+        assertEquals(emptyList<String>(), absent.countries)
+    }
+
+    @Test
     fun readsMovieSearchResults() {
         val page =
             json.decodeFromString<TmdbPage>(

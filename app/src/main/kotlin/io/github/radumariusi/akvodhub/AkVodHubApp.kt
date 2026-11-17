@@ -8,6 +8,7 @@ import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.crossfade
 import dagger.hilt.android.HiltAndroidApp
+import io.github.radumariusi.akvodhub.data.catalog.MatchScheduler
 import io.github.radumariusi.akvodhub.data.playlist.PlaylistWorkerFactory
 import io.github.radumariusi.akvodhub.tv.HomeScreenPublisher
 import kotlinx.coroutines.CoroutineScope
@@ -21,6 +22,8 @@ class AkVodHubApp :
     Application(),
     Configuration.Provider,
     SingletonImageLoader.Factory {
+    @Inject lateinit var matchScheduler: MatchScheduler
+
     @Inject lateinit var workerFactory: PlaylistWorkerFactory
 
     @Inject lateinit var okHttpClient: OkHttpClient
@@ -33,6 +36,7 @@ class AkVodHubApp :
     override fun onCreate() {
         super.onCreate()
         homeScreen.start(appScope)
+        matchScheduler.enqueue()
     }
 
     // WorkManager se inițializează la prima folosire, cu fabrica noastră de worker-e (vezi AndroidManifest).

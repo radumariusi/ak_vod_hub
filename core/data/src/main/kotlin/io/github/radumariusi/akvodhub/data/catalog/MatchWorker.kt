@@ -10,6 +10,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import io.github.radumariusi.akvodhub.parser.player.PlaybackActivityState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.util.concurrent.TimeUnit
@@ -26,6 +27,10 @@ class MatchWorker(
     private val indexer: CatalogIndexer,
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
+        if (PlaybackActivityState.active) {
+            scheduler.enqueueAfterPlaybackPause()
+            return Result.success()
+        }
         // Întâi titlurile locale: după un import, tot playlist-ul apare în hub în câteva minute, fără să
         // aștepte prima rundă TMDB (până la 8 min). Dacă nu s-a schimbat nimic, e doar o verificare rapidă.
         indexer.refresh()
@@ -34,7 +39,7 @@ class MatchWorker(
         indexer.refresh()
         return when (outcome) {
             MatchOutcome.MORE -> {
-                scheduler.enqueue()
+                if (PlaybackActivityState.active) scheduler.enqueueAfterPlaybackPause() else scheduler.enqueue()
                 Result.success()
             }
 
@@ -61,9 +66,15 @@ class MatchScheduler(
     // Lazy: fabrica de worker-e depinde de această clasă, iar WorkManager se inițializează cu fabrica.
     private val workManager by lazy { WorkManager.getInstance(context) }
 
-    fun enqueue() {
+    fun enqueue() = schedule(0L)
+
+    /** Pauza de redare nu consumă retry-uri și nu creează o buclă de joburi fără întârziere. */
+    fun enqueueAfterPlaybackPause() = schedule(60_000L)
+
+    private fun schedule(delayMs: Long) {
         val request =
             OneTimeWorkRequestBuilder<MatchWorker>()
+                .setInitialDelay(delayMs, TimeUnit.MILLISECONDS)
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 1, TimeUnit.MINUTES)
                 .addTag(TAG)

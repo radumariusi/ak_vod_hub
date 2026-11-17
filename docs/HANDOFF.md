@@ -90,6 +90,20 @@ Când e activă: original → MULTI → restul, iar profilul existent decide în
 Se aplică și pistelor audio, episoadelor următoare și rezervelor; sursa aleasă manual are prioritate.
 Filmul/serialul fără limbă originală cunoscută păstrează comportamentul anterior.
 
+### Etapa 10.4 (2026-11-17)
+
+Room v8, migrare aditivă 7→8: `runtimeMinutes`, `certification` (cu țara sistemului de clasificare),
+`originCountries` (coduri TMDB cu virgule la capete), `tagline`, `metadataFetched` (implicit 0).
+`MatchWorker`/`TitleMatcher` existente completează și titlurile deja potrivite: loturi de 100, după ID,
+fără OFFSET și fără catalog complet în memorie; 6 cereri în paralel, limita existentă 30/s, buget 8 minute.
+Un răspuns fără câmpuri opționale este tot marcat procesat (nu se cere zilnic). Jobul pornește și la
+pornirea procesului; continuările păstrează progresul în DB. `PlaybackActivityState` suspendă lucrul
+cât e vizibil PlayerActivity; jobul reîncearcă după 60 s, fără buclă rapidă sau retry-uri consumate.
+Cererile deja pornite pot termina. Cererile TMDB au plafon de 30 s, lotul respectă bugetul rămas.
+Certificare: RO, apoi US, apoi origine/altele; preferă lansarea cinematografică, prefixează țara.
+Durata, certificarea și tagline apar în fișă; pagina deschisă se actualizează după reindexare.
+10.4 precedă 10.3 deoarece filtrul SUA cere țările de origine (nu deducem țara din limba engleză).
+
 ## 6. Ce urmează (din `docs/PROPUNERI.md`)
 
 Ordinea recomandată, **o etapă = un branch + un PR**:

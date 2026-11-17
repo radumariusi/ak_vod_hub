@@ -14,6 +14,7 @@ import io.github.radumariusi.akvodhub.parser.VodKind
 import io.github.radumariusi.akvodhub.parser.match.MatchQuery
 import io.github.radumariusi.akvodhub.parser.match.MatchScorer
 import io.github.radumariusi.akvodhub.parser.match.MediaType
+import io.github.radumariusi.akvodhub.parser.player.PlaybackActivityState
 import io.github.radumariusi.akvodhub.parser.title.ParsedTitle
 import io.github.radumariusi.akvodhub.parser.title.TitleParser
 import kotlinx.coroutines.CancellationException
@@ -24,6 +25,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.IOException
 
 /** Cum s-a terminat o rulare a potrivirii. */
@@ -74,6 +76,7 @@ class TitleMatcher(
                     val key = settings.apiKey()
                     when {
                         key == null -> MatchOutcome.NEEDS_KEY
+                        PlaybackActivityState.active -> MatchOutcome.MORE
                         !searchPending(key, deadline) -> MatchOutcome.MORE
                         !fetchDetails(key, deadline) -> MatchOutcome.MORE
                         else -> MatchOutcome.DONE
@@ -136,7 +139,7 @@ class TitleMatcher(
         deadline: Long,
     ): Boolean {
         while (true) {
-            if (clock() > deadline) return false
+            if (clock() > deadline || PlaybackActivityState.active) return false
             val batch = dao.pendingSearch(BATCH)
             if (batch.isEmpty()) return true
 
@@ -246,17 +249,28 @@ class TitleMatcher(
         key: String,
         deadline: Long,
     ): Boolean {
+        var after = 0L
         while (true) {
-            if (clock() > deadline) return false
-            val titles = dao.titlesWithoutDetails(DETAILS_BATCH)
+            if (clock() > deadline || PlaybackActivityState.active) return false
+            val titles = dao.titlesWithoutDetails(after, DETAILS_BATCH)
             if (titles.isEmpty()) return true
             val permits = Semaphore(PARALLEL)
             val details =
-                coroutineScope {
+                withTimeoutOrNull((deadline - clock()).coerceAtLeast(1L)) {
                     titles
-                        .map { t -> async { permits.withPermit { t to tmdb.details(key, t.mediaType, t.tmdbId) } } }
-                        .awaitAll()
-                }
+                        .map { t ->
+                            async {
+                                permits.withPermit {
+                                    if (PlaybackActivityState.active || clock() >= deadline) {
+                                        null
+                                    } else {
+                                        t to tmdb.details(key, t.mediaType, t.tmdbId)
+                                    }
+                                }
+                            }
+                        }.awaitAll()
+                        .filterNotNull()
+                } ?: return false
             db.withTransaction {
                 val now = clock()
                 for ((title, item) in details) {
@@ -265,10 +279,41 @@ class TitleMatcher(
                         dao.unlinkTitle(title.id)
                         dao.deleteTitle(title.id)
                     } else {
-                        dao.updateTitle(titleOf(title.mediaType, item, true, now).copy(id = title.id))
+                        // Reîncărcăm doar metadatele: rezumatele surselor și datele locale rămân intacte.
+                        val current = dao.titleById(title.id) ?: continue
+                        dao.updateTitle(
+                            current.copy(
+                                name = item.displayTitle.ifBlank { current.name },
+                                originalName = item.original ?: current.originalName,
+                                year = item.year ?: current.year,
+                                overview = item.overview?.ifBlank { null } ?: current.overview,
+                                posterPath = item.posterPath ?: current.posterPath,
+                                backdropPath = item.backdropPath ?: current.backdropPath,
+                                rating = item.voteAverage ?: current.rating,
+                                voteCount = item.voteCount ?: current.voteCount,
+                                popularity = item.popularity ?: current.popularity,
+                                genreIds = item.allGenreIds.joinToString(",").ifEmpty { current.genreIds },
+                                originalLanguage = item.originalLanguage ?: current.originalLanguage,
+                                imdbId = item.imdb ?: current.imdbId,
+                                runtimeMinutes = item.runtimeMinutes,
+                                certification = item.certification,
+                                originCountries =
+                                    item.countries.takeIf { it.isNotEmpty() }?.joinToString(
+                                        ",",
+                                        ",",
+                                        ",",
+                                    ),
+                                tagline = item.tagline?.trim()?.ifEmpty { null },
+                                metadataFetched = true,
+                                detailsFetched = true,
+                                updatedAt = now,
+                            ),
+                        )
                     }
                 }
             }
+            if (details.size < titles.size) return false
+            after = titles.last().id
         }
     }
 
