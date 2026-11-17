@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -48,7 +50,10 @@ fun PhoneSetupScreen(
     val events by viewModel.events.collectAsState()
     val focus = remember { FocusRequester() }
 
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.widthIn(max = 980.dp)) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier.widthIn(max = 980.dp).verticalScroll(rememberScrollState()),
+    ) {
         Text("Configurare de pe telefon", style = MaterialTheme.typography.headlineMedium)
         when (val s = state) {
             PhoneSetupState.Starting -> {

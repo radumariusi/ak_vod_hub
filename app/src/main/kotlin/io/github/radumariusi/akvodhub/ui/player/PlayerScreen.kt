@@ -6,6 +6,9 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -24,6 +28,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,6 +43,8 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -59,6 +66,7 @@ import kotlinx.coroutines.delay
 /**
  * Ecranul de redare. Fără meniu pe ecran: stânga/dreapta derulează 10 s, OK sau sus/jos arată comenzile
  * (pauză, audio, subtitrări, sursă, episodul următor). Comenzile se ascund singure după 5 s.
+ * Pe telefon: atingerea imaginii arată/ascunde comenzile, iar bara de progres se atinge sau se trage.
  */
 @Composable
 fun PlayerScreen(
@@ -175,7 +183,14 @@ fun PlayerScreen(
                     }
                 }
             }.focusRequester(rootFocus)
-            .focusable(),
+            .focusable()
+            // Touch (telefon): o atingere pe imagine arată/ascunde comenzile.
+            .pointerInput(Unit) {
+                detectTapGestures {
+                    lastInput++
+                    controls = !controls
+                }
+            },
     ) {
         AndroidView(
             factory = { context ->
@@ -286,7 +301,15 @@ private fun Controls(
             modifier
                 .fillMaxWidth()
                 .background(Brush.verticalGradient(0f to Color.Transparent, 0.35f to Color.Black.copy(alpha = 0.85f)))
-                .padding(start = 48.dp, end = 48.dp, top = 64.dp, bottom = 32.dp),
+                // Orice atingere pe comenzi amână ascunderea lor (ca o tastă apăsată pe telecomandă).
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            awaitPointerEvent(PointerEventPass.Initial)
+                            onInput()
+                        }
+                    }
+                }.padding(start = 48.dp, end = 48.dp, top = 64.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Text(
@@ -310,7 +333,11 @@ private fun Controls(
             viewModel.seekBy(it)
             onInput()
         })
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Button(onClick = viewModel::togglePlay, modifier = Modifier.focusRequester(playFocus)) {
                 Text(if (isPlaying) "Pauză" else "Redă")
             }
@@ -346,7 +373,7 @@ private fun Controls(
     }
 }
 
-/** Bara de progres: când are focus, stânga/dreapta derulează câte 10 s. */
+/** Bara de progres: când are focus, stânga/dreapta derulează câte 10 s; pe telefon se atinge sau se trage. */
 @Composable
 private fun SeekBar(
     position: Long,
@@ -354,11 +381,35 @@ private fun SeekBar(
     onSeek: (Long) -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
-    val fraction = if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
+    // Poziția trasă cu degetul, aplicată la ridicare (fără căutări repetate în timpul tragerii).
+    var dragFraction by remember { mutableStateOf<Float?>(null) }
+    val currentPosition by rememberUpdatedState(position)
+    val currentDuration by rememberUpdatedState(duration)
+    val seekTo = { f: Float ->
+        if (currentDuration > 0) onSeek((f.coerceIn(0f, 1f) * currentDuration).toLong() - currentPosition)
+    }
+    val fraction =
+        dragFraction ?: if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Box(
             Modifier
                 .fillMaxWidth()
+                .pointerInput(Unit) {
+                    detectTapGestures { seekTo(it.x / size.width) }
+                }.pointerInput(Unit) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { dragFraction = (it.x / size.width).coerceIn(0f, 1f) },
+                        onDragEnd = {
+                            dragFraction?.let(seekTo)
+                            dragFraction = null
+                        },
+                        onDragCancel = { dragFraction = null },
+                    ) { change, _ ->
+                        dragFraction = (change.position.x / size.width).coerceIn(0f, 1f)
+                    }
+                }
+                // Zonă de atingere mai înaltă decât bara desenată.
+                .padding(vertical = 12.dp)
                 .height(if (focused) 10.dp else 6.dp)
                 .onFocusChanged { focused = it.isFocused }
                 .onKeyEvent { e ->

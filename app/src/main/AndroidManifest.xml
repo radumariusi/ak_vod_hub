@@ -38,7 +38,9 @@
     <activity
       android:name=".MainActivity"
       android:exported="true"
-      android:launchMode="singleTask">
+      android:launchMode="singleTask"
+      android:screenOrientation="sensorLandscape">
+      <!-- sensorLandscape: pe telefon interfața de TV rămâne pe orizontală; pe TV nu schimbă nimic. -->
       <intent-filter>
         <action android:name="android.intent.action.MAIN" />
         <category android:name="android.intent.category.LAUNCHER" />
@@ -69,7 +71,8 @@
       android:name=".player.PlayerActivity"
       android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
       android:exported="false"
-      android:launchMode="singleTop" />
+      android:launchMode="singleTop"
+      android:screenOrientation="sensorLandscape" />
 
     <!-- Sugestii pentru căutarea globală Android TV (doar sistemul de căutare le poate citi). -->
     <provider
