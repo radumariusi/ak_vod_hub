@@ -158,7 +158,7 @@ private fun Hero(
     }
     val background = MaterialTheme.colorScheme.background
     Box(Modifier.fillMaxWidth().height(200.dp)) {
-        val backdrop = Images.backdrop(shown.backdropPath)
+        val backdrop = Images.hero(shown.backdropPath)
         if (backdrop != null) {
             AsyncImage(
                 model = backdrop,
@@ -238,4 +238,4 @@ fun Message(text: String) {
     )
 }
 
-private const val HERO_DELAY_MS = 250L
+private const val HERO_DELAY_MS = 300L

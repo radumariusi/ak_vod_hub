@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-11-17 — Etapa 12.1
+- Hero Acasă: fundal la 780 px, încărcat după 300 ms de focus stabil.
+
 Intrări noi sus. Una scurtă pentru fiecare PR (dată, etapă, ce s-a schimbat).
 
 ## 2026-11-17: etapa 10 — livrare prin update TV
