@@ -126,6 +126,7 @@ androidComponents {
 }
 
 baselineProfile {
+    mergeIntoMain = true
     automaticGenerationDuringBuild = false
 }
 

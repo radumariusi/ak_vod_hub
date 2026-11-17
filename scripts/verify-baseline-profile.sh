@@ -19,9 +19,17 @@ PYTHON
   adb logcat -d -b crash -t 120 || true
   exit 1
 fi
-test -s "$profiles/baseline-prof.txt"
-grep -Fq "Lio/github/radumariusi/akvodhub/MainActivity;" "$profiles/baseline-prof.txt"
-grep -Fq "/BrowseScreenKt;" "$profiles/baseline-prof.txt"
+profile="$profiles/baseline-prof.txt"
+if [[ ! -s "$profile" ]]; then
+  echo "Profilul generat lipsește sau este gol: $profile" >&2
+  exit 1
+fi
+for rule in "Lio/github/radumariusi/akvodhub/MainActivity;" "/BrowseScreenKt;"; do
+  if ! grep -Fq "$rule" "$profile"; then
+    echo "Din profilul generat lipsește regula pentru $rule" >&2
+    exit 1
+  fi
+done
 
 ./gradlew --no-daemon :app:assembleBenchmarkRelease
 apk=app/build/outputs/apk/benchmarkRelease/app-benchmarkRelease.apk
