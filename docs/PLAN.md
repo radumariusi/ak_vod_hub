@@ -138,6 +138,7 @@ Documentele astea, `.gitignore`, workflow de curățenie automată, reguli de lu
 
 - ✅ 10.1: etichetă DUB calculată la indexare și salvată în Room v6; fără etichete pentru limbi necunoscute sau surse originale/MULTI.
 - ✅ 10.2: preferă audio original la alegerea sursei și pistei; filtru strict din rezumatul salvat, Room v7.
+- ✅ 10.4: metadate TMDB opționale, completate o singură dată prin jobul existent (Room v8), cu pauză la redare.
 - Restul etapei: vezi `docs/PROPUNERI.md`.
 
 ## Idei suplimentare

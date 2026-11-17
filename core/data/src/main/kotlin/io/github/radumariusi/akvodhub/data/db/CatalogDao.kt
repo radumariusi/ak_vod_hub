@@ -102,8 +102,14 @@ interface CatalogDao {
     @Query("DELETE FROM title WHERE id = :id")
     suspend fun deleteTitle(id: Long)
 
-    @Query("SELECT * FROM title WHERE detailsFetched = 0 LIMIT :limit")
-    suspend fun titlesWithoutDetails(limit: Int): List<TitleEntity>
+    @Query(
+        "SELECT * FROM title WHERE tmdbId > 0 AND metadataFetched = 0 AND id > :afterId " +
+            "AND EXISTS(SELECT 1 FROM raw_entry r WHERE r.titleId = title.id) ORDER BY id LIMIT :limit",
+    )
+    suspend fun titlesWithoutDetails(
+        afterId: Long,
+        limit: Int,
+    ): List<TitleEntity>
 
     // ------------------------------------------------------------ surse și statistici
 

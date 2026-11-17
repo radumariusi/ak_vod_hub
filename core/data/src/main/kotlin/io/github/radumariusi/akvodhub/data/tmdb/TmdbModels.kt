@@ -1,5 +1,7 @@
 package io.github.radumariusi.akvodhub.data.tmdb
 
+import io.github.radumariusi.akvodhub.parser.catalog.CertificationEntry
+import io.github.radumariusi.akvodhub.parser.catalog.MetadataPolicy
 import io.github.radumariusi.akvodhub.parser.match.MatchCandidate
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -25,6 +27,12 @@ data class TmdbItem(
     @SerialName("original_language") val originalLanguage: String? = null,
     @SerialName("imdb_id") val imdbId: String? = null,
     @SerialName("external_ids") val externalIds: TmdbExternalIds? = null,
+    val runtime: Int? = null,
+    @SerialName("episode_run_time") val episodeRunTime: List<Int> = emptyList(),
+    @SerialName("origin_country") val originCountry: List<String> = emptyList(),
+    val tagline: String? = null,
+    @SerialName("release_dates") val releaseDates: TmdbReleaseDates? = null,
+    @SerialName("content_ratings") val contentRatings: TmdbContentRatings? = null,
 ) {
     val displayTitle: String get() = title ?: name ?: originalTitle ?: originalName ?: ""
     val original: String? get() = originalTitle ?: originalName
@@ -32,8 +40,47 @@ data class TmdbItem(
     val allGenreIds: List<Int> get() = genreIds ?: genres?.map { it.id }.orEmpty()
     val imdb: String? get() = (imdbId ?: externalIds?.imdbId)?.ifBlank { null }
 
+    val runtimeMinutes: Int? get() = MetadataPolicy.runtime(runtime, episodeRunTime)
+    val countries: List<String> get() = MetadataPolicy.originCountries(originCountry)
+    val certification: String?
+        get() =
+            MetadataPolicy.certification(
+                releaseDates?.results.orEmpty().flatMap { country ->
+                    country.releases.map { CertificationEntry(country.country, it.certification.orEmpty(), it.type) }
+                } + contentRatings?.results.orEmpty().map { CertificationEntry(it.country, it.rating.orEmpty()) },
+                countries,
+            )
+
     fun candidate() = MatchCandidate(id, displayTitle, original, year, popularity ?: 0.0)
 }
+
+@Serializable
+data class TmdbReleaseDates(
+    val results: List<TmdbReleaseCountry> = emptyList(),
+)
+
+@Serializable
+data class TmdbReleaseCountry(
+    @SerialName("iso_3166_1") val country: String,
+    @SerialName("release_dates") val releases: List<TmdbReleaseCertification> = emptyList(),
+)
+
+@Serializable
+data class TmdbReleaseCertification(
+    val certification: String? = null,
+    val type: Int? = null,
+)
+
+@Serializable
+data class TmdbContentRatings(
+    val results: List<TmdbContentRating> = emptyList(),
+)
+
+@Serializable
+data class TmdbContentRating(
+    @SerialName("iso_3166_1") val country: String,
+    val rating: String? = null,
+)
 
 @Serializable
 data class TmdbGenre(

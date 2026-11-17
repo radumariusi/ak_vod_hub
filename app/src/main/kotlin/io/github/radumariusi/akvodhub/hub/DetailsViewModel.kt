@@ -53,6 +53,17 @@ class DetailsViewModel
         init {
             viewModelScope.launch { repository.watchVersion.drop(1).collect { refreshWatch() } }
             viewModelScope.launch {
+                repository.catalogVersion.drop(1).collect {
+                    val id = mutableState.value.titleId ?: return@collect
+                    val details = repository.details(id)
+                    val sources = details?.groups.orEmpty().flatMap { group -> group.languages.flatMap { it.sources } }
+                    val recommended = repository.playOrder(sources, details?.title?.originalLanguage).firstOrNull()
+                    mutableState.update { state ->
+                        if (state.titleId == id) state.copy(details = details, recommended = recommended) else state
+                    }
+                }
+            }
+            viewModelScope.launch {
                 repository.sourcePreferences.drop(1).collect {
                     mutableState.update { state ->
                         val details = state.details ?: return@update state

@@ -321,6 +321,8 @@ private fun Header(
                     if (title.mediaType == MediaType.MOVIE) "Film" else "Serial",
                     title.year?.toString(),
                     title.dubLabel,
+                    title.runtimeMinutes?.let { "$it min" },
+                    title.certification,
                     title.rating?.takeIf { it > 0 }?.let {
                         "★ %.1f".format(it) +
                             (title.voteCount?.let { v -> " ($v voturi)" } ?: "")
@@ -328,6 +330,13 @@ private fun Header(
                     details.genres.takeIf { it.isNotEmpty() }?.joinToString(", "),
                 ).joinToString(" · ")
             Text(meta, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            title.tagline?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             if (details.summary.isNotEmpty()) {
                 Text(
                     details.summary,

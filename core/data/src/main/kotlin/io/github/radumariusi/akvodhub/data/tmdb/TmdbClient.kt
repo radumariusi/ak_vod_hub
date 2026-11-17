@@ -11,6 +11,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.IOException
+import java.util.concurrent.TimeUnit
 
 /**
  * Client TMDB (API v3), cu cheia utilizatorului: acceptă atât „API Key” (32 de caractere) cât și
@@ -62,8 +63,11 @@ class TmdbClient(
         val url =
             url(if (type == MediaType.TV) "tv/$tmdbId" else "movie/$tmdbId")
                 .addQueryParameter("language", METADATA_LANGUAGE)
-        if (type == MediaType.TV) url.addQueryParameter("append_to_response", "external_ids")
-        val body = get(key, url.build()) ?: return null
+        url.addQueryParameter(
+            "append_to_response",
+            if (type == MediaType.TV) "external_ids,content_ratings" else "external_ids,release_dates",
+        )
+        val body = get(key, url.build(), strict = true) ?: return null
         return json.decodeFromString<TmdbItem>(body)
     }
 
@@ -130,6 +134,7 @@ class TmdbClient(
     private suspend fun get(
         key: String,
         url: HttpUrl,
+        strict: Boolean = false,
     ): String? {
         val bearer = key.startsWith("eyJ")
         val finalUrl = if (bearer) url else url.newBuilder().addQueryParameter("api_key", key).build()
@@ -147,7 +152,9 @@ class TmdbClient(
             val result =
                 try {
                     withContext(Dispatchers.IO) {
-                        http.newCall(request).execute().use { response ->
+                        val call = http.newCall(request)
+                        call.timeout().timeout(30, TimeUnit.SECONDS)
+                        call.execute().use { response ->
                             when {
                                 response.isSuccessful -> {
                                     Result.Body(response.body.string())
@@ -167,13 +174,14 @@ class TmdbClient(
 
                                 // Alte erori 4xx (ex. 422 la o căutare ciudată): tratăm ca „nimic găsit”.
                                 else -> {
+                                    if (strict) throw TmdbHttpException(response.code)
                                     Result.Body(null)
                                 }
                             }
                         }
                     }
                 } catch (e: IOException) {
-                    if (attempt >= MAX_ATTEMPTS) throw e
+                    if (attempt >= MAX_ATTEMPTS || e is TmdbHttpException) throw e
                     Result.Retry(null)
                 }
             when (result) {
@@ -194,6 +202,9 @@ class TmdbClient(
             }
         }
     }
+
+    /** O eroare 4xx de detalii nu dovedește că titlul lipsește și nu trebuie să-i desfacă legăturile. */
+    private class TmdbHttpException(code: Int) : IOException("TMDB a răspuns cu HTTP $code.")
 
     private sealed interface Result {
         data class Body(

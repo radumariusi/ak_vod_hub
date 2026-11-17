@@ -11,6 +11,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import dagger.hilt.android.AndroidEntryPoint
+import io.github.radumariusi.akvodhub.parser.player.PlaybackActivityState
 import io.github.radumariusi.akvodhub.ui.player.PlayerScreen
 import io.github.radumariusi.akvodhub.ui.theme.AkVodHubTheme
 
@@ -35,7 +36,13 @@ class PlayerActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        PlaybackActivityState.active = true
+    }
+
     override fun onStop() {
+        PlaybackActivityState.active = false
         super.onStop()
         viewModel.onStop()
     }
