@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-11-17 — Etapa 12.3
+- Meniu sus: Acasă, Filme, Seriale, Lista mea, Caută și Setări; navigare cu telecomanda și touch.
+
 ## 2026-11-17 — Etapa 12.2
 - Logo TMDB în hero și fișă, la cerere, cu cache limitat și titlu text de rezervă.
 

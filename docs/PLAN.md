@@ -152,6 +152,8 @@ Documentele astea, `.gitignore`, workflow de curățenie automată, reguli de lu
 
 - ✅ 12.2: logo TMDB la cerere în hero/fișă, cache 30 zile (inclusiv lipsa), text la eroare.
 
+- ✅ 12.3: meniu sus cu șase file, telecomandă și touch; conținutul Listei mele urmează în 12.4.
+
 ## Idei suplimentare
 
 1. **Verificare sănătate surse**: test rapid în fundal al linkurilor; sursele moarte sunt marcate și puse la final.
