@@ -143,6 +143,7 @@ fun SettingsScreen(
 
                     }
                     6 -> {
+                        StremioSection(playbackViewModel)
         TmdbSection(
             status = matchStatus,
             keyState = keyState,

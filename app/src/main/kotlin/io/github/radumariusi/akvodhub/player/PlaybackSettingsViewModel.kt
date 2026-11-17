@@ -15,6 +15,8 @@ import io.github.radumariusi.akvodhub.parser.catalog.PosterBadge
 import io.github.radumariusi.akvodhub.parser.catalog.PosterSize
 import io.github.radumariusi.akvodhub.parser.player.SourceProfile
 import io.github.radumariusi.akvodhub.parser.player.SourceRule
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -65,6 +67,11 @@ class PlaybackSettingsViewModel
 
         init {
             loadLanguages()
+            viewModelScope.launch {
+                prefs.map { it.hiddenLanguages to it.hiddenCategories }.distinctUntilChanged().collect {
+                    repository.prepare()
+                }
+            }
         }
 
         fun loadLanguages() {
@@ -115,7 +122,6 @@ class PlaybackSettingsViewModel
 
         fun setContent(key: String, value: String) {
             settings.setContent(key, value)
-            viewModelScope.launch { repository.prepare() }
         }
 
         fun setAudioPassthrough(value: Boolean) = settings.setAudioPassthrough(value)
