@@ -75,12 +75,12 @@ object SourceGrouping {
             VideoQuality.FHD -> "1080p"
             VideoQuality.HD -> "720p"
             VideoQuality.SD -> "SD"
-            null -> "?"
+            null -> "Calitate necunoscută"
         }
 
     fun languageLabel(language: String?): String =
         when (language) {
-            null -> "?"
+            null -> "Limbă audio necunoscută"
             ParsedTitle.MULTI -> "MULTI"
             else -> language.uppercase()
         }

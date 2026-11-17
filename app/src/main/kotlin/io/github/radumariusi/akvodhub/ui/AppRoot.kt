@@ -10,9 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
@@ -23,18 +21,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Text
 import io.github.radumariusi.akvodhub.R
 import io.github.radumariusi.akvodhub.catalog.TmdbViewModel
 import io.github.radumariusi.akvodhub.data.db.TitleCard
@@ -52,7 +42,6 @@ import io.github.radumariusi.akvodhub.ui.hub.BrowseScreen
 import io.github.radumariusi.akvodhub.ui.hub.DetailsScreen
 import io.github.radumariusi.akvodhub.ui.hub.HomeScreen
 import io.github.radumariusi.akvodhub.ui.hub.WatchlistScreen
-import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
 import io.github.radumariusi.akvodhub.update.UpdateViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -199,30 +188,11 @@ fun AppRoot(
                     contentPadding = PaddingValues(horizontal = 32.dp, vertical = 12.dp),
                 ) {
                     items(Destination.entries, key = { it.name }) { destination ->
-                        val tabModifier =
-                            Modifier.semantics {
-                                selected = current == destination
-                                role = Role.Tab
-                            }
-                        OutlinedButton(onClick = { current = destination }, modifier = tabModifier) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    destination.label,
-                                    textDecoration = if (current == destination) TextDecoration.Underline else null,
-                                )
-                                Box(
-                                    Modifier.width(32.dp).height(3.dp).background(
-                                        if (current ==
-                                            destination
-                                        ) {
-                                            MaterialTheme.colorScheme.primary
-                                        } else {
-                                            Color.Transparent
-                                        },
-                                    ),
-                                )
-                            }
-                        }
+                        SelectionTab(
+                            label = destination.label,
+                            active = current == destination,
+                            onClick = { current = destination },
+                        )
                     }
                 }
                 Box(Modifier.weight(1f).padding(start = 32.dp, top = 8.dp, end = 32.dp, bottom = 8.dp)) {

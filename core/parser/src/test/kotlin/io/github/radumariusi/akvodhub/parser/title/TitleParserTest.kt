@@ -7,6 +7,27 @@ import org.junit.Test
 
 class TitleParserTest {
     @Test
+    fun readsDeclaredAudioSeparatelyFromSubtitlesAndQuality() {
+        for (label in listOf("EN 5.1", "ENG 5.1", "[eng 5.1]", "EN 5.1 MULTI-SUB")) {
+            val source = TitleParser.parse("Insula de sticlă $label")
+            assertEquals("Insula de sticlă", source.title)
+            assertEquals(listOf("en"), source.languages)
+            assertEquals(null, source.quality)
+        }
+        val multi = TitleParser.parse("Insula de sticlă (2024) MULTI", "Filme UHD")
+        assertEquals(listOf("mul"), multi.languages)
+        assertEquals(VideoQuality.UHD, multi.quality)
+        val subOnly = TitleParser.parse("Insula de sticlă (2024) 5.1 MULTI-SUB", "Furnizor8K")
+        assertEquals(emptyList<String>(), subOnly.languages)
+        assertEquals(listOf("mul"), subOnly.subtitles)
+        assertEquals(null, subOnly.quality)
+        val both = TitleParser.parse("Insula de sticlă (2024) MULTI-SUB EN 5.1")
+        assertEquals(listOf("en"), both.languages)
+        assertEquals(listOf("mul"), both.subtitles)
+        assertEquals(listOf("mul"), TitleParser.parse("Insula de sticlă", "MULTI | Filme").languages)
+    }
+
+    @Test
     fun examplesFromPlan() {
         val a = TitleParser.parse("EN| The Matrix (1999) 4K HDR")
         assertEquals("The Matrix", a.title)

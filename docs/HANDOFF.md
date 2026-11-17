@@ -284,3 +284,19 @@ backup vechi și nou/restaurare; ascundere/dezascundere fără pierderi; hero ș
 audio original/per serial, passthrough/noapte/buffer; subtitrări addon cu decalaj; statistici după import;
 golire cache și reîncărcare postere; updater și instalare peste versiunea existentă. Testele hardware ale etapei 11
 rămân neconfirmate. Nu se începe etapa 14 în acest fir.
+
+
+### Corecții UI și player TV (2026-11-18)
+
+Vezi [planul corecțiilor și pașii de retestare](CORECTII_TV.md). Fir separat de roadmap, din baza
+`16ec696`. Suprapuneri cu PR-ul draft #36 în cardurile hub, ecranul Filme/Seriale/Căutare și documentație.
+
+La import, parserul tratează separat canalele audio, limba și subtitrările. MatchWorker actualizează
+audio/subtitrări pentru intrările existente în tranzacții de cel mult 500 după ID, cu cursor reluabil în
+preferințele indexerului și pauză la redare. Indexerul reface rezumatele după parcurgere. Room rămâne
+la v14. Actualizarea metadatelor păstrează legăturile titlurilor, istoricul, Lista mea și preferințele.
+
+Playerul păstrează preferințele audio și sincronizarea subtitrărilor. Opțiunea Automat reaplică
+preferința globală de subtitrare și șterge doar alegerea manuală de subtitrare a serialului. Alegerea
+unei subtitrări specifice folosește pista sau rezultatul addon asociat opțiunii.
+Retestarea pe Android 11 TV și instalarea peste versiunea existentă sunt în așteptare.

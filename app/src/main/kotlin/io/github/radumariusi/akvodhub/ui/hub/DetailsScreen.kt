@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalTvMaterial3Api::class)
+@file:OptIn(ExperimentalTvMaterial3Api::class, ExperimentalLayoutApi::class)
 
 package io.github.radumariusi.akvodhub.ui.hub
 
@@ -7,6 +7,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -39,14 +41,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ExperimentalTvMaterial3Api
+import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
@@ -67,6 +66,7 @@ import io.github.radumariusi.akvodhub.parser.player.EpisodeOrder
 import io.github.radumariusi.akvodhub.parser.player.Resume
 import io.github.radumariusi.akvodhub.player.PlayRequest
 import io.github.radumariusi.akvodhub.player.PlayerActivity
+import io.github.radumariusi.akvodhub.ui.SelectionTab
 import io.github.radumariusi.akvodhub.ui.touch.Button
 import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
 import io.github.radumariusi.akvodhub.ui.touch.Surface
@@ -222,7 +222,7 @@ private fun DetailsContent(
         item("personal-library") {
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(vertical = 8.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
             ) {
                 item {
                     OutlinedButton(onClick = onWatchlist, enabled = !state.changingLibrary) {
@@ -251,30 +251,15 @@ private fun DetailsContent(
                 item("seasons") {
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        contentPadding = PaddingValues(vertical = 4.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
                     ) {
                         items(episodes.seasons, key = { it.number }) { s ->
                             val label = if (s.number == 0) "Altele" else "Sezonul ${s.number}"
-                            OutlinedButton(
+                            SelectionTab(
+                                label = label,
+                                active = s.number == state.selectedSeason,
                                 onClick = { onSelectSeason(s.number) },
-                                modifier =
-                                    Modifier.semantics {
-                                        selected = s.number == state.selectedSeason
-                                        role = Role.Tab
-                                    },
-                            ) {
-                                Text(
-                                    label,
-                                    textDecoration =
-                                        if (s.number ==
-                                            state.selectedSeason
-                                        ) {
-                                            TextDecoration.Underline
-                                        } else {
-                                            null
-                                        },
-                                )
-                            }
+                            )
                         }
                     }
                 }
@@ -294,8 +279,8 @@ private fun DetailsContent(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Distribuție", style = MaterialTheme.typography.titleMedium)
                     LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        contentPadding = PaddingValues(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(20.dp),
+                        contentPadding = PaddingValues(12.dp),
                     ) {
                         items(cast) { person ->
                             Surface(onClick = {
@@ -306,7 +291,7 @@ private fun DetailsContent(
                                 }
                             }, modifier = Modifier.width(132.dp)) {
                                 Column(
-                                    Modifier.padding(10.dp),
+                                    Modifier.fillMaxWidth().padding(10.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.spacedBy(4.dp),
                                 ) {
@@ -323,18 +308,22 @@ private fun DetailsContent(
                                     Text(
                                         person.name,
                                         style = MaterialTheme.typography.labelLarge,
-                                        maxLines = 1,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        minLines = 2,
+                                        maxLines = 2,
                                         overflow = TextOverflow.Ellipsis,
                                     )
-                                    person.role?.let {
-                                        Text(
-                                            it,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                    }
+                                    Text(
+                                        person.role.orEmpty(),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = LocalContentColor.current.copy(alpha = 0.9f),
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        minLines = 2,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
                                 }
                             }
                         }
@@ -454,7 +443,11 @@ private fun Header(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) { actions() }
+        FlowRow(
+            Modifier.padding(top = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) { actions() }
     }
 }
 
@@ -473,7 +466,10 @@ private fun QualityRow(
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+        ) {
             items(group.languages, key = { it.language ?: "unknown" }) { language ->
                 OutlinedButton(onClick = {
                     val variants = language.sources

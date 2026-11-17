@@ -5,6 +5,7 @@ package io.github.radumariusi.akvodhub.ui.touch
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -14,7 +15,11 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.CardScale
 import androidx.tv.material3.ExperimentalTvMaterial3Api
+import androidx.tv.material3.ListItemColors
+import androidx.tv.material3.ListItemDefaults
+import androidx.tv.material3.ListItemScale
 import androidx.tv.material3.NavigationDrawerScope
+import androidx.tv.material3.OutlinedButtonDefaults
 import androidx.tv.material3.Button as TvButton
 import androidx.tv.material3.Card as TvCard
 import androidx.tv.material3.ListItem as TvListItem
@@ -52,11 +57,13 @@ fun OutlinedButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    contentPadding: PaddingValues = OutlinedButtonDefaults.ContentPadding,
     content: @Composable RowScope.() -> Unit,
 ) = TvOutlinedButton(
     onClick = onClick,
     modifier = modifier.then(tap(enabled, onClick)),
     enabled = enabled,
+    contentPadding = contentPadding,
     content = content,
 )
 
@@ -81,11 +88,15 @@ fun ListItem(
     onClick: () -> Unit,
     headlineContent: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    colors: ListItemColors = ListItemDefaults.colors(),
+    scale: ListItemScale = ListItemDefaults.scale(),
 ) = TvListItem(
     selected = selected,
     onClick = onClick,
     headlineContent = headlineContent,
     modifier = modifier.then(tap(true, onClick)),
+    colors = colors,
+    scale = scale,
 )
 
 @Composable
