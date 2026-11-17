@@ -33,7 +33,10 @@ class CatalogBaselineProfile {
         rule.collect(packageName = PACKAGE_NAME, includeInStartupProfile = true) {
             pressHome()
             startActivityAndWait()
-            check(device.wait(Until.hasObject(By.text("Filme populare")), TIMEOUT_MS))
+            // Titlul din catalogul sintetic apare în zona vizibilă imediat ce se încarcă Acasă.
+            check(device.wait(Until.hasObject(By.textStartsWith("Catalog Profil ")), TIMEOUT_MS)) {
+                "La pornire, ecranul Acasă nu a afișat catalogul de profilare."
+            }
         }
     }
 
