@@ -21,7 +21,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         PersonCreditEntity::class,
         WatchlistEntity::class,
     ],
-    version = 13,
+    version = 14,
     exportSchema = false,
 )
 abstract class AkVodDatabase : RoomDatabase() {
@@ -48,11 +48,23 @@ abstract class AkVodDatabase : RoomDatabase() {
                     MIGRATION_10_11,
                     MIGRATION_11_12,
                     MIGRATION_12_13,
+                    MIGRATION_13_14,
                 ).addCallback(
                     object : RoomDatabase.Callback() {
                         override fun onOpen(db: SupportSQLiteDatabase) = createSearchTable(db)
                     },
                 ).build()
+
+        /** Etapa 12.7: rezumate locale ale noutăților, completate în fundal de indexer. */
+        val MIGRATION_13_14 =
+            object : Migration(13, 14) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    for (column in listOf("playlistAddedAt", "newEpisodeAt")) {
+                        db.execSQL("ALTER TABLE title ADD COLUMN $column INTEGER DEFAULT NULL")
+                        db.execSQL("CREATE INDEX IF NOT EXISTS index_title_$column ON title ($column)")
+                    }
+                }
+            }
 
         /** Etapa 12.4: listă personală, fără atingerea progresului/istoricului existent. */
         val MIGRATION_12_13 =

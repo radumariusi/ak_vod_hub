@@ -153,6 +153,8 @@ object MatchState {
         Index(value = ["mediaType", "tmdbId"], unique = true),
         Index(value = ["popularity"]),
         Index(value = ["addedAt"]),
+        Index(value = ["playlistAddedAt"]),
+        Index(value = ["newEpisodeAt"]),
         Index(value = ["rating"]),
         Index(value = ["name"]),
         Index(value = ["imdbId"]),
@@ -183,6 +185,8 @@ data class TitleEntity(
     val sourceCount: Int = 0,
     /** Cea mai recentă adăugare în playlist a unei surse (ms), pentru „Adăugate recent”. */
     val addedAt: Long? = null,
+    val playlistAddedAt: Long? = null,
+    val newEpisodeAt: Long? = null,
     /** Cea mai bună calitate a surselor (`VideoQuality.ordinal`). */
     val bestQuality: Int? = null,
     /** Calitățile surselor, cu virgule la capete pentru filtrare: `,UHD,FHD,`. */

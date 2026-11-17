@@ -1,6 +1,7 @@
 package io.github.radumariusi.akvodhub.data.db
 
 import androidx.room.Dao
+import androidx.room.Embedded
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
@@ -27,6 +28,11 @@ data class PendingEntry(
 data class StateCount(
     val state: Int,
     val count: Int,
+)
+
+data class NewsCard(
+    @Embedded val card: TitleCard,
+    val newsAt: Long,
 )
 
 @Dao
@@ -179,6 +185,9 @@ interface CatalogDao {
     @RawQuery
     suspend fun cards(query: SupportSQLiteQuery): List<TitleCard>
 
+    @RawQuery
+    suspend fun newsCards(query: SupportSQLiteQuery): List<NewsCard>
+
     @Query(
         "SELECT t.id, t.mediaType, t.name, t.year, t.posterPath, t.backdropPath, t.rating, t.bestQuality, " +
             "t.overview, t.dubLabel, t.imdbRating, t.imdbVotes, t.tmdbBadge, t.imdbBadge, t.hdrBadge, t.isNew, " +
@@ -272,6 +281,7 @@ interface CatalogDao {
     /** Rezumatele surselor pentru fiecare titlu (vezi [TitleEntity]). `bestQuality` = `VideoQuality.ordinal`. */
     @Query(
         "UPDATE title SET " +
+            "playlistAddedAt = (SELECT MIN(r.firstSeenAt) FROM raw_entry r WHERE r.titleId = title.id), " +
             "sourceCount = (SELECT COUNT(*) FROM raw_entry r WHERE r.titleId = title.id), " +
             "addedAt = (SELECT MAX(CASE WHEN r.providerAddedAt IS NULL THEN r.firstSeenAt " +
             "WHEN r.providerAddedAt < 100000000000 THEN r.providerAddedAt * 1000 ELSE r.providerAddedAt END) " +

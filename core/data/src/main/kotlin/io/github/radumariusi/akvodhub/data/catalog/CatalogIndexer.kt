@@ -66,6 +66,7 @@ class CatalogIndexer(
                 db.withTransaction {
                     dao.updateSummaries()
                     updateDubLabels()
+                    updateEpisodeNews()
                     dao.deleteEmptyLocalTitles()
                     rebuildSearchIndex()
                 }
@@ -174,6 +175,41 @@ class CatalogIndexer(
         )
     }
 
+    /** MIN pe episod evită ca o nouă variantă de calitate/limbă să pară un episod nou. */
+    private fun updateEpisodeNews() {
+        val sql = db.openHelper.writableDatabase
+        sql.execSQL("UPDATE title SET newEpisodeAt = NULL WHERE newEpisodeAt IS NOT NULL")
+        sql.compileStatement("UPDATE title SET newEpisodeAt = ? WHERE id = ?").use { update ->
+            sql
+                .query(
+                    "SELECT titleId, season, episode, MIN(firstSeenAt) FROM raw_entry " +
+                        "WHERE kind = 'EPISODE' AND titleId IS NOT NULL " +
+                        "AND season IS NOT NULL AND episode IS NOT NULL " +
+                        "GROUP BY titleId, season, episode ORDER BY titleId",
+                ).use { cursor ->
+                    var titleId = -1L
+                    var latest = 0L
+
+                    fun save() {
+                        if (titleId <= 0) return
+                        update.bindLong(1, latest)
+                        update.bindLong(2, titleId)
+                        update.executeUpdateDelete()
+                    }
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getLong(0)
+                        if (id != titleId) {
+                            save()
+                            titleId = id
+                            latest = 0L
+                        }
+                        latest = maxOf(latest, cursor.getLong(3))
+                    }
+                    save()
+                }
+        }
+    }
+
     private fun rebuildSearchIndex() {
         val sql = db.openHelper.writableDatabase
         sql.execSQL("DELETE FROM title_search")
@@ -217,7 +253,7 @@ class CatalogIndexer(
 
     companion object {
         private const val TAG = "CatalogIndexer"
-        private const val FINGERPRINT = "fingerprint_v10"
+        private const val FINGERPRINT = "fingerprint_v14"
         private const val BATCH = 2_000
     }
 }

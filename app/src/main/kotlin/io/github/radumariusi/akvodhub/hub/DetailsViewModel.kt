@@ -66,6 +66,10 @@ class DetailsViewModel
                     mutableState.update { state ->
                         if (state.titleId == id) state.copy(details = details, recommended = recommended) else state
                     }
+                    if (details?.title?.mediaType == MediaType.TV) {
+                        val episodes = repository.episodes(id, refresh = false)
+                        if (mutableState.value.titleId == id) showEpisodes(episodes, loadingMore = false)
+                    }
                 }
             }
             viewModelScope.launch {

@@ -160,6 +160,8 @@ Documentele astea, `.gitignore`, workflow de curățenie automată, reguli de lu
 
 - ✅ 12.6: trailer TMDB la apăsare, cache limitat; intent YouTube TV/telefon, apoi aplicația disponibilă.
 
+- ✅ 12.7: Nou în playlist și episoade noi la serialele urmărite, fereastră de șapte zile, paginare dată/ID și refresh Xtream țintit (Room v14).
+
 ## Idei suplimentare
 
 1. **Verificare sănătate surse**: test rapid în fundal al linkurilor; sursele moarte sunt marcate și puse la final.
