@@ -92,6 +92,9 @@ interface CatalogDao {
         imdbId: String,
     )
 
+    @Query("UPDATE title SET overviewRo = :overview, overviewRoFetchedAt = :fetchedAt WHERE id = :id")
+    suspend fun setRomanianOverview(id: Long, overview: String?, fetchedAt: Long)
+
     /** Întoarce -1 dacă titlul există deja. */
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertTitle(title: TitleEntity): Long

@@ -147,14 +147,21 @@ fără OFFSET. Titlurile noi din playlist apar automat la următoarea citire dac
 Cardurile distribuției folosesc Surface touch și ID-ul persoanei; navigarea reține contextul actor/fișă,
 inclusiv actori deschiși succesiv, iar grila își reface paginile până la cardul deschis pentru restaurare.
 
+### Etapa 10.8 (2026-11-17)
+
+Room v12, migrare aditivă 11→12: `overviewRo`, `overviewRoFetchedAt`. Numai deschiderea fișei cere TMDB
+cu ro-RO (fără append de detalii); descrierea EN rămâne intactă și este fallback dacă RO lipsește.
+Cache de 30 zile inclusiv pentru traducerea absentă. Erorile nu marchează cererea reușită; se poate
+reîncerca la redeschidere, iar cache-ul existent rămâne util offline. Nu există worker sau cereri RO pe postere.
+Etapa 10 este implementată integral; după build se așteaptă testarea proprietarului înainte de etapa 12.
+
 ## 6. Ce urmează (din `docs/PROPUNERI.md`)
 
 Ordinea recomandată, **o etapă = un branch + un PR**:
 
-1. **Etapa 10**: etichetă DUB (limba originală TMDB vs limbile audio ale surselor, calculat în `CatalogIndexer`; fără etichetă când limba
+1. **Etapa 10 — implementată**: etichetă DUB (limba originală TMDB vs limbile audio ale surselor, calculat în `CatalogIndexer`; fără etichetă când limba
    e necunoscută), „preferă limba originală”, filtru producții SUA, completare detalii TMDB în fundal (IMDb ID, durată, certificare,
    țară), nota IMDb din `datasets.imdbws.com/title.ratings.tsv.gz` (săptămânal, procesat în flux), insigne pe postere, pagina actorului.
-   *Notă: 10.1 (eticheta DUB) poate fi deja început de Claude; verifică PR-urile deschise și branch-urile `claude/*` înainte.*
 2. **Etapa 12**: revamp interfață (fundal hero cu debounce, logo-uri, tab-uri sus, listă de urmărit, fișă nouă, trailer prin intent YouTube, rândul „Nou”).
 3. **Etapa 11**: player (potrivire frecvență ecran, passthrough, mod noapte, format/viteză, intro per serial marcat manual, memorie audio/subtitrare per serial, derulare accelerată, sleep timer).
 4. **Etapa 13**: setări în două panouri.

@@ -166,6 +166,8 @@ data class TitleEntity(
     val originalName: String? = null,
     val year: Int? = null,
     val overview: String? = null,
+    val overviewRo: String? = null,
+    @ColumnInfo(defaultValue = "0") val overviewRoFetchedAt: Long = 0,
     val posterPath: String? = null,
     val backdropPath: String? = null,
     val rating: Double? = null,

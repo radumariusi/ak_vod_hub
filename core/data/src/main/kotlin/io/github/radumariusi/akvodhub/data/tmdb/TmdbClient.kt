@@ -71,6 +71,16 @@ class TmdbClient(
         return json.decodeFromString<TmdbItem>(body)
     }
 
+    /** Descriere RO numai pentru fișa deschisă; nu cere din nou detaliile suplimentare în engleză. */
+    suspend fun romanianOverview(key: String, type: MediaType, tmdbId: Long): String? {
+        val request =
+            url(if (type == MediaType.TV) "tv/$tmdbId" else "movie/$tmdbId")
+                .addQueryParameter("language", "ro-RO")
+                .build()
+        val body = get(key, request, strict = true) ?: return null
+        return json.decodeFromString<TmdbItem>(body).overview
+    }
+
     /** Distribuția (actori, regizori) unui titlu. null = nu există pe TMDB. */
     suspend fun credits(
         key: String,
