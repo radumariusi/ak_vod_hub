@@ -19,6 +19,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import io.github.radumariusi.akvodhub.catalog.TmdbViewModel
+import io.github.radumariusi.akvodhub.player.PlaybackSettingsViewModel
 import io.github.radumariusi.akvodhub.playlist.PlaylistsViewModel
 import io.github.radumariusi.akvodhub.update.UpdateState
 import io.github.radumariusi.akvodhub.update.UpdateViewModel
@@ -29,6 +30,7 @@ fun SettingsScreen(
     state: UpdateState,
     playlistsViewModel: PlaylistsViewModel,
     tmdbViewModel: TmdbViewModel,
+    playbackViewModel: PlaybackSettingsViewModel,
 ) {
     var adding by rememberSaveable { mutableStateOf(false) }
     val playlists by playlistsViewModel.playlists.collectAsState()
@@ -74,6 +76,8 @@ fun SettingsScreen(
             onMatchNow = tmdbViewModel::matchNow,
             onRetryUnmatched = tmdbViewModel::retryUnmatched,
         )
+
+        PlaybackSection(playbackViewModel)
 
         Text("Actualizări", style = MaterialTheme.typography.titleLarge)
         Text("Versiunea instalată: ${viewModel.currentVersion}", style = MaterialTheme.typography.bodyLarge)

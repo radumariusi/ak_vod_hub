@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+  <!-- API-urile „unstable” din Media3 (fabrica de renderere, override-uri de piste) sunt folosite intenționat. -->
+  <issue id="UnsafeOptInUsageError">
+    <option name="opt-in" value="androidx.media3.common.util.UnstableApi" />
+  </issue>
+</lint>

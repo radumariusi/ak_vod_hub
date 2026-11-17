@@ -36,6 +36,11 @@ android {
         versionName = if (ciVersionCode != null) "$versionBase.$ciVersionCode" else "$versionBase.0-dev"
 
         buildConfigField("String", "UPDATE_REPO", "\"$updateRepo\"")
+
+        // FFmpeg are biblioteci native: doar procesoarele ARM ale TV-urilor (+ x86_64 pentru emulator).
+        ndk {
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64")
+        }
     }
 
     signingConfigs {
@@ -82,6 +87,7 @@ android {
     }
 
     lint {
+        lintConfig = file("lint.xml")
         abortOnError = true
         checkReleaseBuilds = false
         // Aplicația se instalează din GitHub, nu din Play: regulile Play nu se aplică.

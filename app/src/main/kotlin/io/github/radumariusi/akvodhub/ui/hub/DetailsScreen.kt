@@ -2,9 +2,6 @@
 
 package io.github.radumariusi.akvodhub.ui.hub
 
-import android.content.ActivityNotFoundException
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,10 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,14 +52,16 @@ import io.github.radumariusi.akvodhub.parser.catalog.MergedEpisode
 import io.github.radumariusi.akvodhub.parser.match.MediaType
 import io.github.radumariusi.akvodhub.parser.match.QualityGroup
 import io.github.radumariusi.akvodhub.parser.match.SourceGrouping
-import io.github.radumariusi.akvodhub.parser.match.SourceInfo
-import kotlinx.coroutines.launch
+import io.github.radumariusi.akvodhub.parser.player.EpisodeOrder
+import io.github.radumariusi.akvodhub.parser.player.Resume
+import io.github.radumariusi.akvodhub.player.PlayRequest
+import io.github.radumariusi.akvodhub.player.PlayerActivity
 
 /**
  * Pagina unui film sau serial: fundal, poster, descriere, notă, genuri, distribuție, apoi sursele grupate
  * după calitate și limbă (filme) sau sezoanele și episoadele unite din toate sursele (seriale).
  *
- * Redarea folosește deocamdată un player instalat pe TV (ex. VLC); playerul propriu vine în etapa 6.
+ * Redarea pornește playerul propriu; dacă sursa aleasă nu merge, trece singur la următoarea.
  */
 @Composable
 fun DetailsScreen(
@@ -75,25 +71,9 @@ fun DetailsScreen(
     LaunchedEffect(titleId) { viewModel.open(titleId) }
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var message by remember { mutableStateOf<String?>(null) }
-    var choice by remember { mutableStateOf<Choice?>(null) }
 
-    fun play(entryId: Long) {
-        scope.launch {
-            val url = viewModel.streamUrl(entryId)
-            message =
-                if (url == null) {
-                    "Nu pot construi linkul acestei surse (playlist-ul a fost șters?)."
-                } else {
-                    try {
-                        context.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(Uri.parse(url), "video/*"))
-                        null
-                    } catch (e: ActivityNotFoundException) {
-                        "Nu există un player video pe TV. Instalează VLC; playerul propriu vine în etapa următoare."
-                    }
-                }
-        }
+    fun play(request: PlayRequest) {
+        context.startActivity(PlayerActivity.intent(context, request))
     }
 
     val details = state.details?.takeIf { state.titleId == titleId }
@@ -104,21 +84,6 @@ fun DetailsScreen(
                     state = state,
                     details = details,
                     onPlay = ::play,
-                    onChooseSource = { title, sources, info ->
-                        if (sources.size == 1) {
-                            play(sources[0].id)
-                        } else {
-                            choice =
-                                Choice(
-                                    title,
-                                    sources.mapIndexed { i, s ->
-                                        (if (i == 0) "Recomandat: " else "") +
-                                            sourceLabel(s, info[s.id])
-                                    },
-                                    0,
-                                ) { i -> play(sources[i].id) }
-                        }
-                    },
                     onSelectSeason = viewModel::selectSeason,
                 )
             }
@@ -131,28 +96,14 @@ fun DetailsScreen(
                 Box(Modifier.padding(48.dp)) { Message("Titlul nu mai există în playlist-uri.") }
             }
         }
-        message?.let {
-            Text(
-                it,
-                style = MaterialTheme.typography.bodyLarge,
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(24.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.medium)
-                        .padding(horizontal = 20.dp, vertical = 12.dp),
-            )
-        }
     }
-    choice?.let { ChoiceDialog(it, onDismiss = { choice = null }) }
 }
 
 @Composable
 private fun DetailsContent(
     state: DetailsState,
     details: TitleDetails,
-    onPlay: (Long) -> Unit,
-    onChooseSource: (String, List<SourceInfo>, Map<Long, SourceDetails>) -> Unit,
+    onPlay: (PlayRequest) -> Unit,
     onSelectSeason: (Int) -> Unit,
 ) {
     val title = details.title
@@ -181,7 +132,6 @@ private fun DetailsContent(
 
     val episodes = state.episodes
     val season = episodes?.seasons?.firstOrNull { it.number == state.selectedSeason }
-    val firstEpisode = season?.episodes?.firstOrNull()
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 48.dp, vertical = 32.dp),
@@ -189,33 +139,8 @@ private fun DetailsContent(
     ) {
         item("header") {
             Header(details, state.credits) {
-                val best = details.groups.firstOrNull()?.let { firstSource(it) }
-                when {
-                    best != null -> {
-                        Button(onClick = { onPlay(best.id) }, modifier = Modifier.focusRequester(playFocus)) {
-                            Text("Redă (${SourceGrouping.qualityLabel(best.quality)})")
-                        }
-                    }
-
-                    firstEpisode != null -> {
-                        Button(
-                            onClick = {
-                                onChooseSource(
-                                    episodeLabel(firstEpisode),
-                                    firstEpisode.sources,
-                                    episodes?.sources.orEmpty(),
-                                )
-                            },
-                            modifier = Modifier.focusRequester(playFocus),
-                        ) { Text("Redă ${episodeCode(firstEpisode)}") }
-                    }
-
-                    else -> {
-                        OutlinedButton(onClick = {}, modifier = Modifier.focusRequester(playFocus)) {
-                            Text(if (state.loadingEpisodes) "Se încarcă episoadele…" else "Nicio sursă de redare")
-                        }
-                    }
-                }
+                val first = episodes?.let { EpisodeOrder.linear(it.seasons).firstOrNull() }
+                PlayActions(state, title.id, first, playFocus, onPlay)
             }
         }
 
@@ -224,7 +149,7 @@ private fun DetailsContent(
                 Text("Surse (${details.sources.size})", style = MaterialTheme.typography.titleMedium)
             }
             items(details.groups, key = { "q:${it.quality}" }) { group ->
-                QualityRow(group, details.sources, onPlay)
+                QualityRow(group, details.sources) { onPlay(PlayRequest(title.id, entryId = it)) }
             }
         }
 
@@ -250,7 +175,7 @@ private fun DetailsContent(
             }
             season?.let { s ->
                 items(s.episodes, key = { "e:${s.number}:${it.number}:${it.sources.first().id}" }) { episode ->
-                    EpisodeRow(episode) { onChooseSource(episodeLabel(episode), episode.sources, episodes.sources) }
+                    EpisodeRow(episode) { onPlay(episodeRequest(title.id, episode)) }
                 }
             }
         }
@@ -455,44 +380,94 @@ private fun EpisodeRow(
     }
 }
 
-private fun firstSource(group: QualityGroup): SourceInfo? =
-    group.languages
-        .firstOrNull()
-        ?.sources
-        ?.firstOrNull()
+/** Butoanele de redare din fișă: „Continuă de la 12:34” / „De la început” sau „Redă”. */
+@Composable
+private fun PlayActions(
+    state: DetailsState,
+    titleId: Long,
+    firstEpisode: MergedEpisode?,
+    playFocus: FocusRequester,
+    onPlay: (PlayRequest) -> Unit,
+) {
+    val watch = state.watch
+    val isSeries = state.details?.title?.mediaType == MediaType.TV
+    if (!isSeries) {
+        val best = state.recommended
+        when {
+            best == null -> {
+                OutlinedButton(onClick = {}, modifier = Modifier.focusRequester(playFocus)) {
+                    Text("Nicio sursă de redare")
+                }
+            }
+
+            watch != null && Resume.shouldResume(watch.positionMs, watch.durationMs) -> {
+                Button(
+                    onClick = { onPlay(PlayRequest(titleId, resume = true)) },
+                    modifier = Modifier.focusRequester(playFocus),
+                ) { Text("Continuă de la ${Resume.format(watch.positionMs)}") }
+                OutlinedButton(onClick = { onPlay(PlayRequest(titleId)) }) { Text("De la început") }
+            }
+
+            else -> {
+                Button(onClick = { onPlay(PlayRequest(titleId)) }, modifier = Modifier.focusRequester(playFocus)) {
+                    Text("Redă (${sourceShortLabel(best)})")
+                }
+            }
+        }
+        return
+    }
+    val episodes = state.episodes
+    val current =
+        watch?.let { w -> episodes?.let { EpisodeOrder.find(it.seasons, w.season, w.episode) } }
+    when {
+        current != null && watch != null -> {
+            val resume = Resume.shouldResume(watch.positionMs, watch.durationMs)
+            Button(
+                onClick = { onPlay(episodeRequest(titleId, current, resume)) },
+                modifier = Modifier.focusRequester(playFocus),
+            ) {
+                Text(
+                    if (resume) {
+                        "Continuă ${episodeCode(current)} (${Resume.format(watch.positionMs)})"
+                    } else {
+                        "Redă ${episodeCode(current)}"
+                    },
+                )
+            }
+            if (firstEpisode != null && firstEpisode != current) {
+                OutlinedButton(onClick = { onPlay(episodeRequest(titleId, firstEpisode)) }) {
+                    Text("De la ${episodeCode(firstEpisode)}")
+                }
+            }
+        }
+
+        firstEpisode != null -> {
+            Button(
+                onClick = { onPlay(episodeRequest(titleId, firstEpisode)) },
+                modifier = Modifier.focusRequester(playFocus),
+            ) { Text("Redă ${episodeCode(firstEpisode)}") }
+        }
+
+        else -> {
+            OutlinedButton(onClick = {}, modifier = Modifier.focusRequester(playFocus)) {
+                Text(if (state.loadingEpisodes) "Se încarcă episoadele…" else "Nicio sursă de redare")
+            }
+        }
+    }
+}
+
+private fun episodeRequest(
+    titleId: Long,
+    episode: MergedEpisode,
+    resume: Boolean = false,
+) = PlayRequest(
+    titleId = titleId,
+    // Episoadele fără număr se găsesc după sursă.
+    entryId = if (episode.number == null) episode.sources.firstOrNull()?.id else null,
+    season = episode.season,
+    episode = episode.number,
+    resume = resume,
+)
 
 private fun episodeCode(episode: MergedEpisode) =
     if (episode.number != null) "S%02dE%02d".format(episode.season, episode.number) else "episodul"
-
-private fun episodeLabel(episode: MergedEpisode) =
-    listOfNotNull(
-        episodeCode(episode).takeIf {
-            episode.number != null
-        },
-        episode.title,
-    ).joinToString(" · ").ifEmpty { "Episod" }
-
-/** Ex. „EN · HDR10 · H265 · MKV”. */
-private fun sourceTags(
-    source: SourceInfo,
-    info: SourceDetails?,
-): String {
-    val entry = info?.entry
-    return listOfNotNull(
-        source.languages.joinToString("+") { SourceGrouping.languageLabel(it) }.ifEmpty { "?" },
-        source.hdr?.name?.replace('_', ' '),
-        entry?.codec?.name,
-        entry?.containerExt?.uppercase(),
-        source.subtitles.takeIf { it.isNotEmpty() }?.let {
-            "SUB " +
-                it.joinToString("+") { s -> SourceGrouping.languageLabel(s) }
-        },
-    ).joinToString(" · ")
-}
-
-/** O sursă în lista de alegere, ex. „1080p · EN · H265 · MKV — Playlist A”. */
-private fun sourceLabel(
-    source: SourceInfo,
-    info: SourceDetails?,
-) = "${SourceGrouping.qualityLabel(source.quality)} · ${sourceTags(source, info)}" +
-    (info?.playlist?.takeIf { it.isNotEmpty() }?.let { " — $it" } ?: "")

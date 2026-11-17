@@ -131,6 +131,17 @@ interface CatalogDao {
     @Query("SELECT * FROM raw_entry WHERE id = :id")
     suspend fun entry(id: Long): RawEntryEntity?
 
+    // ------------------------------------------------------------ player (etapa 6)
+
+    @Query("SELECT * FROM watch_state WHERE titleId = :titleId")
+    suspend fun watchState(titleId: Long): WatchStateEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun putWatchState(state: WatchStateEntity)
+
+    @Query("DELETE FROM watch_state WHERE titleId = :titleId")
+    suspend fun deleteWatchState(titleId: Long)
+
     /** Combinațiile de limbi din playlist-uri, cele mai frecvente primele (pentru filtrul „Limbă”). */
     @Query(
         "SELECT languages FROM raw_entry WHERE languages IS NOT NULL AND titleId IS NOT NULL " +

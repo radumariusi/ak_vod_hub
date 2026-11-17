@@ -13,6 +13,7 @@ import io.github.radumariusi.akvodhub.data.catalog.HubRepository
 import io.github.radumariusi.akvodhub.data.catalog.MatchScheduler
 import io.github.radumariusi.akvodhub.data.catalog.TitleMatcher
 import io.github.radumariusi.akvodhub.data.db.AkVodDatabase
+import io.github.radumariusi.akvodhub.data.player.PlaybackSettings
 import io.github.radumariusi.akvodhub.data.playlist.PlaylistImporter
 import io.github.radumariusi.akvodhub.data.playlist.PlaylistRepository
 import io.github.radumariusi.akvodhub.data.playlist.PlaylistScheduler
@@ -144,5 +145,12 @@ object AppModule {
         importer: PlaylistImporter,
         tmdb: TmdbClient,
         settings: TmdbSettings,
-    ): HubRepository = HubRepository(db, indexer, importer, tmdb, settings)
+        playback: PlaybackSettings,
+    ): HubRepository = HubRepository(db, indexer, importer, tmdb, settings, playback)
+
+    @Provides
+    @Singleton
+    fun playbackSettings(
+        @ApplicationContext context: Context,
+    ): PlaybackSettings = PlaybackSettings(context)
 }

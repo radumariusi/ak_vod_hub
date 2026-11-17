@@ -7,11 +7,14 @@ import io.github.radumariusi.akvodhub.data.catalog.Credits
 import io.github.radumariusi.akvodhub.data.catalog.HubRepository
 import io.github.radumariusi.akvodhub.data.catalog.SeriesEpisodes
 import io.github.radumariusi.akvodhub.data.catalog.TitleDetails
+import io.github.radumariusi.akvodhub.data.db.WatchStateEntity
 import io.github.radumariusi.akvodhub.parser.match.MediaType
+import io.github.radumariusi.akvodhub.parser.match.SourceInfo
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -25,6 +28,10 @@ data class DetailsState(
     val loadingEpisodes: Boolean = false,
     val credits: Credits? = null,
     val selectedSeason: Int? = null,
+    /** Unde a rămas utilizatorul (pentru „Continuă”). */
+    val watch: WatchStateEntity? = null,
+    /** Sursa pe care o alege playerul singur (profilul din Setări → Redare). */
+    val recommended: SourceInfo? = null,
 )
 
 /** Pagina de detalii a unui film sau serial: fișa, sursele grupate, episoadele unite, distribuția. */
@@ -38,6 +45,10 @@ class DetailsViewModel
         val state: StateFlow<DetailsState> = mutableState.asStateFlow()
         private var job: Job? = null
 
+        init {
+            viewModelScope.launch { repository.watchVersion.drop(1).collect { refreshWatch() } }
+        }
+
         fun open(titleId: Long) {
             if (mutableState.value.titleId == titleId && mutableState.value.details != null) return
             job?.cancel()
@@ -45,7 +56,12 @@ class DetailsViewModel
             job =
                 viewModelScope.launch {
                     val details = repository.details(titleId)
-                    mutableState.update { it.copy(loading = false, details = details) }
+                    val all = details?.groups.orEmpty().flatMap { g -> g.languages.flatMap { it.sources } }
+                    val recommended = repository.playOrder(all).firstOrNull()
+                    val watch = repository.watchState(titleId)
+                    mutableState.update {
+                        it.copy(loading = false, details = details, recommended = recommended, watch = watch)
+                    }
                     if (details == null) return@launch
                     launch {
                         val credits = repository.credits(details.title)
@@ -74,5 +90,12 @@ class DetailsViewModel
 
         fun selectSeason(season: Int) = mutableState.update { it.copy(selectedSeason = season) }
 
-        suspend fun streamUrl(entryId: Long): String? = repository.streamUrl(entryId)
+        /** După player: „Continuă” arată noua poziție (sau episodul următor). */
+        fun refreshWatch() {
+            val titleId = mutableState.value.titleId ?: return
+            viewModelScope.launch {
+                val watch = repository.watchState(titleId)
+                mutableState.update { if (it.titleId == titleId) it.copy(watch = watch) else it }
+            }
+        }
     }
