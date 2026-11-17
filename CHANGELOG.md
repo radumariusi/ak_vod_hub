@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-11-17 — Etapa 12.6
+- Trailer din fișă în aplicația YouTube, la cerere, cu cache și tratarea lipsei aplicației/trailerului.
+
 ## 2026-11-17 — Etapa 12.5
 - Fișă cu fundal integral, acțiuni mari, surse compacte pe calitate/limbă și file pentru sezoane.
 

@@ -30,6 +30,8 @@ import io.github.radumariusi.akvodhub.parser.catalog.MergedSeason
 import io.github.radumariusi.akvodhub.parser.catalog.PersonalLibrary
 import io.github.radumariusi.akvodhub.parser.catalog.PosterBadges
 import io.github.radumariusi.akvodhub.parser.catalog.TitleLogo
+import io.github.radumariusi.akvodhub.parser.catalog.Trailer
+import io.github.radumariusi.akvodhub.parser.catalog.TrailerCandidate
 import io.github.radumariusi.akvodhub.parser.match.QualityGroup
 import io.github.radumariusi.akvodhub.parser.match.SourceGrouping
 import io.github.radumariusi.akvodhub.parser.match.SourceInfo
@@ -98,6 +100,7 @@ class HubRepository(
     private val playlistDao = db.playlistDao()
     private val overviewMutex = Mutex()
     private val logoMutex = Mutex()
+    private val trailerMutex = Mutex()
     private val creditsCache = ConcurrentHashMap<Long, Credits>()
 
     /** Episoadele Xtream cerute de la server în sesiunea curentă (o dată pe serial și playlist). */
@@ -242,6 +245,38 @@ class HubRepository(
             genres = Genres.names(title.genreIds),
         )
     }
+
+    /** Numai apăsarea butonului cere trailerul; cache inclusiv pentru rezultate absente. */
+    suspend fun trailer(titleId: Long): String? =
+        trailerMutex.withLock {
+            val title = dao.titleById(titleId) ?: return@withLock null
+            if (title.isLocal) return@withLock null
+            val cache = db.discoverDao()
+            val cacheKey = "trailer:${title.mediaType}:${title.tmdbId}"
+            val old = cache.cached(cacheKey)
+            val now = System.currentTimeMillis()
+            if (old != null && LocalizedOverview.isCached(old.fetchedAt, now)) return@withLock old.data.ifBlank { null }
+            try {
+                val key = settings.apiKey() ?: throw java.io.IOException("Cheia TMDB lipsește.")
+                val videos = tmdb.videos(key, title.mediaType, title.tmdbId)
+                val id =
+                    Trailer.choose(
+                        videos.results.map {
+                            TrailerCandidate(it.key, it.site, it.type, it.official, it.language)
+                        },
+                        title.originalLanguage,
+                    )
+                db.withTransaction {
+                    cache.putCache(DiscoverCacheEntity(cacheKey, id.orEmpty(), now))
+                    cache.trimTrailers()
+                }
+                id
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (old != null) old.data.ifBlank { null } else throw e
+            }
+        }
 
     /** Numai hero stabil/fișă: rezultat (inclusiv absent) salvat 30 zile, maximum 128 titluri. */
     suspend fun logo(titleId: Long): String? =

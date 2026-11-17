@@ -191,3 +191,6 @@ AppRoot folosește file orizontale sus, cu wrapper-ele touch și stare selectat�
 
 ### Etapa 12.4
 Room v13, migrare aditivă 12→13: `watchlist(titleId, addedAt)`. Lista mea citește numai titlurile disponibile, pagini de 48 după ID. Apartenența rămâne salvată când sursele dispar; potrivirea local→TMDB copiază lista și istoricul în aceeași tranzacție cu legarea surselor. Titlurile locale cu listă/istoric nu se curăță automat. Fișa permite adăugare/scoatere și văzut/nevăzut: acțiunea manuală setează explicit istoricul la 100%/0%, scoate reluarea anterioară și actualizează progresul/posterele/Watch Next. Nu inventează episodul vizionat; un serial marcat văzut are semnificație la nivel de titlu. Backup-ul existent rămâne pentru setări, nu catalog/istoric/listă.
+
+### Etapa 12.6
+Buton Trailer în fișă: TMDB videos la apăsare (en-US, ca metadatele existente), doar YouTube/Trailer și chei validate strict. Preferă RO dacă răspunsul o oferă, apoi EN/original și oficial în aceeași limbă. Cache `trailer:<tip>:<tmdbId>` în discover_cache, 30 zile inclusiv absența, maximum 128. Erorile permit reîncercarea. Intent către YouTube TV, YouTube mobil, apoi handler-ul HTTPS disponibil; mesaj dacă nu există handler. Fără redare în aplicație sau cereri pe postere.

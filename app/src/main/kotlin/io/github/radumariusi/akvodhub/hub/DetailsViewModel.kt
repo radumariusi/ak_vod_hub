@@ -157,6 +157,8 @@ class DetailsViewModel
             }
         }
 
+        suspend fun trailer(titleId: Long): String? = repository.trailer(titleId)
+
         fun toggleWatchlist() = changeLibrary { id -> repository.setInWatchlist(id, !mutableState.value.inWatchlist) }
 
         fun toggleWatched() = changeLibrary { id -> repository.markWatched(id, !mutableState.value.watched) }
