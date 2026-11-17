@@ -411,6 +411,12 @@ private fun Controls(
                     Text("Sursă (${state.sources.size})")
                 }
             }
+            OutlinedButton(onClick = {
+                val minutes = if (state.isSeries) listOf(0, 30, 60, 90, -1) else listOf(0, 30, 60, 90)
+                val labels = listOf("Oprit", "30 minute", "60 minute", "90 minute") +
+                    if (state.isSeries) listOf("Sfârșitul episodului") else emptyList()
+                onChoice(Choice("Timer de somn · ${state.sleepLabel}", labels, null) { viewModel.setSleepTimer(minutes[it]) })
+            }) { Text("Somn: ${state.sleepLabel}") }
             OutlinedButton(onClick = onTechnical) { Text("Info tehnic") }
             OutlinedButton(onClick = onJump) { Text("Salt la minut") }
             if (state.isSeries) {

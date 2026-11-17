@@ -1,6 +1,7 @@
 package io.github.radumariusi.akvodhub.player
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.C
@@ -27,6 +28,7 @@ import io.github.radumariusi.akvodhub.parser.match.MediaType
 import io.github.radumariusi.akvodhub.parser.match.SourceInfo
 import io.github.radumariusi.akvodhub.parser.player.EpisodeOrder
 import io.github.radumariusi.akvodhub.parser.player.FallbackQueue
+import io.github.radumariusi.akvodhub.parser.player.SleepTimer
 import io.github.radumariusi.akvodhub.parser.player.Resume
 import io.github.radumariusi.akvodhub.parser.player.SeekNavigation
 import io.github.radumariusi.akvodhub.parser.player.SeriesPlayback
@@ -73,6 +75,7 @@ data class AddonSubtitleOption(
 )
 
 data class PlayerUiState(
+    val sleepLabel: String = "Oprit",
     val isSeries: Boolean = false,
     val introEndMs: Long = 0,
     val pictureMode: Int = 0,
@@ -156,6 +159,8 @@ class PlayerViewModel
         private var generation = 0
         private var watchdog: Job? = null
         private var countdownJob: Job? = null
+        private var sleepJob: Job? = null
+        private var sleepTimer = SleepTimer()
         private var noticeJob: Job? = null
 
         private var addonJob: Job? = null
@@ -687,6 +692,33 @@ class PlayerViewModel
             if (SeriesPlayback.canSkip(player.currentPosition, player.duration, end)) player.seekTo(end)
         }
 
+        fun setSleepTimer(minutes: Int) {
+            sleepJob?.cancel()
+            sleepTimer = if (minutes == -1 && state.value.isSeries) SleepTimer(endOfEpisode = true)
+                else SleepTimer.after(minutes, SystemClock.elapsedRealtime())
+            val label = when {
+                sleepTimer.endOfEpisode -> "Sfârșitul episodului"
+                sleepTimer.deadlineMs != null -> "$minutes min"
+                else -> "Oprit"
+            }
+            mutableState.update { it.copy(sleepLabel = label) }
+            sleepTimer.deadlineMs?.let { deadline ->
+                sleepJob = viewModelScope.launch {
+                    delay((deadline - SystemClock.elapsedRealtime()).coerceAtLeast(0))
+                    if (sleepTimer.shouldStop(SystemClock.elapsedRealtime(), false)) stopForSleep()
+                }
+            }
+        }
+
+        private fun stopForSleep() {
+            countdownJob?.cancel()
+            watchdog?.cancel()
+            generation++
+            save()
+            player.pause()
+            mutableState.update { it.copy(finished = true, countdown = null) }
+        }
+
         fun technicalInfo(): String {
             val video = player.videoFormat
             val audio = player.audioFormat
@@ -777,6 +809,10 @@ class PlayerViewModel
         }
 
         private fun onEnded() {
+            if (sleepTimer.shouldStop(SystemClock.elapsedRealtime(), true)) {
+                stopForSleep()
+                return
+            }
             watchdog?.cancel()
             save()
             val current = episode
@@ -888,6 +924,7 @@ class PlayerViewModel
             addonLoadJob?.cancel()
             watchdog?.cancel()
             countdownJob?.cancel()
+            sleepJob?.cancel()
             player.removeListener(listener)
             player.release()
         }
