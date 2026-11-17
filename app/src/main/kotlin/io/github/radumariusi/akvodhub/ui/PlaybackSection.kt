@@ -80,17 +80,6 @@ fun PlaybackSection(viewModel: PlaybackSettingsViewModel) {
                     viewModel.setRule(rules.size, SourceRule(VideoQuality.FHD, null))
                 }) { Text(if (rules.isEmpty()) "Adaugă o preferință" else "Adaugă „altfel”") }
             }
-            val subtitleOptions = listOf<String?>(null) + languages
-            OutlinedButton(onClick = {
-                choice =
-                    Choice(
-                        "Subtitrări automate",
-                        subtitleOptions.map { it?.let(::languageName) ?: "Oprite" },
-                        subtitleOptions.indexOf(prefs.subtitleLanguage).takeIf { it >= 0 },
-                    ) { viewModel.setSubtitleLanguage(subtitleOptions[it]) }
-            }) {
-                Text("Subtitrări automate: ${prefs.subtitleLanguage?.let(::languageName) ?: "oprite"}")
-            }
         }
         Text(
             "Decodor audio software (AC3, EAC3, DTS): ${viewModel.ffmpegStatus}",
@@ -105,7 +94,7 @@ fun PlaybackSection(viewModel: PlaybackSettingsViewModel) {
 private fun qualityName(quality: VideoQuality?) =
     if (quality == null) "Orice calitate" else SourceGrouping.qualityLabel(quality)
 
-private fun languageName(code: String?): String {
+internal fun languageName(code: String?): String {
     if (code == null) return "Orice limbă"
     val ro = Locale.forLanguageTag("ro")
     val name = Locale.forLanguageTag(code).getDisplayLanguage(ro).replaceFirstChar { it.titlecase(ro) }

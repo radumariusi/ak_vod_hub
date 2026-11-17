@@ -13,10 +13,10 @@ import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 
-/** Ce piste alege playerul singur: limbile audio în ordinea preferinței și limba subtitrării (null = oprite). */
+/** Ce piste alege playerul singur: limbile audio și ale subtitrărilor, în ordinea preferinței (goală = oprite). */
 data class TrackPreferences(
     val audioLanguages: List<String>,
-    val subtitleLanguage: String?,
+    val subtitleLanguages: List<String>,
 )
 
 /**
@@ -71,9 +71,12 @@ object PlayerFactory {
             params
                 .buildUpon()
                 .setPreferredAudioLanguages(*preferences.audioLanguages.toTypedArray())
-        val subtitle = preferences.subtitleLanguage
-        if (subtitle != null) {
-            builder.setPreferredTextLanguages(subtitle).setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+        val subtitles = preferences.subtitleLanguages
+        if (subtitles.isNotEmpty()) {
+            builder
+                .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+                .setPreferredTextLanguages(*subtitles.toTypedArray())
+                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
         } else {
             builder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
         }

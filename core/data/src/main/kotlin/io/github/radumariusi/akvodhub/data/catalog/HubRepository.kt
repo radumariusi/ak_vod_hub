@@ -24,6 +24,7 @@ import io.github.radumariusi.akvodhub.parser.match.QualityGroup
 import io.github.radumariusi.akvodhub.parser.match.SourceGrouping
 import io.github.radumariusi.akvodhub.parser.match.SourceInfo
 import io.github.radumariusi.akvodhub.parser.player.SourceProfile
+import io.github.radumariusi.akvodhub.parser.stremio.StremioIds
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -219,6 +220,31 @@ class HubRepository(
             )
         creditsCache[title.id] = result
         return result
+    }
+
+    /**
+     * ID-ul IMDb al titlului (pentru subtitrările din addon-uri). Dacă potrivirea nu l-a adus încă, îl cerem
+     * de la TMDB o dată și îl salvăm. null la titlurile locale sau fără cheie TMDB.
+     */
+    suspend fun imdbId(title: TitleEntity): String? {
+        title.imdbId?.takeIf { StremioIds.isImdb(it) }?.let { return it }
+        if (title.isLocal) return null
+        dao
+            .titleById(title.id)
+            ?.imdbId
+            ?.takeIf { StremioIds.isImdb(it) }
+            ?.let { return it }
+        val key = settings.apiKey() ?: return null
+        val imdb =
+            try {
+                tmdb.details(key, title.mediaType, title.tmdbId)?.imdb
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                null
+            }?.takeIf { StremioIds.isImdb(it) } ?: return null
+        dao.setImdbId(title.id, imdb)
+        return imdb
     }
 
     /** Linkul de redare al unei surse (la Xtream se construiește din cont, ca parola să nu stea în fiecare intrare). */

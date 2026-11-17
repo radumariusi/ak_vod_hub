@@ -15,7 +15,12 @@ import io.github.radumariusi.akvodhub.data.catalog.HubRepository
 import io.github.radumariusi.akvodhub.data.catalog.SourceDetails
 import io.github.radumariusi.akvodhub.data.db.TitleEntity
 import io.github.radumariusi.akvodhub.data.db.WatchStateEntity
+import io.github.radumariusi.akvodhub.data.db.isLocal
+import io.github.radumariusi.akvodhub.data.player.PlaybackPrefs
 import io.github.radumariusi.akvodhub.data.player.PlaybackSettings
+import io.github.radumariusi.akvodhub.data.player.SubtitleStyle
+import io.github.radumariusi.akvodhub.data.stremio.StremioAddons
+import io.github.radumariusi.akvodhub.data.stremio.SubtitleRepository
 import io.github.radumariusi.akvodhub.parser.catalog.MergedEpisode
 import io.github.radumariusi.akvodhub.parser.catalog.MergedSeason
 import io.github.radumariusi.akvodhub.parser.match.MediaType
@@ -23,8 +28,13 @@ import io.github.radumariusi.akvodhub.parser.match.SourceInfo
 import io.github.radumariusi.akvodhub.parser.player.EpisodeOrder
 import io.github.radumariusi.akvodhub.parser.player.FallbackQueue
 import io.github.radumariusi.akvodhub.parser.player.Resume
+import io.github.radumariusi.akvodhub.parser.stremio.AddonSubtitle
+import io.github.radumariusi.akvodhub.parser.stremio.SubtitleChoice
+import io.github.radumariusi.akvodhub.parser.stremio.SubtitleLanguages
+import io.github.radumariusi.akvodhub.parser.subtitle.SubtitleDocument
 import io.github.radumariusi.akvodhub.ui.hub.sourceLabel
 import io.github.radumariusi.akvodhub.ui.hub.sourceShortLabel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -54,6 +64,12 @@ data class SourceOption(
     val current: Boolean,
 )
 
+/** O subtitrare din addon-uri în meniul „Subtitrări”, ex. „Română 2 · OpenSubtitles v3”. */
+data class AddonSubtitleOption(
+    val subtitle: AddonSubtitle,
+    val label: String,
+)
+
 data class PlayerUiState(
     val title: String = "",
     /** La seriale: „S01E03 · Titlul episodului”. */
@@ -68,6 +84,15 @@ data class PlayerUiState(
     val failures: List<String> = emptyList(),
     val audio: List<TrackOption> = emptyList(),
     val subtitles: List<TrackOption> = emptyList(),
+    /** Subtitrările găsite în addon-urile Stremio (limbile preferate primele). */
+    val addonSubtitles: List<AddonSubtitleOption> = emptyList(),
+    /** Starea căutării în addon-uri (ex. „Caut subtitrări…”); null când lista e gata și nu e nimic de spus. */
+    val addonStatus: String? = null,
+    /** Subtitrarea din addon afișată acum (adresa ei), null = niciuna. */
+    val externalSubtitle: String? = null,
+    val externalLabel: String? = null,
+    /** Decalajul subtitrării din addon: pozitiv = apare mai târziu. */
+    val subtitleOffsetMs: Long = 0,
     val sources: List<SourceOption> = emptyList(),
     /** Eticheta episodului următor, dacă există. */
     val next: String? = null,
@@ -89,12 +114,18 @@ class PlayerViewModel
         @ApplicationContext context: Context,
         private val repository: HubRepository,
         private val settings: PlaybackSettings,
+        private val subtitleRepository: SubtitleRepository,
+        private val addons: StremioAddons,
     ) : ViewModel() {
-        val player: ExoPlayer =
-            PlayerFactory.create(
-                context,
-                TrackPreferences(settings.preferredLanguages(), settings.state.value.subtitleLanguage),
-            )
+        val player: ExoPlayer = PlayerFactory.create(context, trackPreferences())
+
+        /** Mărimea și stilul subtitrărilor (Setări → Subtitrări; se pot schimba și din player). */
+        val prefs: StateFlow<PlaybackPrefs> = settings.state
+
+        private val mutableDocument = MutableStateFlow<SubtitleDocument?>(null)
+
+        /** Subtitrarea din addon afișată peste video (null = folosim pistele sursei). */
+        val externalDocument: StateFlow<SubtitleDocument?> = mutableDocument.asStateFlow()
 
         private val mutableState = MutableStateFlow(PlayerUiState())
         val state: StateFlow<PlayerUiState> = mutableState.asStateFlow()
@@ -118,6 +149,18 @@ class PlayerViewModel
         private var watchdog: Job? = null
         private var countdownJob: Job? = null
         private var noticeJob: Job? = null
+
+        private var addonJob: Job? = null
+        private var addonLoadJob: Job? = null
+
+        /** Subtitrările din addon-uri pentru titlul / episodul curent (null = încă se caută). */
+        private var addonResults: List<AddonSubtitle>? = null
+
+        /** Limbile subtitrărilor încorporate în sursa curentă (null = pistele nu se știu încă). */
+        private var embeddedTextLanguages: List<String?>? = null
+
+        /** Alegerea automată a subtitrării s-a făcut (sau utilizatorul a ales singur) pentru acest titlu / episod. */
+        private var subtitleDecided = false
 
         private val listener =
             object : Player.Listener {
@@ -176,6 +219,11 @@ class PlayerViewModel
                             subtitles = TrackOptions.list(tracks, C.TRACK_TYPE_TEXT),
                         )
                     }
+                    if (!tracks.isEmpty) {
+                        embeddedTextLanguages =
+                            TrackOptions.languages(tracks, C.TRACK_TYPE_TEXT).map(SubtitleLanguages::toIso1)
+                        autoPickSubtitle()
+                    }
                 }
 
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -207,6 +255,7 @@ class PlayerViewModel
             }
             title = details.title
             mutableState.update { it.copy(title = details.title.name) }
+            if (details.title.mediaType != MediaType.TV) searchAddonSubtitles(null, null)
             val watch = repository.watchState(request.titleId)
             if (details.title.mediaType == MediaType.TV) {
                 val episodes = repository.episodes(request.titleId, refresh = false)
@@ -255,6 +304,7 @@ class PlayerViewModel
             mutableState.update {
                 it.copy(subtitle = episodeLabel(episode), next = next?.let(::episodeLabel), countdown = null)
             }
+            searchAddonSubtitles(episode.season, episode.number)
             play(episode.sources, chosen, positionMs)
         }
 
@@ -278,6 +328,7 @@ class PlayerViewModel
             val gen = generation
             started = false
             retriedSame = false
+            embeddedTextLanguages = null
             startPosition = positionMs
             mutableState.update {
                 it.copy(loading = true, sourceLabel = currentLabel(), sources = sourceOptions(), audio = emptyList())
@@ -365,9 +416,172 @@ class PlayerViewModel
             playCurrent(startPosition)
         }
 
-        fun selectTrack(option: TrackOption) = TrackOptions.select(player, option)
+        fun selectTrack(option: TrackOption) {
+            if (option.type == C.TRACK_TYPE_TEXT) {
+                subtitleDecided = true
+                clearExternal()
+            }
+            TrackOptions.select(player, option)
+        }
 
-        fun disableSubtitles() = TrackOptions.disableSubtitles(player)
+        fun disableSubtitles() {
+            subtitleDecided = true
+            clearExternal()
+            TrackOptions.disableSubtitles(player)
+        }
+
+        /**
+         * Caută subtitrări în addon-uri pentru titlul curent (filmul sau episodul dat). Subtitrarea din addon
+         * a episodului anterior se scoate, iar pistele încorporate revin la preferințe.
+         */
+        private fun searchAddonSubtitles(
+            season: Int?,
+            number: Int?,
+        ) {
+            addonJob?.cancel()
+            addonLoadJob?.cancel()
+            addonResults = null
+            subtitleDecided = false
+            if (mutableDocument.value != null) {
+                clearExternal()
+                player.trackSelectionParameters =
+                    PlayerFactory.apply(player.trackSelectionParameters, trackPreferences())
+            }
+            val title = title ?: return
+            val series = title.mediaType == MediaType.TV
+            mutableState.update {
+                it.copy(
+                    addonSubtitles = emptyList(),
+                    addonStatus = if (addons.addons.value.isEmpty()) null else "Caut subtitrări în addon-uri…",
+                    subtitleOffsetMs = 0,
+                )
+            }
+            if (addons.addons.value.isEmpty()) {
+                addonResults = emptyList()
+                return
+            }
+            addonJob =
+                viewModelScope.launch {
+                    val imdb = repository.imdbId(title)
+                    val status: String?
+                    val found: List<AddonSubtitle>
+                    when {
+                        imdb == null -> {
+                            found = emptyList()
+                            status =
+                                if (title.isLocal) {
+                                    "Titlul nu e potrivit pe TMDB, deci addon-urile nu-l pot căuta."
+                                } else {
+                                    "Nu știu ID-ul IMDb al titlului (cheia TMDB lipsește?)."
+                                }
+                        }
+
+                        series && number == null -> {
+                            found = emptyList()
+                            status = "Episodul nu are număr, deci addon-urile nu-l pot căuta."
+                        }
+
+                        else -> {
+                            val result = subtitleRepository.find(imdb, series, season, number)
+                            found =
+                                SubtitleChoice
+                                    .order(result.subtitles, settings.state.value.subtitleLanguages)
+                                    .take(MAX_ADDON_SUBTITLES)
+                            status =
+                                when {
+                                    found.isNotEmpty() -> null
+                                    result.problems.isNotEmpty() -> result.problems.joinToString("; ")
+                                    else -> "Nicio subtitrare în addon-uri pentru acest titlu."
+                                }
+                        }
+                    }
+                    addonResults = found
+                    mutableState.update { it.copy(addonSubtitles = addonLabels(found), addonStatus = status) }
+                    autoPickSubtitle()
+                }
+        }
+
+        /**
+         * O singură dată pe titlu / episod, după ce știm pistele sursei și lista din addon-uri: dacă sursa nu are
+         * subtitrare într-o limbă preferată la fel de bună, pornim cea mai bună din addon-uri.
+         */
+        private fun autoPickSubtitle() {
+            if (subtitleDecided) return
+            val embedded = embeddedTextLanguages ?: return
+            val found = addonResults ?: return
+            subtitleDecided = true
+            val prefs = settings.state.value
+            if (!prefs.addonSubtitlesAuto) return
+            val pick = SubtitleChoice.autoPick(embedded, found, prefs.subtitleLanguages) ?: return
+            loadAddonSubtitle(pick, automatic = true)
+        }
+
+        /** Utilizatorul alege o subtitrare din addon-uri în meniu. */
+        fun selectAddonSubtitle(option: AddonSubtitleOption) {
+            subtitleDecided = true
+            loadAddonSubtitle(option.subtitle, automatic = false)
+        }
+
+        private fun loadAddonSubtitle(
+            subtitle: AddonSubtitle,
+            automatic: Boolean,
+        ) {
+            addonLoadJob?.cancel()
+            val label =
+                mutableState.value.addonSubtitles
+                    .firstOrNull { it.subtitle.url == subtitle.url }
+                    ?.label
+            if (!automatic) showNotice("Se încarcă subtitrarea…")
+            addonLoadJob =
+                viewModelScope.launch {
+                    try {
+                        val document = subtitleRepository.load(subtitle)
+                        mutableDocument.value = document
+                        TrackOptions.disableSubtitles(player)
+                        mutableState.update { it.copy(externalSubtitle = subtitle.url, externalLabel = label) }
+                        showNotice("Subtitrare: ${label ?: subtitle.addon}")
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        showNotice("Subtitrarea nu se poate folosi (${SubtitleRepository.reason(e)}).")
+                    }
+                }
+        }
+
+        private fun clearExternal() {
+            addonLoadJob?.cancel()
+            mutableDocument.value = null
+            mutableState.update { it.copy(externalSubtitle = null, externalLabel = null) }
+        }
+
+        /** Sincronizarea subtitrării din addon: + o întârzie, − o grăbește. */
+        fun adjustSubtitleOffset(deltaMs: Long) {
+            mutableState.update {
+                it.copy(subtitleOffsetMs = (it.subtitleOffsetMs + deltaMs).coerceIn(-MAX_OFFSET_MS, MAX_OFFSET_MS))
+            }
+        }
+
+        fun resetSubtitleOffset() {
+            mutableState.update { it.copy(subtitleOffsetMs = 0) }
+        }
+
+        fun setSubtitleScale(percent: Int) = settings.setSubtitleScale(percent)
+
+        fun setSubtitleStyle(style: SubtitleStyle) = settings.setSubtitleStyle(style)
+
+        private fun trackPreferences() =
+            TrackPreferences(settings.preferredLanguages(), settings.state.value.subtitleLanguages)
+
+        /** „Română 1 · OpenSubtitles v3”, „Română 2 · …”, „Engleză 1 · …”. */
+        private fun addonLabels(list: List<AddonSubtitle>): List<AddonSubtitleOption> {
+            val counts = HashMap<String, Int>()
+            return list.map { sub ->
+                val language = SubtitleLanguages.displayName(sub.rawLanguage.ifBlank { null })
+                val n = (counts[language] ?: 0) + 1
+                counts[language] = n
+                AddonSubtitleOption(sub, "$language $n · ${sub.addon}")
+            }
+        }
 
         fun togglePlay() {
             if (player.isPlaying) {
@@ -508,6 +722,8 @@ class PlayerViewModel
 
         override fun onCleared() {
             save()
+            addonJob?.cancel()
+            addonLoadJob?.cancel()
             watchdog?.cancel()
             countdownJob?.cancel()
             player.removeListener(listener)
@@ -520,6 +736,8 @@ class PlayerViewModel
             const val SAVE_EVERY_MS = 15_000L
             const val NOTICE_MS = 7_000L
             const val NEXT_COUNTDOWN_S = 10
+            const val MAX_ADDON_SUBTITLES = 80
+            const val MAX_OFFSET_MS = 600_000L
 
             fun episodeLabel(episode: MergedEpisode): String {
                 val code =
