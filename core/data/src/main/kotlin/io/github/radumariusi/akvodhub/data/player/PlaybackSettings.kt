@@ -32,6 +32,9 @@ data class PlaybackPrefs(
     /** Mărimea subtitrărilor, în procente (100 = normal). */
     val subtitleScale: Int = 100,
     val subtitleStyle: SubtitleStyle = SubtitleStyle.WHITE_OUTLINE,
+    val contentLanguages: String = "",
+    val hiddenLanguages: String = "",
+    val hiddenCategories: String = "",
     val preferOriginalLanguage: Boolean = false,
     val matchFrameRate: Boolean = false,
     val audioPassthrough: Boolean = false,
@@ -65,6 +68,7 @@ class PlaybackSettings(
     fun preferredLanguages(originalLanguage: String? = null): List<String> =
         (
             listOfNotNull(OriginalLanguage.code(originalLanguage).takeIf { state.value.preferOriginalLanguage }) +
+                io.github.radumariusi.akvodhub.parser.catalog.ContentVisibility.tokens(state.value.contentLanguages) +
                 state.value.profile.languages + listOfNotNull(systemLanguage) + "en"
         ).filter { it.length == 2 }
             .distinct()
@@ -99,6 +103,13 @@ class PlaybackSettings(
         ) {
             prefs.edit().putString(name, endMs.toString()).apply()
         }
+    }
+
+    fun setContent(key: String, value: String) {
+        if (key !in CONTENT_KEYS) return
+        val clean = io.github.radumariusi.akvodhub.parser.catalog.ContentVisibility.tokens(value).joinToString(",")
+        prefs.edit().putString(key, clean).apply()
+        mutableState.value = read()
     }
 
     fun setBufferPreset(value: BufferPreset) {
@@ -181,6 +192,7 @@ class PlaybackSettings(
                     put(key, value)
                 }
             }
+            CONTENT_KEYS.forEach { key -> prefs.getString(key, null)?.let { put(key, it) } }
             put(BUFFER, state.value.bufferPreset.name)
             put(NIGHT, state.value.nightMode.toString())
             put(PASSTHROUGH, state.value.audioPassthrough.toString())
@@ -198,6 +210,7 @@ class PlaybackSettings(
 
     /** Restaurare din backup: doar cheile cunoscute, cu valori verificate la citire. */
     fun restore(values: Map<String, String>) {
+        CONTENT_KEYS.forEach { key -> values[key]?.let { setContent(key, it) } }
         val edit = prefs.edit()
         values[BUFFER]?.let { edit.putString(BUFFER, BufferPreset.decode(it).name) }
         values.forEach { (key, value) ->
@@ -252,6 +265,9 @@ class PlaybackSettings(
                 }
             }
         return PlaybackPrefs(
+            contentLanguages = prefs.getString("content_languages", "").orEmpty(),
+            hiddenLanguages = prefs.getString("hidden_languages", "").orEmpty(),
+            hiddenCategories = prefs.getString("hidden_categories", "").orEmpty(),
             bufferPreset = BufferPreset.decode(prefs.getString(BUFFER, null)),
             nightMode = prefs.getBoolean(NIGHT, false),
             audioPassthrough = prefs.getBoolean(PASSTHROUGH, false),
@@ -271,6 +287,7 @@ class PlaybackSettings(
     }
 
     companion object {
+        private val CONTENT_KEYS = listOf("content_languages", "hidden_languages", "hidden_categories")
         private const val BUFFER = "buffer_preset"
         private const val NIGHT = "night_mode"
         private const val PASSTHROUGH = "audio_passthrough"

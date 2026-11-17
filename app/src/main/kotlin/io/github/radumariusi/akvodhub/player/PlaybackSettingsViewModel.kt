@@ -105,6 +105,11 @@ class PlaybackSettingsViewModel
             settings.setSubtitleLanguages(list.distinct())
         }
 
+        fun setContent(key: String, value: String) {
+            settings.setContent(key, value)
+            viewModelScope.launch { repository.prepare() }
+        }
+
         fun setPosterSize(size: PosterSize) = settings.setPosterSize(size)
 
         fun setAccentColor(color: AccentColor) = settings.setAccentColor(color)
