@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-18 — Corecții UI și player TV
+- Spațiu de focus, contrast, titluri și distribuție centrate, un singur indicator de filă.
+- Comenzi compacte, un singur play/pauză la OK pe bară, subtitrări interne și externe și meniuri întunecate.
+- Calitatea și limba necunoscute au etichete distincte. Limbile declarate se completează în fundal, cu Room v14.
+
 ## 2026-11-17 — Etapa 13
 - Setări în două panouri, opt categorii, telecomandă și touch; valori curente și explicații în română.
 - Preferințe noi funcționale cu backup, statistici SQL în fundal și golire cache imagini. Room v14 neschimbat.

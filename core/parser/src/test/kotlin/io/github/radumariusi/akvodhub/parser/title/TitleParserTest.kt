@@ -8,7 +8,7 @@ import org.junit.Test
 class TitleParserTest {
     @Test
     fun readsDeclaredAudioSeparatelyFromSubtitlesAndQuality() {
-        for (label in listOf("EN 5.1", "ENG 5.1", "[ENG 5.1]")) {
+        for (label in listOf("EN 5.1", "ENG 5.1", "[eng 5.1]", "EN 5.1 MULTI-SUB")) {
             val source = TitleParser.parse("Insula de sticlă $label")
             assertEquals("Insula de sticlă", source.title)
             assertEquals(listOf("en"), source.languages)

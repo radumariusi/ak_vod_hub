@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalTvMaterial3Api::class)
+@file:OptIn(ExperimentalTvMaterial3Api::class, ExperimentalLayoutApi::class)
 
 package io.github.radumariusi.akvodhub.ui.player
 
@@ -6,7 +6,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -28,6 +29,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
@@ -62,7 +64,7 @@ fun ExternalSubtitles(
     offsetMs: Long,
     scale: Int,
     style: SubtitleStyle,
-    raised: Boolean,
+    controlsHeight: Dp,
     modifier: Modifier,
 ) {
     var text by remember { mutableStateOf("") }
@@ -83,7 +85,10 @@ fun ExternalSubtitles(
         )
     Box(
         modifier
-            .padding(start = 80.dp, end = 80.dp, bottom = if (raised) 250.dp else 48.dp),
+            .padding(
+                horizontal = 24.dp,
+                vertical = 8.dp,
+            ).padding(bottom = if (controlsHeight > 0.dp) controlsHeight else 32.dp),
         contentAlignment = Alignment.BottomCenter,
     ) {
         if (style == SubtitleStyle.WHITE_BOX) {
@@ -129,7 +134,10 @@ fun SubtitleAdjustPanel(
                 "Sincronizare: ${formatOffset(state.subtitleOffsetMs)}",
                 style = MaterialTheme.typography.titleMedium,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 OutlinedButton(
                     onClick = { viewModel.adjustSubtitleOffset(-1_000) },
                     modifier = Modifier.focusRequester(focus),
@@ -152,20 +160,38 @@ fun SubtitleAdjustPanel(
             )
         }
         Text("Mărime: $scale%", style = MaterialTheme.typography.titleMedium)
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             val smaller = PlaybackSettings.SCALES.lastOrNull { it < scale }
             val bigger = PlaybackSettings.SCALES.firstOrNull { it > scale }
             OutlinedButton(
                 onClick = { smaller?.let(viewModel::setSubtitleScale) },
                 enabled = smaller != null,
-                modifier = if (state.externalSubtitle == null) Modifier.focusRequester(focus) else Modifier,
+                modifier =
+                    if (state.externalSubtitle == null &&
+                        smaller != null
+                    ) {
+                        Modifier.focusRequester(focus)
+                    } else {
+                        Modifier
+                    },
             ) { Text("A−") }
-            OutlinedButton(onClick = { bigger?.let(viewModel::setSubtitleScale) }, enabled = bigger != null) {
+            OutlinedButton(
+                onClick = { bigger?.let(viewModel::setSubtitleScale) },
+                enabled = bigger != null,
+                modifier =
+                    if (state.externalSubtitle == null && smaller == null) Modifier.focusRequester(focus) else Modifier,
+            ) {
                 Text("A+")
             }
         }
         Text("Stil", style = MaterialTheme.typography.titleMedium)
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             SubtitleStyle.entries.forEach { s ->
                 if (s == style) {
                     Button(onClick = {}) { Text(s.label) }
@@ -185,8 +211,15 @@ object SubtitleLook {
         view: PlayerView,
         scale: Int,
         style: SubtitleStyle,
+        controlsHeight: Int,
     ) {
         val subtitles = view.subtitleView ?: return
+        if (controlsHeight > 0 && subtitles.height > controlsHeight) {
+            val fraction = controlsHeight.toFloat() / subtitles.height
+            subtitles.setBottomPaddingFraction((fraction + 0.02f).coerceIn(0.08f, 0.8f))
+        } else {
+            subtitles.setBottomPaddingFraction(0.08f)
+        }
         subtitles.setApplyEmbeddedStyles(false)
         subtitles.setApplyEmbeddedFontSizes(false)
         subtitles.setFractionalTextSize(SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * scale / 100f)

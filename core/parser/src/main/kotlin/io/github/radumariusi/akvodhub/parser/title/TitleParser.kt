@@ -82,7 +82,7 @@ object TitleParser {
     private val extension =
         Regex("""(?i)\.(mkv|mp4|avi|m4v|mov|wmv|mpg|mpeg|flv|webm|divx|ts|m3u8)$""")
     private val codecDot = Regex("""(?i)\b([hx])\.(26[45])\b""")
-    private val multiSubtitle = Regex("""(?i)\bMULTI[-. ]SUBS?\b""")
+    private val multiSubtitle = Regex("""(?i)\bMULTI[-.]SUBS?\b""")
     private val declaredAudioChannels = Regex("""(?i)\b(EN|ENG)([ .-]+)5\.1\b""")
     private val audioDot = Regex("""\b(\d)\.(\d)\b""")
     private val spaces = Regex("""\s+""")
@@ -100,7 +100,7 @@ object TitleParser {
         var s = extension.replace(sb.toString().trim(), "")
         s = codecDot.replace(s, "$1$2")
         s = multiSubtitle.replace(s, "MULTISUB")
-        s = declaredAudioChannels.replace(s, "$1$2AUDIO51")
+        s = declaredAudioChannels.replace(s) { "${it.groupValues[1].uppercase()}${it.groupValues[2]}AUDIO51" }
         s = audioDot.replace(s, "$1 $2")
         // Nume „scene” (The.Matrix.1999.1080p): punctele sunt separatori.
         if (' ' !in s && s.count { it == '.' } >= 2) s = s.replace('.', ' ')
@@ -402,7 +402,18 @@ object TitleParser {
             tokens(rest).filter { t -> consumed.none { t.start >= it.first && t.end - 1 <= it.last } }
         val firstWordStart = words.firstOrNull()?.start ?: 0
         val strongAnchor =
-            words.firstOrNull { it.start > firstWordStart && isStrong(it.text) }?.start ?: Int.MAX_VALUE
+            words.indices
+                .firstOrNull { index ->
+                    val token = words[index]
+                    token.start > firstWordStart &&
+                        (
+                            isStrong(token.text) ||
+                                (
+                                    (token.text == "EN" || token.text == "ENG") &&
+                                        words.getOrNull(index + 1)?.text == "AUDIO51"
+                                )
+                        )
+                }?.let { words[it].start } ?: Int.MAX_VALUE
         var anchor = minOf(strongAnchor, bracketAnchor, se?.start ?: Int.MAX_VALUE)
 
         // Anul: preferăm unul din paranteză; altfel ultimul an liber dinaintea ancorei (nu primul cuvânt).

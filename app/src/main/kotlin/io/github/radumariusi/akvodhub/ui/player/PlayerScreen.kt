@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalTvMaterial3Api::class)
+@file:OptIn(ExperimentalTvMaterial3Api::class, ExperimentalLayoutApi::class)
 
 package io.github.radumariusi.akvodhub.ui.player
 
@@ -12,6 +12,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,6 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -47,6 +50,8 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -95,17 +100,25 @@ fun PlayerScreen(
     val prefs by viewModel.prefs.collectAsState()
     val document by viewModel.externalDocument.collectAsState()
     var isPlaying by remember { mutableStateOf(player.isPlaying) }
+    var playWhenReady by remember { mutableStateOf(player.playWhenReady) }
     var position by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(0L) }
     val rootFocus = remember { FocusRequester() }
     val playFocus = remember { FocusRequester() }
     var openingKey by remember { mutableStateOf<Key?>(null) }
+    var controlsHeight by remember { mutableIntStateOf(0) }
+    val adjustFocus = remember { FocusRequester() }
+    var returnToAdjust by remember { mutableStateOf(false) }
 
     DisposableEffect(player) {
         val listener =
             object : Player.Listener {
                 override fun onIsPlayingChanged(playing: Boolean) {
                     isPlaying = playing
+                }
+
+                override fun onPlayWhenReadyChanged(ready: Boolean, reason: Int) {
+                    playWhenReady = ready
                 }
             }
         player.addListener(listener)
@@ -127,18 +140,37 @@ fun PlayerScreen(
     LaunchedEffect(state.finished) { if (state.finished) onExit() }
     val overlay = state.error != null || state.countdown != null || adjusting
     LaunchedEffect(controls, overlay) {
-        if (!overlay) runCatching { if (controls) playFocus.requestFocus() else rootFocus.requestFocus() }
+        if (!overlay) {
+            runCatching {
+                when {
+                    !controls -> {
+                        rootFocus.requestFocus()
+                    }
+
+                    returnToAdjust && (state.externalSubtitle != null || state.subtitles.any { it.selected }) -> {
+                        adjustFocus.requestFocus()
+                    }
+
+                    else -> {
+                        playFocus.requestFocus()
+                    }
+                }
+            }
+            returnToAdjust = false
+        }
     }
 
     BackHandler {
         when {
             adjusting -> adjusting = false
-            controls -> controls = false
+            state.error != null -> onExit()
             state.countdown != null -> viewModel.cancelCountdown()
+            controls -> controls = false
             else -> onExit()
         }
     }
 
+    val subtitleClearance = if (controls && !overlay) controlsHeight else 0
     Box(
         Modifier
             .fillMaxSize()
@@ -218,7 +250,7 @@ fun PlayerScreen(
                 }
             },
             update = { view ->
-                SubtitleLook.applyTo(view, prefs.subtitleScale, prefs.subtitleStyle)
+                SubtitleLook.applyTo(view, prefs.subtitleScale, prefs.subtitleStyle, subtitleClearance)
                 view.resizeMode =
                     when (state.pictureMode) {
                         1 -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
@@ -248,7 +280,7 @@ fun PlayerScreen(
                 offsetMs = state.subtitleOffsetMs,
                 scale = prefs.subtitleScale,
                 style = prefs.subtitleStyle,
-                raised = controls && !overlay,
+                controlsHeight = with(LocalDensity.current) { subtitleClearance.toDp() },
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
         }
@@ -284,17 +316,21 @@ fun PlayerScreen(
         if (controls && !overlay) {
             Controls(
                 state = state,
-                isPlaying = isPlaying,
+                isPlaying = playWhenReady && player.playbackState != Player.STATE_ENDED,
                 position = position,
                 duration = duration,
                 playFocus = playFocus,
+                adjustFocus = adjustFocus,
                 viewModel = viewModel,
                 onInput = { lastInput++ },
                 onChoice = { choice = it },
-                onAdjust = { adjusting = true },
+                onAdjust = {
+                    returnToAdjust = true
+                    adjusting = true
+                },
                 onJump = { jumping = true },
                 onTechnical = { technical = true },
-                modifier = Modifier.align(Alignment.BottomStart),
+                modifier = Modifier.align(Alignment.BottomStart).onSizeChanged { controlsHeight = it.height },
             )
         }
 
@@ -328,6 +364,7 @@ private fun Controls(
     position: Long,
     duration: Long,
     playFocus: FocusRequester,
+    adjustFocus: FocusRequester,
     viewModel: PlayerViewModel,
     onInput: () -> Unit,
     onChoice: (Choice) -> Unit,
@@ -338,6 +375,7 @@ private fun Controls(
 ) {
     val playbackPrefs by viewModel.prefs.collectAsState()
     var focusedCommand by remember { mutableStateOf("") }
+    var seekFocused by remember { mutableStateOf(false) }
     val onCommandFocus: (String) -> Unit = { focusedCommand = it }
     Column(
         modifier =
@@ -372,7 +410,7 @@ private fun Controls(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        SeekBar(position, duration, onTogglePlay = viewModel::togglePlay) {
+        SeekBar(position, duration, onTogglePlay = viewModel::togglePlay, onFocus = { seekFocused = it }) {
             viewModel.seekBy(it)
             onInput()
         }
@@ -406,12 +444,30 @@ private fun Controls(
                 }
             }
             val subtitleCount = state.subtitles.size + state.addonSubtitles.size
-            PlayerCommand(R.drawable.ic_player_subtitles, if (subtitleCount == 0) "Subtitrări" else "Subtitrări ($subtitleCount)", onCommandFocus) { onChoice(subtitleChoice(state, viewModel)) }
+            PlayerCommand(
+                R.drawable.ic_player_subtitles,
+                if (subtitleCount ==
+                    0
+                ) {
+                    "Subtitrări"
+                } else {
+                    "Subtitrări ($subtitleCount)"
+                },
+                onCommandFocus,
+            ) { onChoice(subtitleChoice(state, viewModel)) }
             if (state.externalSubtitle != null || state.subtitles.any { it.selected }) {
-                PlayerCommand(R.drawable.ic_player_adjust, "Ajustează subtitrările", onCommandFocus, onClick = onAdjust)
+                PlayerCommand(
+                    R.drawable.ic_player_adjust,
+                    "Ajustează subtitrările",
+                    onCommandFocus,
+                    modifier = Modifier.focusRequester(adjustFocus),
+                    onClick = onAdjust,
+                )
             }
             if (state.sources.size > 1) {
-                PlayerCommand(R.drawable.ic_player_source, "Sursă (${state.sources.size})", onCommandFocus) { onChoice(sourceChoice(state, viewModel)) }
+                PlayerCommand(R.drawable.ic_player_source, "Sursă (${state.sources.size})", onCommandFocus) {
+                    onChoice(sourceChoice(state, viewModel))
+                }
             }
             PlayerCommand(R.drawable.ic_player_screen, "Frecvență ecran", onCommandFocus) {
                 onChoice(
@@ -497,9 +553,19 @@ private fun Controls(
             PlayerCommand(R.drawable.ic_player_info, "Info tehnic", onCommandFocus, onClick = onTechnical)
             PlayerCommand(R.drawable.ic_player_timer, "Salt la minut", onCommandFocus, onClick = onJump)
             if (state.isSeries) {
-                PlayerCommand(R.drawable.ic_player_reset, "Resetează audio/subtitrare serial", onCommandFocus, onClick = viewModel::resetSeriesTracks)
+                PlayerCommand(
+                    R.drawable.ic_player_reset,
+                    "Resetează audio/subtitrare serial",
+                    onCommandFocus,
+                    onClick = viewModel::resetSeriesTracks,
+                )
                 if (SeriesPlayback.canSkip(position, duration, state.introEndMs)) {
-                    PlayerCommand(R.drawable.ic_player_next, "Sari intro", onCommandFocus, onClick = viewModel::skipIntro)
+                    PlayerCommand(
+                        R.drawable.ic_player_next,
+                        "Sari intro",
+                        onCommandFocus,
+                        onClick = viewModel::skipIntro,
+                    )
                 }
                 PlayerCommand(R.drawable.ic_player_bookmark, "Marcaj intro serial", onCommandFocus) {
                     onChoice(
@@ -514,11 +580,16 @@ private fun Controls(
                 }
             }
             if (state.next != null) {
-                PlayerCommand(R.drawable.ic_player_next, "Episodul următor", onCommandFocus, onClick = viewModel::playNext)
+                PlayerCommand(
+                    R.drawable.ic_player_next,
+                    "Episodul următor",
+                    onCommandFocus,
+                    onClick = viewModel::playNext,
+                )
             }
         }
         Text(
-            focusedCommand,
+            if (seekFocused) "OK redă sau pune pauză · Stânga/Dreapta derulează" else focusedCommand,
             style = MaterialTheme.typography.labelMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -551,6 +622,7 @@ private fun SeekBar(
     position: Long,
     duration: Long,
     onTogglePlay: () -> Unit,
+    onFocus: (Boolean) -> Unit,
     onSeek: (Long) -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
@@ -583,9 +655,11 @@ private fun SeekBar(
                 }
                 // Zonă de atingere mai înaltă decât bara desenată.
                 .padding(vertical = 12.dp)
-                .height(if (focused) 10.dp else 6.dp)
-                .onFocusChanged { focused = it.isFocused }
-                .onKeyEvent { e ->
+                .height(10.dp)
+                .onFocusChanged {
+                    focused = it.isFocused
+                    onFocus(focused)
+                }.onKeyEvent { e ->
                     val down = e.type == KeyEventType.KeyDown
                     when {
                         e.key.isPlayerOk() -> {
@@ -596,7 +670,10 @@ private fun SeekBar(
                         e.key == Key.DirectionLeft || e.key == Key.DirectionRight -> {
                             if (down) {
                                 val direction = if (e.key == Key.DirectionRight) 1 else -1
-                                onSeek(SeekNavigation.increment(e.nativeKeyEvent.eventTime - e.nativeKeyEvent.downTime) * direction)
+                                onSeek(
+                                    SeekNavigation.increment(e.nativeKeyEvent.eventTime - e.nativeKeyEvent.downTime) *
+                                        direction,
+                                )
                             }
                             true
                         }
@@ -608,6 +685,7 @@ private fun SeekBar(
                 }.focusable()
                 .background(Color.White.copy(alpha = 0.25f), MaterialTheme.shapes.small)
                 .then(if (focused) Modifier.border(1.dp, Color.White, MaterialTheme.shapes.small) else Modifier),
+            contentAlignment = Alignment.CenterStart,
         ) {
             Box(
                 Modifier
@@ -634,7 +712,7 @@ private fun ErrorPanel(
 ) {
     val focus = remember { FocusRequester() }
     LaunchedEffect(state.error) { runCatching { focus.requestFocus() } }
-    ThemedPanel(modifier.padding(20.dp).widthIn(max = 820.dp)) {
+    ThemedPanel(modifier.padding(20.dp).widthIn(max = 820.dp).verticalScroll(rememberScrollState())) {
         Text(state.error.orEmpty(), style = MaterialTheme.typography.headlineSmall)
         state.failures.take(MAX_FAILURES_SHOWN).forEach {
             Text(
@@ -652,7 +730,11 @@ private fun ErrorPanel(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        FlowRow(
+            Modifier.padding(top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             if (state.sources.isNotEmpty()) {
                 Button(onClick = viewModel::retry, modifier = Modifier.focusRequester(focus)) {
                     Text("Încearcă din nou")
@@ -684,7 +766,10 @@ private fun NextPanel(
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             Button(onClick = viewModel::playNext, modifier = Modifier.focusRequester(focus)) { Text("Redă acum") }
             OutlinedButton(onClick = viewModel::cancelCountdown) { Text("Anulează") }
         }
@@ -715,9 +800,17 @@ private fun subtitleChoice(
                     ?.let { addonStart + it }
             }
 
-            embedded.any { it.selected } -> embeddedStart + embedded.indexOfFirst { it.selected }
-            state.subtitlesOff -> 0
-            else -> 1
+            embedded.any { it.selected } -> {
+                embeddedStart + embedded.indexOfFirst { it.selected }
+            }
+
+            state.subtitlesOff -> {
+                0
+            }
+
+            else -> {
+                1
+            }
         }
     return Choice("Subtitrări", options, selected, headings, footer = state.addonStatus) { i ->
         when {

@@ -36,7 +36,13 @@ fun TechnicalInfoDialog(viewModel: PlayerViewModel, onClose: () -> Unit) {
             Text("Info tehnic", style = MaterialTheme.typography.titleLarge)
             Text(
                 info,
-                modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(vertical = 4.dp),
+                modifier =
+                    Modifier
+                        .weight(
+                            1f,
+                            fill = false,
+                        ).verticalScroll(rememberScrollState())
+                        .padding(vertical = 4.dp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Button(onClick = onClose) { Text("Închide") }

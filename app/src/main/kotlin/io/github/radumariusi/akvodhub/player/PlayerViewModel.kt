@@ -645,7 +645,13 @@ class PlayerViewModel
                         val document = subtitleRepository.load(subtitle)
                         mutableDocument.value = document
                         TrackOptions.disableSubtitles(player)
-                        mutableState.update { it.copy(externalSubtitle = subtitle.url, externalLabel = label, subtitlesOff = false) }
+                        mutableState.update {
+                            it.copy(
+                                externalSubtitle = subtitle.url,
+                                externalLabel = label,
+                                subtitlesOff = false,
+                            )
+                        }
                         showNotice("Subtitrare: ${label ?: subtitle.addon}")
                     } catch (e: CancellationException) {
                         throw e

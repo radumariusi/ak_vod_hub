@@ -33,7 +33,10 @@ class SourceGroupingTest {
         assertEquals(listOf(VideoQuality.UHD, VideoQuality.FHD, VideoQuality.SD, null), groups.map { it.quality })
         // EN are 2 surse, deci înaintea DE.
         assertEquals(listOf("en", "de"), groups[0].languages.map { it.language })
-        assertEquals("4K: EN, DE · 1080p: ES, FR, IT, +2 · SD: RO · Calitate necunoscută: Limbă audio necunoscută", SourceGrouping.summary(groups))
+        assertEquals(
+            "4K: EN, DE · 1080p: ES, FR, IT, +2 · SD: RO · Calitate necunoscută: Limbă audio necunoscută",
+            SourceGrouping.summary(groups),
+        )
     }
 
     @Test

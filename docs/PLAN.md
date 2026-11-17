@@ -187,6 +187,10 @@ Documentele astea, `.gitignore`, workflow de curățenie automată, reguli de lu
 - Preferințe existente păstrate, opțiuni noi incluse în backup; statistici SQL în fundal, cache imagini golit la cerere.
 - Room v14, fără migrare sau biblioteci noi. Verificarea pe Android 11 TV rămâne de efectuat.
 
+## Corecții UI și player TV
+
+Vezi [planul separat al corecțiilor și verificarea pe Android 11 TV](CORECTII_TV.md).
+
 ## Idei suplimentare
 
 1. **Verificare sănătate surse**: test rapid în fundal al linkurilor; sursele moarte sunt marcate și puse la final.

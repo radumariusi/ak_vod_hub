@@ -1,10 +1,11 @@
-@file:OptIn(androidx.tv.material3.ExperimentalTvMaterial3Api::class)
+@file:OptIn(androidx.tv.material3.ExperimentalTvMaterial3Api::class, ExperimentalLayoutApi::class)
 
 package io.github.radumariusi.akvodhub.ui.player
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -31,22 +32,39 @@ import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
 @Composable
 fun JumpToMinuteDialog(viewModel: PlayerViewModel, onClose: () -> Unit) {
     var minute by remember { mutableStateOf("") }
+    var invalid by remember { mutableStateOf(false) }
     Dialog(onDismissRequest = onClose) {
         ThemedPanel(Modifier.width(520.dp)) {
             val colors = MaterialTheme.colorScheme
             Text("Salt la minut (de la început)", style = MaterialTheme.typography.titleLarge)
             BasicTextField(
                 value = minute,
-                onValueChange = { minute = it.filter { c -> c in '0'..'9' }.take(8) },
+                onValueChange = {
+                    minute = it.filter { c -> c in '0'..'9' }.take(8)
+                    invalid = false
+                },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 textStyle = TextStyle(color = colors.onSurfaceVariant),
                 cursorBrush = SolidColor(colors.onSurfaceVariant),
                 singleLine = true,
                 modifier =
-                    Modifier.fillMaxWidth().background(colors.surfaceVariant, MaterialTheme.shapes.small).padding(16.dp),
+                    Modifier
+                        .fillMaxWidth()
+                        .background(
+                            colors.surfaceVariant,
+                            MaterialTheme.shapes.small,
+                        ).padding(16.dp),
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(onClick = { if (viewModel.jumpToMinute(minute)) onClose() }) { Text("Mergi") }
+            if (invalid) {
+                Text("Introdu un minut din durata filmului. Sursa trebuie să permită derularea.", color = colors.error)
+            }
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Button(onClick = {
+                    if (viewModel.jumpToMinute(minute)) onClose() else invalid = true
+                }) { Text("Mergi") }
                 OutlinedButton(onClick = onClose) { Text("Anulează") }
             }
         }

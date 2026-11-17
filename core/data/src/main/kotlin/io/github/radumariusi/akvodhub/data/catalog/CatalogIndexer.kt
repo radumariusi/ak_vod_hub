@@ -118,7 +118,11 @@ class CatalogIndexer(
                             batch.lastOrNull()?.id ?: -1L
                         }
                     // Cursorul poate rămâne în urmă la întrerupere. Repetarea lotului este idempotentă.
-                    prefs.edit().putLong(key, lastId).remove(FINGERPRINT).apply()
+                    prefs
+                        .edit()
+                        .putLong(key, lastId)
+                        .remove(FINGERPRINT)
+                        .apply()
                     if (lastId < 0L) return@withContext true
                     after = lastId
                 }

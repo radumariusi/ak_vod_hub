@@ -4,8 +4,8 @@ package io.github.radumariusi.akvodhub.ui.hub
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -23,8 +23,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.ListItemDefaults
+import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import io.github.radumariusi.akvodhub.ui.theme.ThemedPanel
 import io.github.radumariusi.akvodhub.ui.touch.ListItem
@@ -59,47 +59,47 @@ fun ChoiceDialog(
                     pressedSelectedContainerColor = colors.secondary,
                     pressedSelectedContentColor = colors.onSecondary,
                 )
-                Text(choice.title, style = MaterialTheme.typography.headlineSmall)
-                LazyColumn(
-                    state = rememberLazyListState(initialFirstVisibleItemIndex = initial),
-                    modifier = Modifier.heightIn(max = 400.dp).weight(1f, fill = false),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    itemsIndexed(choice.options) { index, label ->
-                        Column {
-                            choice.headings[index]?.let { labelHeading ->
-                                Text(
-                                    labelHeading,
-                                    modifier = Modifier.fillMaxWidth().semantics { heading() }.padding(12.dp),
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            ListItem(
-                                selected = index == choice.selected,
-                                colors = itemColors,
-                                scale = ListItemDefaults.scale(focusedScale = 1f),
-                                onClick = {
-                                    choice.onPick(index)
-                                    onDismiss()
-                                },
-                                headlineContent = { Text(label) },
-                                modifier = if (index == initial) Modifier.focusRequester(focus) else Modifier,
-                            )
-                        }
-                    }
-                    choice.footer?.let { message ->
-                        item {
+            Text(choice.title, style = MaterialTheme.typography.headlineSmall)
+            LazyColumn(
+                state = rememberLazyListState(initialFirstVisibleItemIndex = initial),
+                modifier = Modifier.heightIn(max = 400.dp).weight(1f, fill = false),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                itemsIndexed(choice.options) { index, label ->
+                    Column {
+                        choice.headings[index]?.let { labelHeading ->
                             Text(
-                                message,
-                                modifier = Modifier.padding(12.dp),
-                                style = MaterialTheme.typography.bodySmall,
+                                labelHeading,
+                                modifier = Modifier.fillMaxWidth().semantics { heading() }.padding(12.dp),
+                                style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
+                        ListItem(
+                            selected = index == choice.selected,
+                            colors = itemColors,
+                            scale = ListItemDefaults.scale(focusedScale = 1f),
+                            onClick = {
+                                choice.onPick(index)
+                                onDismiss()
+                            },
+                            headlineContent = { Text(label) },
+                            modifier = if (index == initial) Modifier.focusRequester(focus) else Modifier,
+                        )
                     }
                 }
+                choice.footer?.let { message ->
+                    item {
+                        Text(
+                            message,
+                            modifier = Modifier.padding(12.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
         }
     }
 }
