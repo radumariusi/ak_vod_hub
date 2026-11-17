@@ -65,6 +65,28 @@ fun PlaybackSection(viewModel: PlaybackSettingsViewModel) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        OutlinedButton(onClick = { viewModel.setMatchFrameRate(!prefs.matchFrameRate) }) {
+            Text("Potrivește frecvența ecranului: " + if (prefs.matchFrameRate) "da" else "nu")
+        }
+        Text("Păstrează rezoluția; unele TV-uri clipesc la schimbarea frecvenței.")
+        OutlinedButton(onClick = {
+            val options = io.github.radumariusi.akvodhub.parser.player.BufferPreset.entries
+            choice = Choice("Buffer", options.map { it.label }, options.indexOf(prefs.bufferPreset)) {
+                viewModel.setBufferPreset(options[it])
+            }
+        }) { Text("Buffer: ${prefs.bufferPreset.label}") }
+        Text("Bufferul se aplică la redeschiderea playerului; mare folosește mai multă memorie.")
+        OutlinedButton(onClick = {
+            val options = io.github.radumariusi.akvodhub.parser.player.PlaybackDefaults.speeds
+            choice = Choice("Viteză implicită", options.map { "$it×" }, options.indexOf(prefs.defaultSpeed)) {
+                viewModel.setDefaultSpeed(options[it])
+            }
+        }) { Text("Viteză implicită: ${prefs.defaultSpeed}×") }
+        Text("La deschiderea playerului. Viteza din player rămâne valabilă pentru sesiunea curentă.")
+        OutlinedButton(onClick = { viewModel.setAutoNext(!prefs.autoNext) }) {
+            Text("Episodul următor automat: " + if (prefs.autoNext) "da" else "nu")
+        }
+        Text("Pornește după numărătoarea de zece secunde; timerul de somn are prioritate.")
         rules.forEachIndexed { index, rule ->
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(if (index == 0) "Prima:" else "Altfel:", style = MaterialTheme.typography.bodyLarge)

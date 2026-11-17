@@ -1,9 +1,9 @@
 package io.github.radumariusi.akvodhub.parser
 
 import io.github.radumariusi.akvodhub.parser.catalog.ContentVisibility
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
+import org.junit.Test
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 
 class ContentVisibilityTest {
     @Test fun boundParametersAndEmptyFilter() {

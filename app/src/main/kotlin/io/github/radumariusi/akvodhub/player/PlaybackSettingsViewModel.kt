@@ -110,6 +110,11 @@ class PlaybackSettingsViewModel
             viewModelScope.launch { repository.prepare() }
         }
 
+        fun setDefaultSpeed(value: Float) = settings.setDefaultSpeed(value)
+        fun setAutoNext(value: Boolean) = settings.setAutoNext(value)
+        fun setMatchFrameRate(value: Boolean) = settings.setMatchFrameRate(value)
+        fun setBufferPreset(value: io.github.radumariusi.akvodhub.parser.player.BufferPreset) = settings.setBufferPreset(value)
+
         fun setHomeHero(enabled: Boolean) = settings.setHomeHero(enabled)
 
         fun setPosterSize(size: PosterSize) = settings.setPosterSize(size)

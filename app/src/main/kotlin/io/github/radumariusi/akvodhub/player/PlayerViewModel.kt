@@ -146,7 +146,8 @@ class PlayerViewModel
         /** Subtitrarea din addon afișată peste video (null = folosim pistele sursei). */
         val externalDocument: StateFlow<SubtitleDocument?> = mutableDocument.asStateFlow()
 
-        private val mutableState = MutableStateFlow(PlayerUiState())
+        private val mutableState = MutableStateFlow(PlayerUiState(speed = settings.state.value.defaultSpeed))
+        init { player.setPlaybackSpeed(settings.state.value.defaultSpeed) }
         val state: StateFlow<PlayerUiState> = mutableState.asStateFlow()
 
         /** Scrierile progresului nu se anulează când se închide ecranul. */
@@ -404,7 +405,7 @@ class PlayerViewModel
             val next = q.fail(reason)
             generation++
             player.stop()
-            if (next == null) {
+            if (next == null || !settings.state.value.autoNext) {
                 mutableState.update {
                     it.copy(
                         loading = false,
@@ -866,7 +867,7 @@ class PlayerViewModel
             save()
             val current = episode
             val next = current?.let { EpisodeOrder.next(seasons, it.season, it.number) }
-            if (next == null) {
+            if (next == null || !settings.state.value.autoNext) {
                 mutableState.update { it.copy(finished = true) }
                 return
             }
