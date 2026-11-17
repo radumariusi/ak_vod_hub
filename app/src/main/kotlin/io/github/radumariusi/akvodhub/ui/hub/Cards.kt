@@ -23,6 +23,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -32,6 +33,9 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.allowHardware
+import coil3.request.allowRgb565
 import io.github.radumariusi.akvodhub.data.db.TitleCard
 import io.github.radumariusi.akvodhub.data.tmdb.TmdbClient
 import io.github.radumariusi.akvodhub.parser.catalog.PosterBadge
@@ -71,6 +75,20 @@ object Images {
             path.startsWith("http://") || path.startsWith("https://") -> path
             else -> "${TmdbClient.IMAGE_BASE}$size$path"
         }
+}
+
+@Composable
+private fun posterModel(url: String): Any {
+    if (!url.startsWith(TmdbClient.IMAGE_BASE) || !url.endsWith(".jpg", ignoreCase = true)) return url
+    val context = LocalContext.current
+    return remember(context, url) {
+        ImageRequest
+            .Builder(context)
+            .data(url)
+            .allowHardware(false)
+            .allowRgb565(true)
+            .build()
+    }
 }
 
 fun qualityLabel(ordinal: Int?): String? =
@@ -130,7 +148,7 @@ fun PosterCard(
                     )
                 } else {
                     AsyncImage(
-                        model = poster,
+                        model = posterModel(poster),
                         contentDescription = card.name,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),

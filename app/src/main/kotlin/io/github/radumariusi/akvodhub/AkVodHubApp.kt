@@ -5,6 +5,7 @@ import androidx.work.Configuration
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
+import coil3.disk.DiskCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.crossfade
 import dagger.hilt.android.HiltAndroidApp
@@ -16,6 +17,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import okhttp3.OkHttpClient
+import okio.Path.Companion.toOkioPath
 import javax.inject.Inject
 
 @HiltAndroidApp
@@ -47,12 +49,18 @@ class AkVodHubApp :
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder().setWorkerFactory(workerFactory).build()
 
-    // Coil (postere, fundaluri): același client HTTP ca restul aplicației; cache în memorie și pe disc implicite.
+    // Coil (postere, fundaluri): același client HTTP ca restul aplicației; plafon pentru cache-ul de pe disc.
     // Fără crossfade: pe TV-uri slabe, derularea rapidă prin rânduri rămâne fluidă.
     override fun newImageLoader(context: PlatformContext): ImageLoader =
         ImageLoader
             .Builder(context)
             .components { add(OkHttpNetworkFetcherFactory(okHttpClient)) }
-            .crossfade(false)
+            .diskCache {
+                DiskCache
+                    .Builder()
+                    .directory(cacheDir.resolve("image_cache").toOkioPath())
+                    .maxSizeBytes(64L * 1024 * 1024)
+                    .build()
+            }.crossfade(false)
             .build()
 }
