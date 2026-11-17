@@ -3,7 +3,22 @@ set -euo pipefail
 
 package=io.github.radumariusi.akvodhub
 profiles=app/src/main/generated/baselineProfiles
-./gradlew --no-daemon :app:generateBaselineProfile
+if ! ./gradlew --no-daemon :app:generateBaselineProfile; then
+  python3 - <<'PYTHON'
+from pathlib import Path
+from xml.etree import ElementTree
+
+results = Path("baselineprofile/build/outputs/androidTest-results")
+for report in sorted(results.rglob("TEST-*.xml")):
+    for testcase in ElementTree.parse(report).iter("testcase"):
+        for kind in ("failure", "error"):
+            for issue in testcase.findall(kind):
+                print(f"{testcase.get('classname')}.{testcase.get('name')}: {issue.get('message', '')}")
+                print(issue.text or "")
+PYTHON
+  adb logcat -d -b crash -t 120 || true
+  exit 1
+fi
 test -s "$profiles/baseline-prof.txt"
 grep -Fq "Lio/github/radumariusi/akvodhub/MainActivity;" "$profiles/baseline-prof.txt"
 grep -Fq "/BrowseScreenKt;" "$profiles/baseline-prof.txt"
