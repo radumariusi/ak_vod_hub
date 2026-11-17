@@ -146,6 +146,10 @@ Documentele astea, `.gitignore`, workflow de curățenie automată, reguli de lu
 - ✅ 10.8: descrieri RO la cerere, cache 30 zile și fallback la engleza existentă (Room v12).
 - Etapa 10 completă; build și testare pe dispozitiv înainte de etapa 12.
 
+### Etapa 12: interfață
+
+- ✅ 12.1: hero existent extins cu debounce de 300 ms și backdrop TMDB de 780 px; gradient întunecat, fără blur.
+
 ## Idei suplimentare
 
 1. **Verificare sănătate surse**: test rapid în fundal al linkurilor; sursele moarte sunt marcate și puse la final.

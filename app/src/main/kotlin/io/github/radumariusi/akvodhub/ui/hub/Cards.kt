@@ -48,6 +48,8 @@ val PosterHeight = 168.dp
 object Images {
     fun poster(path: String?) = url(path, "w342")
 
+    fun hero(path: String?) = url(path, "w780")
+
     fun backdrop(path: String?) = url(path, "w1280")
 
     fun profile(path: String?) = url(path, "w185")
