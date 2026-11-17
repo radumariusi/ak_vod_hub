@@ -20,9 +20,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import io.github.radumariusi.akvodhub.data.player.PlaybackSettings
 import io.github.radumariusi.akvodhub.data.player.SubtitleStyle
@@ -31,6 +29,8 @@ import io.github.radumariusi.akvodhub.player.AddonAddState
 import io.github.radumariusi.akvodhub.player.PlaybackSettingsViewModel
 import io.github.radumariusi.akvodhub.ui.hub.Choice
 import io.github.radumariusi.akvodhub.ui.hub.ChoiceDialog
+import io.github.radumariusi.akvodhub.ui.touch.Button
+import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
 
 /**
  * Setări → Subtitrări: limbile preferate (ex. RO, apoi EN), pornirea automată din addon-uri, mărimea, stilul

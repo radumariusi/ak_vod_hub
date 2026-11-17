@@ -12,7 +12,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import io.github.radumariusi.akvodhub.parser.match.SourceGrouping
 import io.github.radumariusi.akvodhub.parser.player.SourceProfile
@@ -21,6 +20,7 @@ import io.github.radumariusi.akvodhub.parser.title.VideoQuality
 import io.github.radumariusi.akvodhub.player.PlaybackSettingsViewModel
 import io.github.radumariusi.akvodhub.ui.hub.Choice
 import io.github.radumariusi.akvodhub.ui.hub.ChoiceDialog
+import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
 import java.util.Locale
 
 /**

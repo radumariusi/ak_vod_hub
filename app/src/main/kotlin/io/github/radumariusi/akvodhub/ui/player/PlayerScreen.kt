@@ -50,10 +50,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.Player
 import androidx.media3.ui.PlayerView
-import androidx.tv.material3.Button
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import io.github.radumariusi.akvodhub.parser.player.Resume
 import io.github.radumariusi.akvodhub.player.PlayerFactory
@@ -61,6 +59,8 @@ import io.github.radumariusi.akvodhub.player.PlayerUiState
 import io.github.radumariusi.akvodhub.player.PlayerViewModel
 import io.github.radumariusi.akvodhub.ui.hub.Choice
 import io.github.radumariusi.akvodhub.ui.hub.ChoiceDialog
+import io.github.radumariusi.akvodhub.ui.touch.Button
+import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
 import kotlinx.coroutines.delay
 
 /**
@@ -183,14 +183,7 @@ fun PlayerScreen(
                     }
                 }
             }.focusRequester(rootFocus)
-            .focusable()
-            // Touch (telefon): o atingere pe imagine arată/ascunde comenzile.
-            .pointerInput(Unit) {
-                detectTapGestures {
-                    lastInput++
-                    controls = !controls
-                }
-            },
+            .focusable(),
     ) {
         AndroidView(
             factory = { context ->
@@ -205,6 +198,17 @@ fun PlayerScreen(
             update = { view -> SubtitleLook.applyTo(view, prefs.subtitleScale, prefs.subtitleStyle) },
             onRelease = { it.player = null },
             modifier = Modifier.fillMaxSize(),
+        )
+
+        // Touch (telefon): o atingere pe imagine arată/ascunde comenzile. Strat separat peste PlayerView,
+        // ca atingerile să nu se piardă în View-ul Android de dedesubt.
+        Box(
+            Modifier.matchParentSize().pointerInput(Unit) {
+                detectTapGestures {
+                    lastInput++
+                    controls = !controls
+                }
+            },
         )
 
         document?.let {

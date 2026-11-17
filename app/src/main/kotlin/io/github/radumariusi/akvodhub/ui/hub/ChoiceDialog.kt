@@ -19,11 +19,11 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.ListItem
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
+import io.github.radumariusi.akvodhub.ui.touch.ListItem
 
 /** O alegere dintr-o listă (filtru, sursă de redare), cu focusul pe opțiunea curentă. */
 data class Choice(

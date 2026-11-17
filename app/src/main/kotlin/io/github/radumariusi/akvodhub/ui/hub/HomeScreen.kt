@@ -38,7 +38,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.Button
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -48,6 +47,7 @@ import io.github.radumariusi.akvodhub.data.playlist.LibraryTotals
 import io.github.radumariusi.akvodhub.hub.HomeRow
 import io.github.radumariusi.akvodhub.hub.HomeViewModel
 import io.github.radumariusi.akvodhub.ui.formatCount
+import io.github.radumariusi.akvodhub.ui.touch.Button
 import kotlinx.coroutines.delay
 
 /**

@@ -25,11 +25,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import io.github.radumariusi.akvodhub.remote.PhoneSetupState
 import io.github.radumariusi.akvodhub.remote.PhoneSetupViewModel
+import io.github.radumariusi.akvodhub.ui.touch.Button
 import io.nayuki.qrcodegen.QrCode
 
 /**
