@@ -2,6 +2,10 @@
 
 Intrări noi sus. Una scurtă pentru fiecare PR (dată, etapă, ce s-a schimbat).
 
+## 2026-11-17: etapa 10 — livrare prin update TV
+- Release-ul și tagul v0.1.14 sunt protejate permanent; curățarea păstrează baza și cea mai nouă versiune.
+- Livrarea pentru TV folosește release-ul semnat și updaterul existent, la cererea lui Radu.
+
 ## 2026-11-17: etapa 10.8 — descrieri în română
 - Descriere TMDB ro-RO numai la deschiderea fișei, cu engleza existentă dacă traducerea lipsește; cache 30 zile și migrare Room 11→12.
 - Etapa 10 este implementată integral; fără descărcarea descrierilor RO pentru tot catalogul.

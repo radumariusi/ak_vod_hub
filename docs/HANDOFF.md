@@ -52,7 +52,7 @@ Fluxul de date: import playlist → `raw_entry` (titlu/an/calitate/limbi parsate
 | — | Hub-ul arată playlist-ul imediat după import (indexer înainte de TMDB) | #13, v0.1.14 |
 | — | Propuneri etapele 10–15 (`docs/PROPUNERI.md`) | #14 |
 
-Release-uri păstrate acum: **v0.1.14** (ultimul, testat) și v0.1.13.
+Bază protejată permanent: **v0.1.14 și tagul ei**. Politica de livrare păstrează baza și cea mai nouă altă versiune; vezi `docs/RELEASES.md`.
 
 ## 5. Capcane importante (citește înainte de cod)
 
@@ -67,8 +67,9 @@ Release-uri păstrate acum: **v0.1.14** (ultimul, testat) și v0.1.13.
 5. **Slim:** APK-ul are 7,5 MB. Nicio bibliotecă nouă dacă se poate scrie în câteva sute de linii; orice bibliotecă nouă se justifică în PR.
 6. **Semnare și release:** APK-ul e semnat cu secretul GitHub `AK_SIGNING_KEY` (cert SHA-256 începe cu `DD:DD:81:5F`).
    Pierderea sau schimbarea cheii = update-urile nu se mai instalează peste aplicația existentă. **Nu atinge** secretele,
-   `.github/workflows/*` sau configurarea de semnare din `app/build.gradle.kts`. Release-ul se pornește **doar manual de Radu**
-   (Actions → Release → Run workflow); workflow-ul păstrează doar ultimele 2 release-uri.
+   `.github/workflows/*` sau configurarea de semnare din `app/build.gradle.kts`. La cererea lui Radu (2026-11-17), agentul poate porni Release
+   după CI verde pentru update direct în aplicația TV. Workflow-ul păstrează permanent **v0.1.14 și tagul ei**,
+   plus cea mai nouă altă versiune. Este autorizată numai modificarea curățării pentru protejarea bazei.
 7. **Versiune** = `0.1.<numărul de commit-uri pe main>`, calculată automat. Nu o modifica manual.
 8. **GitHub ușor:** fără APK/build outputs/fișiere > 1 MB/playlist-uri reale/secrete în repo (vezi `docs/WORKFLOW.md`).
 9. **Build:** CI rulează `ktlint` + `./gradlew :core:parser:test testDebugUnitTest lintDebug assembleDebug`. Dacă mediul tău nu poate

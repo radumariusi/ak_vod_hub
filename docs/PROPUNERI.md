@@ -2,6 +2,8 @@
 
 Status: în implementare; elementele terminate sunt marcate cu ✅.
 
+Livrare etapa 10: release semnat pentru actualizare din TV; v0.1.14 și tagul ei rămân permanent protejate (Radu, 2026-11-17).
+
 Punct de plecare (v0.1.14): APK **7,5 MB** (cu FFmpeg pentru 3 arhitecturi), 7 biblioteci mari
 (Compose TV, Media3, Room, Hilt, WorkManager, OkHttp, Coil). Playlist-ul lui Radu: ~90.800 filme +
 ~20.400 seriale, deci orice calcul „pe titlu” se face o dată, la indexare, nu la afișare.

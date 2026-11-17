@@ -1,5 +1,5 @@
 # APK semnat → GitHub Releases, doar la cerere (Actions → Release → Run workflow), nu la fiecare merge.
-# Se păstrează doar ultimele 2 release-uri.
+# Se păstrează permanent v0.1.14 și cea mai nouă altă versiune.
 name: Release
 
 on:
@@ -77,12 +77,18 @@ jobs:
           gh release create "v$name" "$RUNNER_TEMP/ak-vod-hub-$name.apk" \
             --target "$GITHUB_SHA" --title "AK VOD Hub $name" --notes-file "$RUNNER_TEMP/notes.md"
 
-      - name: Păstrează doar ultimele 2 release-uri
+      - name: Păstrează baza v0.1.14 și cea mai nouă versiune
         if: steps.key.outputs.ok == 'true'
         run: |
+          set -euo pipefail
+          gh release view v0.1.14 --json tagName >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v0.1.14" >/dev/null
           gh release list --limit 100 --json tagName,createdAt \
-            --jq 'sort_by(.createdAt) | reverse | .[2:] | .[].tagName' |
+            --jq 'map(select(.tagName != "v0.1.14" and .tagName != "claude-handoff-2026-11-17")) | sort_by(.createdAt) | reverse | .[1:] | .[].tagName' |
           while read -r tag; do
+            case "$tag" in
+              v0.1.14|claude-handoff-2026-11-17) echo "::error::Tag protejat: $tag"; exit 1 ;;
+            esac
             echo "delete release $tag"
             gh release delete "$tag" --yes --cleanup-tag
           done
