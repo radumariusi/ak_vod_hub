@@ -2,6 +2,7 @@ import java.util.Base64
 
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.baseline.profile)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
@@ -106,7 +107,14 @@ android {
     }
 }
 
+baselineProfile {
+    automaticGenerationDuringBuild = false
+}
+
 dependencies {
+    baselineProfile(project(":baselineprofile"))
+    implementation(libs.androidx.profileinstaller)
+
     implementation(project(":core:data"))
     implementation(project(":core:player"))
 
