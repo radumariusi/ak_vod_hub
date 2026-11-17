@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -23,7 +24,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,6 +36,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ExperimentalTvMaterial3Api
@@ -124,12 +132,12 @@ private fun DetailsContent(
     val playFocus = remember { FocusRequester() }
     LaunchedEffect(title.id) { runCatching { playFocus.requestFocus() } }
 
-    Images.backdrop(title.backdropPath)?.let {
+    Images.hero(title.backdropPath)?.let {
         AsyncImage(
             model = it,
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            alpha = 0.45f,
+            alpha = 0.65f,
             modifier = Modifier.fillMaxSize(),
         )
     }
@@ -142,6 +150,8 @@ private fun DetailsContent(
             ),
         ),
     )
+
+    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.1f to Color.Transparent, 1f to background)))
 
     val episodes = state.episodes
     val season = episodes?.seasons?.firstOrNull { it.number == state.selectedSeason }
@@ -193,10 +203,25 @@ private fun DetailsContent(
                     ) {
                         items(episodes.seasons, key = { it.number }) { s ->
                             val label = if (s.number == 0) "Altele" else "Sezonul ${s.number}"
-                            if (s.number == state.selectedSeason) {
-                                Button(onClick = { onSelectSeason(s.number) }) { Text(label) }
-                            } else {
-                                OutlinedButton(onClick = { onSelectSeason(s.number) }) { Text(label) }
+                            OutlinedButton(
+                                onClick = { onSelectSeason(s.number) },
+                                modifier =
+                                    Modifier.semantics {
+                                        selected = s.number == state.selectedSeason
+                                        role = Role.Tab
+                                    },
+                            ) {
+                                Text(
+                                    label,
+                                    textDecoration =
+                                        if (s.number ==
+                                            state.selectedSeason
+                                        ) {
+                                            TextDecoration.Underline
+                                        } else {
+                                            null
+                                        },
+                                )
                             }
                         }
                     }
@@ -239,7 +264,7 @@ private fun DetailsContent(
                                         contentScale = ContentScale.Crop,
                                         modifier =
                                             Modifier
-                                                .size(64.dp)
+                                                .size(80.dp)
                                                 .clip(CircleShape)
                                                 .background(MaterialTheme.colorScheme.surfaceVariant),
                                     )
@@ -320,91 +345,75 @@ private fun Header(
     actions: @Composable () -> Unit,
 ) {
     val title = details.title
-    Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
-        Box(
-            Modifier
-                .size(PosterWidth * 1.6f, PosterHeight * 1.6f)
-                .clip(MaterialTheme.shapes.medium)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-        ) {
-            Images.poster(title.posterPath)?.let {
-                AsyncImage(
-                    model = it,
-                    contentDescription = title.name,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
+    Column(Modifier.widthIn(max = 680.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        TitleHeading(title.name, logoPath)
+        if (title.originalName != null && title.originalName != title.name) {
+            Text(
+                title.originalName.orEmpty(),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
-        Column(Modifier.widthIn(max = 620.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            TitleHeading(title.name, logoPath)
-            if (title.originalName != null && title.originalName != title.name) {
-                Text(
-                    title.originalName.orEmpty(),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            val meta =
-                listOfNotNull(
-                    if (title.mediaType == MediaType.MOVIE) "Film" else "Serial",
-                    title.year?.toString(),
-                    title.dubLabel,
-                    title.runtimeMinutes?.let { "$it min" },
-                    title.certification,
-                    title.imdbRating?.let { rating ->
-                        "IMDb %.1f".format(rating) + (title.imdbVotes?.let { " ($it voturi)" } ?: "")
-                    },
-                    title.rating?.takeIf { it > 0 }?.let {
-                        "★ %.1f".format(it) +
-                            (title.voteCount?.let { v -> " ($v voturi)" } ?: "")
-                    },
-                    details.genres.takeIf { it.isNotEmpty() }?.joinToString(", "),
-                ).joinToString(" · ")
-            Text(meta, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            title.tagline?.let {
-                Text(
-                    it,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            if (details.summary.isNotEmpty()) {
-                Text(
-                    details.summary,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.secondary,
-                )
-            }
-            LocalizedOverview.choose(title.overviewRo, title.overview)?.let {
-                Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 6, overflow = TextOverflow.Ellipsis)
-            }
-            credits?.directors?.takeIf { it.isNotEmpty() }?.let {
-                Text(
-                    "Regia: ${it.joinToString(", ")}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            if (title.isLocal) {
-                Text(
-                    "Titlu negăsit (încă) pe TMDB: informațiile vin din playlist.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) { actions() }
+        val meta =
+            listOfNotNull(
+                if (title.mediaType == MediaType.MOVIE) "Film" else "Serial",
+                title.year?.toString(),
+                title.dubLabel,
+                title.runtimeMinutes?.let { "$it min" },
+                title.certification,
+                title.imdbRating?.let { rating ->
+                    "IMDb %.1f".format(rating) + (title.imdbVotes?.let { " ($it voturi)" } ?: "")
+                },
+                title.rating?.takeIf { it > 0 }?.let {
+                    "★ TMDB %.1f".format(it) +
+                        (title.voteCount?.let { v -> " ($v voturi)" } ?: "")
+                },
+                details.genres.takeIf { it.isNotEmpty() }?.joinToString(", "),
+            ).joinToString(" · ")
+        Text(meta, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        title.tagline?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
+        if (details.summary.isNotEmpty()) {
+            Text(
+                details.summary,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.secondary,
+            )
+        }
+        LocalizedOverview.choose(title.overviewRo, title.overview)?.let {
+            Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 6, overflow = TextOverflow.Ellipsis)
+        }
+        credits?.directors?.takeIf { it.isNotEmpty() }?.let {
+            Text(
+                "Regia: ${it.joinToString(", ")}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (title.isLocal) {
+            Text(
+                "Titlu negăsit (încă) pe TMDB: informațiile vin din playlist.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) { actions() }
     }
 }
 
-/** Un rând de calitate (ex. „4K”), cu câte un buton pentru fiecare sursă, grupate pe limbă. */
+/** Câte un buton pe limbă/calitate; variantele se aleg numai când deschizi grupul. */
 @Composable
 private fun QualityRow(
     group: QualityGroup,
     sources: Map<Long, SourceDetails>,
     onPlay: (Long) -> Unit,
 ) {
+    var choice by remember(group) { mutableStateOf<Choice?>(null) }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
             "${SourceGrouping.qualityLabel(group.quality)} · ${group.count} " +
@@ -412,25 +421,32 @@ private fun QualityRow(
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(vertical = 4.dp)) {
-            val all = group.languages.flatMap { it.sources }
-            items(all, key = { it.id }) { source ->
-                val info = sources[source.id]
-                Surface(onClick = { onPlay(source.id) }, modifier = Modifier.widthIn(min = 150.dp, max = 260.dp)) {
-                    Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                        Text(sourceTags(source, info), style = MaterialTheme.typography.titleSmall, maxLines = 1)
-                        Text(
-                            info?.playlist.orEmpty(),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
+            items(group.languages, key = { it.language ?: "unknown" }) { language ->
+                OutlinedButton(onClick = {
+                    val variants = language.sources
+                    choice =
+                        Choice(
+                            "${SourceGrouping.qualityLabel(
+                                group.quality,
+                            )} · ${SourceGrouping.languageLabel(language.language)}",
+                            variants.mapIndexed { index, source ->
+                                val info = sources[source.id]
+                                "${sourceTags(source, info)} · ${info?.playlist.orEmpty()} · varianta ${index + 1}"
+                            },
+                            selected = null,
+                            onPick = { index -> onPlay(variants[index].id) },
                         )
-                    }
+                }) {
+                    Text(
+                        "${SourceGrouping.languageLabel(language.language)} · ${language.sources.size} " +
+                            if (language.sources.size == 1) "sursă" else "surse",
+                    )
                 }
             }
         }
     }
+    choice?.let { ChoiceDialog(it, onDismiss = { choice = null }) }
 }
 
 @Composable
@@ -485,7 +501,7 @@ private fun PlayActions(
         val best = state.recommended
         when {
             best == null -> {
-                OutlinedButton(onClick = {}, modifier = Modifier.focusRequester(playFocus)) {
+                OutlinedButton(onClick = {}, modifier = Modifier.focusRequester(playFocus).heightIn(min = 56.dp)) {
                     Text("Nicio sursă de redare")
                 }
             }
@@ -493,13 +509,15 @@ private fun PlayActions(
             watch != null && Resume.shouldResume(watch.positionMs, watch.durationMs) -> {
                 Button(
                     onClick = { onPlay(PlayRequest(titleId, resume = true)) },
-                    modifier = Modifier.focusRequester(playFocus),
+                    modifier = Modifier.focusRequester(playFocus).heightIn(min = 56.dp),
                 ) { Text("Continuă de la ${Resume.format(watch.positionMs)}") }
                 OutlinedButton(onClick = { onPlay(PlayRequest(titleId)) }) { Text("De la început") }
             }
 
             else -> {
-                Button(onClick = { onPlay(PlayRequest(titleId)) }, modifier = Modifier.focusRequester(playFocus)) {
+                Button(onClick = {
+                    onPlay(PlayRequest(titleId))
+                }, modifier = Modifier.focusRequester(playFocus).heightIn(min = 56.dp)) {
                     Text("Redă (${sourceShortLabel(best)})")
                 }
             }
@@ -514,7 +532,7 @@ private fun PlayActions(
             val resume = Resume.shouldResume(watch.positionMs, watch.durationMs)
             Button(
                 onClick = { onPlay(episodeRequest(titleId, current, resume)) },
-                modifier = Modifier.focusRequester(playFocus),
+                modifier = Modifier.focusRequester(playFocus).heightIn(min = 56.dp),
             ) {
                 Text(
                     if (resume) {
@@ -534,12 +552,12 @@ private fun PlayActions(
         firstEpisode != null -> {
             Button(
                 onClick = { onPlay(episodeRequest(titleId, firstEpisode)) },
-                modifier = Modifier.focusRequester(playFocus),
+                modifier = Modifier.focusRequester(playFocus).heightIn(min = 56.dp),
             ) { Text("Redă ${episodeCode(firstEpisode)}") }
         }
 
         else -> {
-            OutlinedButton(onClick = {}, modifier = Modifier.focusRequester(playFocus)) {
+            OutlinedButton(onClick = {}, modifier = Modifier.focusRequester(playFocus).heightIn(min = 56.dp)) {
                 Text(if (state.loadingEpisodes) "Se încarcă episoadele…" else "Nicio sursă de redare")
             }
         }
