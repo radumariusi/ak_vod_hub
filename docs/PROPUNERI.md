@@ -14,7 +14,7 @@ asupra derulării / pornirii · 🟢 neglijabil · 🟡 de urmărit · 🔴 greu
 
 ---
 
-## Etapa 10: Limba originală, note TMDB + IMDb, etichete pe postere (cererile tale)
+## ✅ Etapa 10: Limba originală, note TMDB + IMDb, etichete pe postere (cererile tale)
 
 | # | Funcție | Inspirat din | APK | DB | Viteză |
 |---|---------|--------------|-----|----|--------|
@@ -25,7 +25,7 @@ asupra derulării / pornirii · 🟢 neglijabil · 🟡 de urmărit · 🔴 greu
 | ✅ 10.5 | **Nota IMDb** pe postere și în fișă, din fișierul public IMDb `title.ratings` (descărcat săptămânal, ~8 MB, procesat în flux și aruncat) | Kodi (scrapers), Stremio | 🟢 0 | 🟢 +2 coloane | 🟡 ~15–30 s/săpt. în fundal |
 | ✅ 10.6 | **Insigne pe postere** (configurabile): ★ TMDB, IMDb, 4K/HDR, DUB, bară de progres, „Nou” | TiviMate, Plex, NuvioTV | 🟢 | 🟢 | 🟢 dacă sunt text pre-calculat |
 | ✅ 10.7 | **Pagina actorului**: din distribuție (care există deja în fișă) deschizi actorul și vezi doar filmele lui din playlist | Plex, Jellyfin | 🟢 | 🟢 cache mic | 🟢 la cerere |
-| 10.8 | **Descrieri în română** (TMDB ro-RO, cu engleză dacă lipsește) | Kodi | 🟢 | 🟡 | 🔴 dublează cererile TMDB pentru 110k titluri; recomand doar la cerere, în fișă |
+| ✅ 10.8 | **Descrieri în română** (TMDB ro-RO, cu engleză dacă lipsește) | Kodi | 🟢 | 🟡 | 🔴 dublează cererile TMDB pentru 110k titluri; recomand doar la cerere, în fișă |
 
 **Cum ar merge 10.1–10.3, concret.** TMDB ne dă deja limba originală (`originalLanguage`), iar parserul
 scoate limbile audio din numele surselor (`audioLanguages`). La indexare compar cele două:

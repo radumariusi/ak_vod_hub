@@ -10,6 +10,7 @@ import io.github.radumariusi.akvodhub.data.catalog.TitleDetails
 import io.github.radumariusi.akvodhub.data.db.WatchStateEntity
 import io.github.radumariusi.akvodhub.data.discover.DiscoverRepository
 import io.github.radumariusi.akvodhub.data.discover.TitleDiscovery
+import io.github.radumariusi.akvodhub.parser.catalog.LocalizedOverview
 import io.github.radumariusi.akvodhub.parser.match.MediaType
 import io.github.radumariusi.akvodhub.parser.match.SourceInfo
 import kotlinx.coroutines.Job
@@ -77,7 +78,15 @@ class DetailsViewModel
         }
 
         fun open(titleId: Long) {
-            if (mutableState.value.titleId == titleId && mutableState.value.details != null) return
+            val current = mutableState.value.details?.title
+            if (mutableState.value.titleId == titleId && current != null &&
+                (
+                    current.tmdbId < 0 ||
+                        LocalizedOverview.isCached(current.overviewRoFetchedAt, System.currentTimeMillis())
+                )
+            ) {
+                return
+            }
             job?.cancel()
             mutableState.value = DetailsState(titleId = titleId)
             job =
@@ -90,6 +99,18 @@ class DetailsViewModel
                         it.copy(loading = false, details = details, recommended = recommended, watch = watch)
                     }
                     if (details == null) return@launch
+                    launch overview@ {
+                        val localized = repository.romanianOverview(titleId) ?: return@overview
+                        mutableState.update { state ->
+                            if (state.titleId ==
+                                titleId
+                            ) {
+                                state.copy(details = state.details?.copy(title = localized))
+                            } else {
+                                state
+                            }
+                        }
+                    }
                     launch {
                         val credits = repository.credits(details.title)
                         mutableState.update { it.copy(credits = credits) }

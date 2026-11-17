@@ -47,6 +47,7 @@ import io.github.radumariusi.akvodhub.data.db.TitleCard
 import io.github.radumariusi.akvodhub.data.db.isLocal
 import io.github.radumariusi.akvodhub.hub.DetailsState
 import io.github.radumariusi.akvodhub.hub.DetailsViewModel
+import io.github.radumariusi.akvodhub.parser.catalog.LocalizedOverview
 import io.github.radumariusi.akvodhub.parser.catalog.MergedEpisode
 import io.github.radumariusi.akvodhub.parser.match.MediaType
 import io.github.radumariusi.akvodhub.parser.match.QualityGroup
@@ -357,7 +358,7 @@ private fun Header(
                     color = MaterialTheme.colorScheme.secondary,
                 )
             }
-            title.overview?.let {
+            LocalizedOverview.choose(title.overviewRo, title.overview)?.let {
                 Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 6, overflow = TextOverflow.Ellipsis)
             }
             credits?.directors?.takeIf { it.isNotEmpty() }?.let {

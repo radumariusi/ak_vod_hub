@@ -14,6 +14,27 @@ import java.io.IOException
 
 class TmdbDetailsTest {
     @Test
+    fun romanianDescriptionUsesOneLocalizedRequestWithoutExtraDetails() =
+        runBlocking {
+            val http =
+                OkHttpClient
+                    .Builder()
+                    .addInterceptor { chain ->
+                        assertEquals("ro-RO", chain.request().url.queryParameter("language"))
+                        assertNull(chain.request().url.queryParameter("append_to_response"))
+                        Response
+                            .Builder()
+                            .request(chain.request())
+                            .protocol(Protocol.HTTP_1_1)
+                            .code(200)
+                            .message("OK")
+                            .body("""{"id":1,"overview":"Descriere română"}""".toResponseBody())
+                            .build()
+                    }.build()
+            assertEquals("Descriere română", TmdbClient(http).romanianOverview("example", MediaType.MOVIE, 1))
+        }
+
+    @Test
     fun forbiddenDetailsAreAnErrorRatherThanAMissingTitle() =
         runBlocking {
             var calls = 0

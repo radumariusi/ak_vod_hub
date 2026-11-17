@@ -22,6 +22,7 @@ import io.github.radumariusi.akvodhub.parser.catalog.CatalogQuery
 import io.github.radumariusi.akvodhub.parser.catalog.EpisodeEntry
 import io.github.radumariusi.akvodhub.parser.catalog.EpisodeMerge
 import io.github.radumariusi.akvodhub.parser.catalog.Genres
+import io.github.radumariusi.akvodhub.parser.catalog.LocalizedOverview
 import io.github.radumariusi.akvodhub.parser.catalog.MergedSeason
 import io.github.radumariusi.akvodhub.parser.catalog.PosterBadges
 import io.github.radumariusi.akvodhub.parser.match.QualityGroup
@@ -37,6 +38,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 
@@ -88,6 +91,7 @@ class HubRepository(
 ) {
     private val dao = db.catalogDao()
     private val playlistDao = db.playlistDao()
+    private val overviewMutex = Mutex()
     private val creditsCache = ConcurrentHashMap<Long, Credits>()
 
     /** Episoadele Xtream cerute de la server în sesiunea curentă (o dată pe serial și playlist). */
@@ -202,6 +206,26 @@ class HubRepository(
             genres = Genres.names(title.genreIds),
         )
     }
+
+    /** Numai fișa deschisă cere traducerea. Erorile păstrează descrierea existentă și permit reîncercarea. */
+    suspend fun romanianOverview(titleId: Long): TitleEntity? =
+        overviewMutex.withLock {
+            val title = dao.titleById(titleId) ?: return@withLock null
+            if (title.isLocal || LocalizedOverview.isCached(title.overviewRoFetchedAt, System.currentTimeMillis())) {
+                return@withLock title
+            }
+            val key = settings.apiKey() ?: return@withLock title
+            val overview =
+                try {
+                    tmdb.romanianOverview(key, title.mediaType, title.tmdbId)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    return@withLock title
+                }
+            dao.setRomanianOverview(titleId, LocalizedOverview.clean(overview), System.currentTimeMillis())
+            dao.titleById(titleId)
+        }
 
     /**
      * Episoadele unui serial din toate sursele, unite pe sezon + episod. La Xtream, lista de episoade se cere
