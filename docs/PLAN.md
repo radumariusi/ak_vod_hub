@@ -154,6 +154,8 @@ Documentele astea, `.gitignore`, workflow de curățenie automată, reguli de lu
 
 - ✅ 12.3: meniu sus cu șase file, telecomandă și touch; conținutul Listei mele urmează în 12.4.
 
+- ✅ 12.4: Lista mea persistentă, pagini de 48 după ID; văzut/nevăzut manual din fișă (Room v13).
+
 ## Idei suplimentare
 
 1. **Verificare sănătate surse**: test rapid în fundal al linkurilor; sursele moarte sunt marcate și puse la final.

@@ -89,6 +89,8 @@ fun DetailsScreen(
                     state = state,
                     details = details,
                     onPlay = ::play,
+                    onWatchlist = viewModel::toggleWatchlist,
+                    onWatched = viewModel::toggleWatched,
                     onSelectSeason = viewModel::selectSeason,
                     onActor = onActor,
                     onOpen = onOpen,
@@ -111,6 +113,8 @@ private fun DetailsContent(
     state: DetailsState,
     details: TitleDetails,
     onPlay: (PlayRequest) -> Unit,
+    onWatchlist: () -> Unit,
+    onWatched: () -> Unit,
     onSelectSeason: (Int) -> Unit,
     onActor: (Person) -> Unit,
     onOpen: (TitleCard) -> Unit,
@@ -150,6 +154,24 @@ private fun DetailsContent(
             Header(details, state.credits, state.logoPath) {
                 val first = episodes?.let { EpisodeOrder.linear(it.seasons).firstOrNull() }
                 PlayActions(state, title.id, first, playFocus, onPlay)
+            }
+        }
+
+        item("personal-library") {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(vertical = 8.dp),
+            ) {
+                item {
+                    OutlinedButton(onClick = onWatchlist, enabled = !state.changingLibrary) {
+                        Text(if (state.inWatchlist) "Scoate din Lista mea" else "Adaugă în Lista mea")
+                    }
+                }
+                item {
+                    OutlinedButton(onClick = onWatched, enabled = !state.changingLibrary) {
+                        Text(if (state.watched) "Marchează nevăzut" else "Marchează văzut")
+                    }
+                }
             }
         }
 

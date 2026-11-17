@@ -32,6 +32,9 @@ data class DetailsState(
     val credits: Credits? = null,
     val selectedSeason: Int? = null,
     val logoPath: String? = null,
+    val inWatchlist: Boolean = false,
+    val watched: Boolean = false,
+    val changingLibrary: Boolean = false,
     /** Unde a rămas utilizatorul (pentru „Continuă”). */
     val watch: WatchStateEntity? = null,
     /** Sursa pe care o alege playerul singur (profilul din Setări → Redare). */
@@ -96,8 +99,17 @@ class DetailsViewModel
                     val all = details?.groups.orEmpty().flatMap { g -> g.languages.flatMap { it.sources } }
                     val recommended = repository.playOrder(all, details?.title?.originalLanguage).firstOrNull()
                     val watch = repository.watchState(titleId)
+                    val listed = repository.inWatchlist(titleId)
+                    val watched = repository.isWatched(titleId)
                     mutableState.update {
-                        it.copy(loading = false, details = details, recommended = recommended, watch = watch)
+                        it.copy(
+                            loading = false,
+                            details = details,
+                            recommended = recommended,
+                            watch = watch,
+                            inWatchlist = listed,
+                            watched = watched,
+                        )
                     }
                     if (details == null) return@launch
                     launch {
@@ -145,14 +157,39 @@ class DetailsViewModel
             }
         }
 
+        fun toggleWatchlist() = changeLibrary { id -> repository.setInWatchlist(id, !mutableState.value.inWatchlist) }
+
+        fun toggleWatched() = changeLibrary { id -> repository.markWatched(id, !mutableState.value.watched) }
+
+        private fun changeLibrary(action: suspend (Long) -> Unit) {
+            val state = mutableState.value
+            val id = state.titleId ?: return
+            if (state.changingLibrary) return
+            mutableState.update { it.copy(changingLibrary = true) }
+            viewModelScope.launch {
+                try {
+                    action(id)
+                    updateWatch(id)
+                } finally {
+                    mutableState.update { if (it.titleId == id) it.copy(changingLibrary = false) else it }
+                }
+            }
+        }
+
         fun selectSeason(season: Int) = mutableState.update { it.copy(selectedSeason = season) }
 
         /** După player: „Continuă” arată noua poziție (sau episodul următor). */
         fun refreshWatch() {
             val titleId = mutableState.value.titleId ?: return
-            viewModelScope.launch {
-                val watch = repository.watchState(titleId)
-                mutableState.update { if (it.titleId == titleId) it.copy(watch = watch) else it }
+            viewModelScope.launch { updateWatch(titleId) }
+        }
+
+        private suspend fun updateWatch(titleId: Long) {
+            val watch = repository.watchState(titleId)
+            val listed = repository.inWatchlist(titleId)
+            val watched = repository.isWatched(titleId)
+            mutableState.update {
+                if (it.titleId == titleId) it.copy(watch = watch, inWatchlist = listed, watched = watched) else it
             }
         }
     }

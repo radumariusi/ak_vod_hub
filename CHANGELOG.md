@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-11-17 — Etapa 12.4
+- Lista mea salvată în DB, cu paginare după ID; adăugare/scoatere și văzut/nevăzut manual din fișă.
+
 ## 2026-11-17 — Etapa 12.3
 - Meniu sus: Acasă, Filme, Seriale, Lista mea, Caută și Setări; navigare cu telecomanda și touch.
 

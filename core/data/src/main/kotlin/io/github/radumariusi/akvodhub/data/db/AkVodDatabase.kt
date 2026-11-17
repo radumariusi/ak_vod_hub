@@ -19,8 +19,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ImdbMapEntity::class,
         ImdbRatingStage::class,
         PersonCreditEntity::class,
+        WatchlistEntity::class,
     ],
-    version = 12,
+    version = 13,
     exportSchema = false,
 )
 abstract class AkVodDatabase : RoomDatabase() {
@@ -46,11 +47,22 @@ abstract class AkVodDatabase : RoomDatabase() {
                     MIGRATION_9_10,
                     MIGRATION_10_11,
                     MIGRATION_11_12,
+                    MIGRATION_12_13,
                 ).addCallback(
                     object : RoomDatabase.Callback() {
                         override fun onOpen(db: SupportSQLiteDatabase) = createSearchTable(db)
                     },
                 ).build()
+
+        /** Etapa 12.4: listă personală, fără atingerea progresului/istoricului existent. */
+        val MIGRATION_12_13 =
+            object : Migration(12, 13) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS watchlist (titleId INTEGER NOT NULL, addedAt INTEGER NOT NULL, PRIMARY KEY(titleId))",
+                    )
+                }
+            }
 
         /** Etapa 10.8: descriere RO la cerere, inclusiv cache pentru traducerea absentă. */
         val MIGRATION_11_12 =

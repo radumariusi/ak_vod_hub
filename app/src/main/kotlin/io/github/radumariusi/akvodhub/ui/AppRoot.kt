@@ -38,6 +38,7 @@ import io.github.radumariusi.akvodhub.hub.ActorViewModel
 import io.github.radumariusi.akvodhub.hub.BrowseViewModel
 import io.github.radumariusi.akvodhub.hub.DetailsViewModel
 import io.github.radumariusi.akvodhub.hub.HomeViewModel
+import io.github.radumariusi.akvodhub.hub.WatchlistViewModel
 import io.github.radumariusi.akvodhub.player.PlaybackSettingsViewModel
 import io.github.radumariusi.akvodhub.playlist.PlaylistsViewModel
 import io.github.radumariusi.akvodhub.remote.PhoneSetupViewModel
@@ -46,7 +47,7 @@ import io.github.radumariusi.akvodhub.ui.hub.ActorScreen
 import io.github.radumariusi.akvodhub.ui.hub.BrowseScreen
 import io.github.radumariusi.akvodhub.ui.hub.DetailsScreen
 import io.github.radumariusi.akvodhub.ui.hub.HomeScreen
-import io.github.radumariusi.akvodhub.ui.hub.Message
+import io.github.radumariusi.akvodhub.ui.hub.WatchlistScreen
 import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
 import io.github.radumariusi.akvodhub.update.UpdateViewModel
 import kotlinx.coroutines.delay
@@ -72,6 +73,7 @@ class HubViewModels(
     val playback: PlaybackSettingsViewModel,
     val phoneSetup: PhoneSetupViewModel,
     val actor: ActorViewModel,
+    val watchlist: WatchlistViewModel,
 )
 
 /**
@@ -248,7 +250,7 @@ fun AppRoot(
                             }
 
                             Destination.WATCHLIST -> {
-                                Message("Lista mea este goală.")
+                                WatchlistScreen(hub.watchlist, open, restoreKey, onRestored)
                             }
 
                             Destination.SEARCH -> {

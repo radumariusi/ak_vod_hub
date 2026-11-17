@@ -19,6 +19,7 @@ import io.github.radumariusi.akvodhub.hub.ActorViewModel
 import io.github.radumariusi.akvodhub.hub.BrowseViewModel
 import io.github.radumariusi.akvodhub.hub.DetailsViewModel
 import io.github.radumariusi.akvodhub.hub.HomeViewModel
+import io.github.radumariusi.akvodhub.hub.WatchlistViewModel
 import io.github.radumariusi.akvodhub.player.PlayRequest
 import io.github.radumariusi.akvodhub.player.PlaybackSettingsViewModel
 import io.github.radumariusi.akvodhub.player.PlayerActivity
@@ -40,6 +41,7 @@ class MainActivity : ComponentActivity() {
     private val tmdbViewModel: TmdbViewModel by viewModels()
     private val homeViewModel: HomeViewModel by viewModels()
     private val actorViewModel: ActorViewModel by viewModels()
+    private val watchlistViewModel: WatchlistViewModel by viewModels()
     private val browseViewModel: BrowseViewModel by viewModels()
     private val detailsViewModel: DetailsViewModel by viewModels()
     private val playbackViewModel: PlaybackSettingsViewModel by viewModels()
@@ -75,6 +77,7 @@ class MainActivity : ComponentActivity() {
                                 playbackViewModel,
                                 phoneSetupViewModel,
                                 actorViewModel,
+                                watchlistViewModel,
                             ),
                             navRequests,
                         )
