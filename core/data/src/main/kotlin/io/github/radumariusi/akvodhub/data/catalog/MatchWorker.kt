@@ -10,6 +10,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import io.github.radumariusi.akvodhub.data.imdb.ImdbRatingsScheduler
 import io.github.radumariusi.akvodhub.parser.player.PlaybackActivityState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -25,6 +26,7 @@ class MatchWorker(
     private val matcher: TitleMatcher,
     private val scheduler: MatchScheduler,
     private val indexer: CatalogIndexer,
+    private val imdb: ImdbRatingsScheduler,
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         if (PlaybackActivityState.active) {
@@ -37,6 +39,7 @@ class MatchWorker(
         val outcome = matcher.run(BUDGET_MS)
         // Hub-ul vede rezultatele după fiecare rundă (și titlurile locale, chiar fără cheie TMDB).
         indexer.refresh()
+        imdb.enqueueIfDue()
         return when (outcome) {
             MatchOutcome.MORE -> {
                 if (PlaybackActivityState.active) scheduler.enqueueAfterPlaybackPause() else scheduler.enqueue()

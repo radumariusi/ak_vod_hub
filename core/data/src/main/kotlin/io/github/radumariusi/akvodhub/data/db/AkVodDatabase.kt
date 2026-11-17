@@ -17,8 +17,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         WatchHistoryEntity::class,
         DiscoverCacheEntity::class,
         ImdbMapEntity::class,
+        ImdbRatingStage::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = false,
 )
 abstract class AkVodDatabase : RoomDatabase() {
@@ -40,11 +41,25 @@ abstract class AkVodDatabase : RoomDatabase() {
                     MIGRATION_5_6,
                     MIGRATION_6_7,
                     MIGRATION_7_8,
+                    MIGRATION_8_9,
                 ).addCallback(
                     object : RoomDatabase.Callback() {
                         override fun onOpen(db: SupportSQLiteDatabase) = createSearchTable(db)
                     },
                 ).build()
+
+        /** Etapa 10.5: note IMDb și cache de lucru pentru aplicare atomică. */
+        val MIGRATION_8_9 =
+            object : Migration(8, 9) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE title ADD COLUMN imdbRating REAL DEFAULT NULL")
+                    db.execSQL("ALTER TABLE title ADD COLUMN imdbVotes INTEGER DEFAULT NULL")
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS imdb_rating_stage (imdbId TEXT NOT NULL, " +
+                            "rating REAL NOT NULL, votes INTEGER NOT NULL, PRIMARY KEY(imdbId))",
+                    )
+                }
+            }
 
         /** Etapa 10.4: metadate opționale și progresul completării în fundal. */
         val MIGRATION_7_8 =

@@ -15,6 +15,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -41,6 +42,9 @@ class CatalogIndexer(
 
     /** Crește după fiecare reindexare: ecranele își reîncarcă listele. */
     val version: StateFlow<Long> = mutableVersion.asStateFlow()
+
+    /** Notele schimbă doar cardurile: nu refacem rezumatele surselor sau FTS. */
+    fun notifyCardsChanged() = mutableVersion.update { maxOf(clock(), it + 1) }
 
     suspend fun refresh(force: Boolean = false) =
         mutex.withLock {

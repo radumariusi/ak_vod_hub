@@ -24,6 +24,9 @@ import io.github.radumariusi.akvodhub.ui.touch.Button
 import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
 import io.github.radumariusi.akvodhub.update.UpdateState
 import io.github.radumariusi.akvodhub.update.UpdateViewModel
+import java.text.DateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun SettingsScreen(
@@ -40,6 +43,7 @@ fun SettingsScreen(
     val addState by playlistsViewModel.addState.collectAsState()
     val matchStatus by tmdbViewModel.status.collectAsState()
     val keyState by tmdbViewModel.keyState.collectAsState()
+    val imdb by tmdbViewModel.imdb.collectAsState()
 
     if (adding) {
         AddPlaylistScreen(
@@ -93,6 +97,41 @@ fun SettingsScreen(
             onMatchNow = tmdbViewModel::matchNow,
             onRetryUnmatched = tmdbViewModel::retryUnmatched,
         )
+
+        Text("Note IMDb", style = MaterialTheme.typography.titleLarge)
+        Text(
+            "Din fișierul public oficial IMDb, actualizat la șapte zile; fără cheie API. " +
+                "Se păstrează numai notele titlurilor cu ID IMDb din playlist.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        val updated =
+            imdb.lastUpdated?.let {
+                DateFormat
+                    .getDateTimeInstance(
+                        DateFormat.SHORT,
+                        DateFormat.SHORT,
+                        Locale.forLanguageTag("ro"),
+                    ).format(Date(it))
+            }
+        Text(
+            if (updated ==
+                null
+            ) {
+                "Notele IMDb nu au fost încă actualizate."
+            } else {
+                "Ultima actualizare: $updated · ${imdb.updatedTitles} titluri"
+            },
+            style = MaterialTheme.typography.bodySmall,
+        )
+        imdb.lastError?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+        if (imdb.running) {
+            Text(
+                "Actualizare în curs sau programată; se amână în timpul redării.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        OutlinedButton(onClick = tmdbViewModel::refreshImdb, enabled = !imdb.running) { Text("Actualizează acum") }
 
         PlaybackSection(playbackViewModel)
 

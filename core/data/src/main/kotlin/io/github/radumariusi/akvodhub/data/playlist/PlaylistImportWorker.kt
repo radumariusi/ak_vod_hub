@@ -13,6 +13,10 @@ import io.github.radumariusi.akvodhub.data.catalog.MatchScheduler
 import io.github.radumariusi.akvodhub.data.catalog.MatchWorker
 import io.github.radumariusi.akvodhub.data.catalog.TitleMatcher
 import io.github.radumariusi.akvodhub.data.db.PlaylistDao
+import io.github.radumariusi.akvodhub.data.imdb.ImdbRatingsScheduler
+import io.github.radumariusi.akvodhub.data.imdb.ImdbRatingsSettings
+import io.github.radumariusi.akvodhub.data.imdb.ImdbRatingsUpdater
+import io.github.radumariusi.akvodhub.data.imdb.ImdbRatingsWorker
 import kotlinx.coroutines.CancellationException
 
 /**
@@ -75,6 +79,9 @@ class PlaylistWorkerFactory(
     private val matcher: TitleMatcher,
     private val matchScheduler: MatchScheduler,
     private val indexer: CatalogIndexer,
+    private val imdbUpdater: ImdbRatingsUpdater,
+    private val imdbSettings: ImdbRatingsSettings,
+    private val imdbScheduler: ImdbRatingsScheduler,
 ) : WorkerFactory() {
     override fun createWorker(
         appContext: Context,
@@ -87,7 +94,11 @@ class PlaylistWorkerFactory(
             }
 
             MatchWorker::class.java.name -> {
-                MatchWorker(appContext, workerParameters, matcher, matchScheduler, indexer)
+                MatchWorker(appContext, workerParameters, matcher, matchScheduler, indexer, imdbScheduler)
+            }
+
+            ImdbRatingsWorker::class.java.name -> {
+                ImdbRatingsWorker(appContext, workerParameters, imdbUpdater, imdbSettings, imdbScheduler)
             }
 
             else -> {
