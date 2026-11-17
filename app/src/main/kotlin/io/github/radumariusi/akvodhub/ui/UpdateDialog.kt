@@ -16,13 +16,13 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import io.github.radumariusi.akvodhub.data.update.AppUpdate
+import io.github.radumariusi.akvodhub.ui.touch.Button
+import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
 import io.github.radumariusi.akvodhub.update.UpdateState
 
 /** Update-ul oferit utilizatorului în starea curentă, dacă există. */

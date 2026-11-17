@@ -14,9 +14,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
-import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import io.github.radumariusi.akvodhub.R
+import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
 import java.util.Locale
 
 /**

@@ -14,12 +14,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import io.github.radumariusi.akvodhub.catalog.KeyState
 import io.github.radumariusi.akvodhub.data.catalog.MatchStatus
+import io.github.radumariusi.akvodhub.ui.touch.Button
+import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
 
 /** Setări → TMDB: cheia utilizatorului și progresul potrivirii titlurilor. */
 @Composable

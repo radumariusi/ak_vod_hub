@@ -22,12 +22,12 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import io.github.radumariusi.akvodhub.data.db.PlaylistType
 import io.github.radumariusi.akvodhub.playlist.AddPlaylistState
+import io.github.radumariusi.akvodhub.ui.touch.Button
+import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
 
 @Composable
 fun AddPlaylistScreen(
