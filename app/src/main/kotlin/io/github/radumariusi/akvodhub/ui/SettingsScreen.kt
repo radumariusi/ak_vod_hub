@@ -122,7 +122,7 @@ fun SettingsScreen(
                         PosterBadgesSection(playbackViewModel)
                     }
                     2 -> PlaybackSection(playbackViewModel)
-                    3 -> Text("Preferințele audio sunt disponibile și în comenzile playerului.")
+                    3 -> AudioSection(playbackViewModel)
                     4 -> SubtitlesSection(playbackViewModel)
                     5 -> {
         PlaylistsSection(

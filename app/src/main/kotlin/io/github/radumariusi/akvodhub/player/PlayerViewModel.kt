@@ -656,7 +656,7 @@ class PlayerViewModel
             val audio = key?.let { settings.seriesTrack(it, "audio") }
             val text = key?.let { settings.seriesTrack(it, "text") }
             return TrackPreferences(
-                SeriesPlayback.audioLanguages(audio, settings.preferredLanguages(title?.originalLanguage)),
+                SeriesPlayback.audioLanguages(audio, settings.audioLanguages(title?.originalLanguage)),
                 if (text == "off") {
                     emptyList()
                 } else {

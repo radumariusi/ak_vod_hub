@@ -110,6 +110,9 @@ class PlaybackSettingsViewModel
             viewModelScope.launch { repository.prepare() }
         }
 
+        fun setAudioPassthrough(value: Boolean) = settings.setAudioPassthrough(value)
+        fun setNightMode(value: Boolean) = settings.setNightMode(value)
+
         fun setDefaultSpeed(value: Float) = settings.setDefaultSpeed(value)
         fun setAutoNext(value: Boolean) = settings.setAutoNext(value)
         fun setMatchFrameRate(value: Boolean) = settings.setMatchFrameRate(value)

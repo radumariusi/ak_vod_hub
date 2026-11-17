@@ -35,6 +35,7 @@ data class PlaybackPrefs(
     val homeHero: Boolean = true,
     val defaultSpeed: Float = 1f,
     val autoNext: Boolean = true,
+    val audioLanguage: String = "",
     val contentLanguages: String = "",
     val hiddenLanguages: String = "",
     val hiddenCategories: String = "",
@@ -75,6 +76,10 @@ class PlaybackSettings(
                 state.value.profile.languages + listOfNotNull(systemLanguage) + "en"
         ).filter { it.length == 2 }
             .distinct()
+
+    fun audioLanguages(originalLanguage: String?): List<String> =
+        (listOfNotNull(OriginalLanguage.code(originalLanguage).takeIf { state.value.preferOriginalLanguage }) +
+            listOf(state.value.audioLanguage).filter { it.length == 2 } + preferredLanguages(originalLanguage)).distinct()
 
     fun seriesTrack(key: String, type: String): String? = prefs.getString("series.$key.$type", null)
 
@@ -292,6 +297,7 @@ class PlaybackSettings(
             homeHero = prefs.getBoolean("home_hero", true),
             defaultSpeed = io.github.radumariusi.akvodhub.parser.player.PlaybackDefaults.speed(prefs.getFloat("default_speed", 1f)),
             autoNext = prefs.getBoolean("auto_next", true),
+            audioLanguage = prefs.getString("audio_language", "").orEmpty(),
             contentLanguages = prefs.getString("content_languages", "").orEmpty(),
             hiddenLanguages = prefs.getString("hidden_languages", "").orEmpty(),
             hiddenCategories = prefs.getString("hidden_categories", "").orEmpty(),
@@ -314,7 +320,7 @@ class PlaybackSettings(
     }
 
     companion object {
-        private val CONTENT_KEYS = listOf("content_languages", "hidden_languages", "hidden_categories")
+        private val CONTENT_KEYS = listOf("content_languages", "hidden_languages", "hidden_categories", "audio_language")
         private const val BUFFER = "buffer_preset"
         private const val NIGHT = "night_mode"
         private const val PASSTHROUGH = "audio_passthrough"
