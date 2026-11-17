@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-11-17 — Etapa 12.8
+- Aspect: postere mici/medii/mari și cinci culori de accent, cu salvare și backup; etapa 12 completă pentru testarea pe TV.
+
 ## 2026-11-17 — Etapa 12.7
 - Rânduri Nou în playlist și Episoade noi la serialele urmărite; refresh Xtream limitat în fundal și paginare după dată/ID.
 

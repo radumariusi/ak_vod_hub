@@ -146,7 +146,7 @@ Documentele astea, `.gitignore`, workflow de curățenie automată, reguli de lu
 - ✅ 10.8: descrieri RO la cerere, cache 30 zile și fallback la engleza existentă (Room v12).
 - Etapa 10 completă; build și testare pe dispozitiv înainte de etapa 12.
 
-### Etapa 12: interfață
+### ✅ Etapa 12: interfață
 
 - ✅ 12.1: hero existent extins cu debounce de 300 ms și backdrop TMDB de 780 px; gradient întunecat, fără blur.
 
@@ -161,6 +161,9 @@ Documentele astea, `.gitignore`, workflow de curățenie automată, reguli de lu
 - ✅ 12.6: trailer TMDB la apăsare, cache limitat; intent YouTube TV/telefon, apoi aplicația disponibilă.
 
 - ✅ 12.7: Nou în playlist și episoade noi la serialele urmărite, fereastră de șapte zile, paginare dată/ID și refresh Xtream țintit (Room v14).
+
+- ✅ 12.8: postere mic/mediu/mare și cinci culori de accent; preferințe locale și backup, fără biblioteci noi.
+- Etapa 12 completă (12.1–12.8); 12.9/12.10 respinse. Livrare semnată după CI și merge, apoi testarea proprietarului. Etapa 11 nu începe în acest fir.
 
 ## Idei suplimentare
 
