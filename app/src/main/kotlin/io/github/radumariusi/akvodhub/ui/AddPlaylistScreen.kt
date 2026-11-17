@@ -7,6 +7,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -52,7 +54,10 @@ fun AddPlaylistScreen(
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     LaunchedEffect(state) { if (state == AddPlaylistState.Done) onClose() }
 
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier.verticalScroll(rememberScrollState()),
+    ) {
         Text("Adaugă playlist", style = MaterialTheme.typography.headlineMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             listOf(

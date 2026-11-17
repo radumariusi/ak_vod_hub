@@ -5,6 +5,12 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.ui.Modifier
+import androidx.tv.material3.MaterialTheme
 import dagger.hilt.android.AndroidEntryPoint
 import io.github.radumariusi.akvodhub.catalog.TmdbViewModel
 import io.github.radumariusi.akvodhub.hub.BrowseViewModel
@@ -45,19 +51,22 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             AkVodHubTheme {
-                AppRoot(
-                    updateViewModel,
-                    playlistsViewModel,
-                    tmdbViewModel,
-                    HubViewModels(
-                        homeViewModel,
-                        browseViewModel,
-                        detailsViewModel,
-                        playbackViewModel,
-                        phoneSetupViewModel,
-                    ),
-                    navRequests,
-                )
+                // Pe telefon conținutul nu intră sub barele sistemului / tastatură; pe TV marginile sunt 0.
+                Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).safeDrawingPadding()) {
+                    AppRoot(
+                        updateViewModel,
+                        playlistsViewModel,
+                        tmdbViewModel,
+                        HubViewModels(
+                            homeViewModel,
+                            browseViewModel,
+                            detailsViewModel,
+                            playbackViewModel,
+                            phoneSetupViewModel,
+                        ),
+                        navRequests,
+                    )
+                }
             }
         }
     }

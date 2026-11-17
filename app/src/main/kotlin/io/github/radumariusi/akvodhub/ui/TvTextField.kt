@@ -5,8 +5,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
@@ -57,7 +58,8 @@ fun TvTextField(
                 ),
             modifier =
                 modifier
-                    .width(640.dp)
+                    .widthIn(max = 640.dp)
+                    .fillMaxWidth()
                     .onFocusChanged { focused = it.isFocused }
                     .background(colors.surfaceVariant, shape)
                     .border(2.dp, if (focused) colors.primary else colors.surfaceVariant, shape)
