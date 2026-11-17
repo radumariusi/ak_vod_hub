@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-17 — Etapa 13
+- Setări în două panouri, opt categorii, telecomandă și touch; valori curente și explicații în română.
+- Preferințe noi funcționale cu backup, statistici SQL în fundal și golire cache imagini. Room v14 neschimbat.
+
 ## 2026-11-17 — Etapa 11: player
 - Frecvență ecran, passthrough și mod noapte opționale; format imagine și viteză.
 - Intro și limbi audio/subtitrare per serial, derulare accelerată, salt la minut, info tehnic, timer și buffer configurabil.

@@ -131,6 +131,44 @@ class HubRepository(
             originalLanguage.takeIf { playback.state.value.preferOriginalLanguage },
         )
 
+    /** Agregări SQL la deschiderea panoului; doar grupurile de limbi se parcurg în flux. */
+    suspend fun statistics(): String =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val sql = db.openHelper.readableDatabase
+            val totals =
+                sql
+                    .query(
+                        "SELECT COUNT(CASE WHEN mediaType = 'MOVIE' THEN 1 END), " +
+                            "COUNT(CASE WHEN mediaType = 'TV' THEN 1 END), " +
+                            "COUNT(CASE WHEN qualities LIKE '%,UHD,%' THEN 1 END), " +
+                            "COUNT(CASE WHEN tmdbId > 0 THEN 1 END), COUNT(*) FROM title WHERE sourceCount > 0",
+                    ).use { c ->
+                        c.moveToFirst()
+                        "${c.getLong(0)} filme · ${c.getLong(1)} seriale · ${c.getLong(2)} titluri 4K\n" +
+                            "Potrivite TMDB: ${c.getLong(3)} din ${c.getLong(4)} titluri vizibile"
+                    }
+            val languages = mutableMapOf<String, Long>()
+            sql.query("SELECT languages, COUNT(*) FROM raw_entry GROUP BY languages").use { c ->
+                while (c.moveToNext()) {
+                    val codes =
+                        c
+                            .getString(0)
+                            .orEmpty()
+                            .split(',')
+                            .filter { it.isNotBlank() }
+                            .distinct()
+                    if (codes.isEmpty()) languages["necunoscută"] = (languages["necunoscută"] ?: 0L) + c.getLong(1)
+                    codes.forEach { code -> languages[code] = (languages[code] ?: 0L) + c.getLong(1) }
+                }
+            }
+            totals + "\nSurse pe limbi (inclusiv cele ascunse; MULTI separat):\n" +
+                languages.entries
+                    .sortedByDescending { it.value }
+                    .take(
+                        30,
+                    ).joinToString(" · ") { "${it.key.uppercase()}: ${it.value}" }
+        }
+
     suspend fun inWatchlist(titleId: Long): Boolean = dao.inWatchlist(titleId)
 
     suspend fun isWatched(titleId: Long): Boolean = db.discoverDao().history(titleId)?.finished == true

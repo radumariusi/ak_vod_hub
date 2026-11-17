@@ -38,6 +38,7 @@ class CatalogIndexer(
 ) {
     private val dao = db.catalogDao()
     private val prefs = context.getSharedPreferences("catalog_index", Context.MODE_PRIVATE)
+    private val contentPrefs = context.getSharedPreferences("playback", Context.MODE_PRIVATE)
     private val mutex = Mutex()
     private val mutableVersion = MutableStateFlow(0L)
 
@@ -52,7 +53,13 @@ class CatalogIndexer(
             withContext(Dispatchers.IO) {
                 val now = clock()
                 val day = now / 86_400_000L
-                if (!force && dao.fingerprint() == prefs.getString(FINGERPRINT, null) && searchIndexReady()) {
+                val hiddenLanguages = contentPrefs.getString("hidden_languages", "").orEmpty()
+                val hiddenCategories = contentPrefs.getString("hidden_categories", "").orEmpty()
+                val visibility = "$hiddenLanguages|$hiddenCategories"
+                if (!force && visibility == prefs.getString("visibility", "") &&
+                    dao.fingerprint() == prefs.getString(FINGERPRINT, null) &&
+                    searchIndexReady()
+                ) {
                     if (prefs.getLong("badge_day", -1L) != day) {
                         val changed = dao.expireNewBadges(now - PosterBadges.NEW_WINDOW_MS, now)
                         prefs.edit().putLong("badge_day", day).apply()
@@ -68,11 +75,18 @@ class CatalogIndexer(
                     updateDubLabels()
                     updateEpisodeNews()
                     dao.deleteEmptyLocalTitles()
+                    val hidden =
+                        io.github.radumariusi.akvodhub.parser.catalog.ContentVisibility.hiddenTitles(
+                            hiddenLanguages,
+                            hiddenCategories,
+                        )
+                    db.openHelper.writableDatabase.execSQL(hidden.sql, hidden.args.toTypedArray())
                     rebuildSearchIndex()
                 }
                 prefs
                     .edit()
                     .putString(FINGERPRINT, dao.fingerprint())
+                    .putString("visibility", visibility)
                     .putLong("badge_day", day)
                     .apply()
                 mutableVersion.value = clock()

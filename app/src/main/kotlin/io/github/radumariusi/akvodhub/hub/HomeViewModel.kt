@@ -52,6 +52,8 @@ class HomeViewModel
         private val repository: HubRepository,
         private val discover: DiscoverRepository,
     ) : ViewModel() {
+        val prefs = repository.sourcePreferences
+
         private val mutableState = MutableStateFlow(HomeState())
         val state: StateFlow<HomeState> = mutableState.asStateFlow()
 

@@ -18,6 +18,8 @@ import io.github.radumariusi.akvodhub.parser.player.SourceRule
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -47,6 +49,14 @@ class PlaybackSettingsViewModel
         private val installer: AddonInstaller,
     ) : ViewModel() {
         val prefs: StateFlow<PlaybackPrefs> = settings.state
+        private val mutableStatistics = MutableStateFlow("Se calculează…")
+        val statistics = mutableStatistics.asStateFlow()
+
+        fun loadStatistics() {
+            viewModelScope.launch {
+                mutableStatistics.value = repository.statistics()
+            }
+        }
 
         private val mutableLanguages = MutableStateFlow<List<String>>(emptyList())
 
@@ -57,6 +67,11 @@ class PlaybackSettingsViewModel
 
         init {
             loadLanguages()
+            viewModelScope.launch {
+                prefs.map { it.hiddenLanguages to it.hiddenCategories }.distinctUntilChanged().collect {
+                    repository.prepare()
+                }
+            }
         }
 
         fun loadLanguages() {
@@ -105,6 +120,28 @@ class PlaybackSettingsViewModel
             settings.setSubtitleLanguages(list.distinct())
         }
 
+        fun setContent(key: String, value: String) {
+            settings.setContent(key, value)
+        }
+
+        fun setAudioPassthrough(value: Boolean) = settings.setAudioPassthrough(value)
+
+        fun setNightMode(value: Boolean) = settings.setNightMode(value)
+
+        fun setDefaultSpeed(value: Float) = settings.setDefaultSpeed(value)
+
+        fun setAutoNext(value: Boolean) = settings.setAutoNext(value)
+
+        fun setMatchFrameRate(value: Boolean) = settings.setMatchFrameRate(value)
+
+        fun setBufferPreset(value: io.github.radumariusi.akvodhub.parser.player.BufferPreset) =
+            settings
+                .setBufferPreset(
+                    value,
+                )
+
+        fun setHomeHero(enabled: Boolean) = settings.setHomeHero(enabled)
+
         fun setPosterSize(size: PosterSize) = settings.setPosterSize(size)
 
         fun setAccentColor(color: AccentColor) = settings.setAccentColor(color)
@@ -114,6 +151,8 @@ class PlaybackSettingsViewModel
         fun setPreferOriginalLanguage(enabled: Boolean) = settings.setPreferOriginalLanguage(enabled)
 
         fun setAddonSubtitlesAuto(enabled: Boolean) = settings.setAddonSubtitlesAuto(enabled)
+
+        fun setSubtitleDelayMs(value: Long) = settings.setSubtitleDelayMs(value)
 
         fun setSubtitleScale(percent: Int) = settings.setSubtitleScale(percent)
 

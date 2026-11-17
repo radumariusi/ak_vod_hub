@@ -27,6 +27,10 @@ fun AppearanceSection(viewModel: PlaybackSettingsViewModel) {
     val prefs by viewModel.prefs.collectAsState()
     var choice by remember { mutableStateOf<Choice?>(null) }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        OutlinedButton(onClick = { viewModel.setHomeHero(!prefs.homeHero) }) {
+            Text("Hero pe Acasă: " + if (prefs.homeHero) "da" else "nu")
+        }
+        Text("Fundalul și descrierea titlului selectat, deasupra rândurilor de pe Acasă.")
         Text("Aspect", style = MaterialTheme.typography.titleLarge)
         Text("Posterele mici lasă loc pentru mai multe titluri pe ecran.", style = MaterialTheme.typography.bodyMedium)
         OutlinedButton(onClick = {

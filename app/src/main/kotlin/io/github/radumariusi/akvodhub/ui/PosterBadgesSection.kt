@@ -2,7 +2,7 @@ package io.github.radumariusi.akvodhub.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -23,7 +23,7 @@ fun PosterBadgesSection(viewModel: PlaybackSettingsViewModel) {
             style = MaterialTheme.typography.bodyMedium,
         )
         PosterBadge.entries.chunked(2).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 row.forEach { badge ->
                     OutlinedButton(onClick = { viewModel.togglePosterBadge(badge) }) {
                         Text("${badge.label}: " + if (badge in prefs.posterBadges) "da" else "nu")

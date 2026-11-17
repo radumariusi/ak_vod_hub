@@ -251,3 +251,36 @@ pune pauză și închide ecranul de redare; nu stinge televizorul. „Sfârșitu
 11. Regresii: reluare, sursă manuală/rezervă, episod următor, subtitrări și interfața etapei 12.
 
 Nu se consideră testate pe TV funcțiile validate numai în CI. Etapa 13 nu începe în acest fir.
+
+### Etapa 13 — setări
+
+Opt categorii în stânga, opțiuni în dreapta: Conținut, Aspect, Redare, Audio, Subtitrări,
+Surse și playlist-uri, Servicii, Sistem. Dreapta intră în opțiuni; Stânga/Înapoi revine la categoria selectată.
+Dialogurile și ecranele de adăugare/configurare păstrează propriul Înapoi. Derularea se păstrează per categorie.
+Wrappere touch existente; fără biblioteci noi sau migrare, Room **v14** verificat în cod.
+
+Inventar refolosit 10–12: profil surse și original, insigne, postere/accent, subtitrări (limbi/automat/mărime/stil),
+frecvență/passthrough/noapte/buffer, playlist-uri/import/refresh/ștergere, TMDB/reîncercări, IMDb și addon-uri.
+Backup/restaurare și configurarea telefonului sunt accesibile în Sistem, prin serverul local existent.
+
+Chei noi în `playback`, incluse în backup și validate la restaurare: `content_languages`, `hidden_languages`,
+`hidden_categories`, `home_hero` (true), `default_speed` (1×), `auto_next` (true), `audio_language`,
+`subtitle_delay_ms` (0). Nicio cheie veche nu este redenumită. Preferințele goale păstrează fallback-ul existent.
+Ascunderea este pe titlul întreg când **oricare** sursă declară o limbă/categorie blocată; categoriile sunt nume
+exacte, separate prin virgulă (numele cu virgulă nu pot fi selectate individual). Reindexarea actualizează
+vizibilitatea în rezumatul `sourceCount`; intrările, istoricul și lista rămân intacte. Nu este control parental.
+Limba audio per serial și originalul au prioritate; limba audio globală nu schimbă profilul surselor.
+Întârzierea implicită este pentru addon-uri; ajustarea din player rămâne pe episod. Viteza implicită se aplică
+la deschiderea playerului; viteza aleasă în player rămâne pe sesiune. Autoplay oprit păstrează pornirea manuală.
+
+Statistici la deschiderea categoriei, în fundal: titluri vizibile unice, 4K, potrivire TMDB; surse pe limbi
+inclusiv cele ascunse, MULTI separat, maximum 30 de limbi afișate. Nu se recalculează la recompoziție.
+Cache imagini: memoria și discul Coil, la cerere; fără ștergerea DB sau a metadatelor.
+`claude-handoff-2026-11-17` absent la verificare; nu a fost recreat. `claude-snapshot` și tagul v0.1.14 păstrate.
+
+Testarea pe TV nu este efectuată. Proprietarul verifică: toate cele opt categorii cu telecomanda și touch;
+Dreapta/Stânga/Înapoi, dialoguri, derulare și revenire din adăugare playlist/telefon; persistență după repornire;
+backup vechi și nou/restaurare; ascundere/dezascundere fără pierderi; hero și insigne; viteză/autoplay,
+audio original/per serial, passthrough/noapte/buffer; subtitrări addon cu decalaj; statistici după import;
+golire cache și reîncărcare postere; updater și instalare peste versiunea existentă. Testele hardware ale etapei 11
+rămân neconfirmate. Nu se începe etapa 14 în acest fir.

@@ -146,7 +146,12 @@ class PlayerViewModel
         /** Subtitrarea din addon afișată peste video (null = folosim pistele sursei). */
         val externalDocument: StateFlow<SubtitleDocument?> = mutableDocument.asStateFlow()
 
-        private val mutableState = MutableStateFlow(PlayerUiState())
+        private val mutableState = MutableStateFlow(PlayerUiState(speed = settings.state.value.defaultSpeed))
+
+        init {
+            player.setPlaybackSpeed(settings.state.value.defaultSpeed)
+        }
+
         val state: StateFlow<PlayerUiState> = mutableState.asStateFlow()
 
         /** Scrierile progresului nu se anulează când se închide ecranul. */
@@ -501,7 +506,7 @@ class PlayerViewModel
                 it.copy(
                     addonSubtitles = emptyList(),
                     addonStatus = if (addons.addons.value.isEmpty()) null else "Caut subtitrări în addon-uri…",
-                    subtitleOffsetMs = 0,
+                    subtitleOffsetMs = settings.state.value.subtitleDelayMs,
                 )
             }
             if (addons.addons.value.isEmpty()) {
@@ -655,7 +660,7 @@ class PlayerViewModel
             val audio = key?.let { settings.seriesTrack(it, "audio") }
             val text = key?.let { settings.seriesTrack(it, "text") }
             return TrackPreferences(
-                SeriesPlayback.audioLanguages(audio, settings.preferredLanguages(title?.originalLanguage)),
+                SeriesPlayback.audioLanguages(audio, settings.audioLanguages(title?.originalLanguage)),
                 if (text == "off") {
                     emptyList()
                 } else {
@@ -870,6 +875,7 @@ class PlayerViewModel
                 mutableState.update { it.copy(finished = true) }
                 return
             }
+            if (!settings.state.value.autoNext) return
             countdownJob?.cancel()
             countdownJob =
                 viewModelScope.launch {

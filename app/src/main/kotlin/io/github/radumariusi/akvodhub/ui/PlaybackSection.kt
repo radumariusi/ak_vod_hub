@@ -2,7 +2,7 @@ package io.github.radumariusi.akvodhub.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -65,24 +65,39 @@ fun PlaybackSection(viewModel: PlaybackSettingsViewModel) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        OutlinedButton(onClick = { viewModel.setPreferOriginalLanguage(!prefs.preferOriginalLanguage) }) {
-            Text("Preferă limba originală: " + if (prefs.preferOriginalLanguage) "da" else "nu")
+        OutlinedButton(onClick = { viewModel.setMatchFrameRate(!prefs.matchFrameRate) }) {
+            Text("Potrivește frecvența ecranului: " + if (prefs.matchFrameRate) "da" else "nu")
         }
-        Text(
-            "Audio original înaintea profilului de surse, apoi MULTI; restul păstrează ordinea profilului. " +
-                "Alegerea manuală a sursei are prioritate.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Text("Păstrează rezoluția; unele TV-uri clipesc la schimbarea frecvenței.")
+        OutlinedButton(onClick = {
+            val options = io.github.radumariusi.akvodhub.parser.player.BufferPreset.entries
+            choice =
+                Choice("Buffer", options.map { it.label }, options.indexOf(prefs.bufferPreset)) {
+                    viewModel.setBufferPreset(options[it])
+                }
+        }) { Text("Buffer: ${prefs.bufferPreset.label}") }
+        Text("Bufferul se aplică la redeschiderea playerului; mare folosește mai multă memorie.")
+        OutlinedButton(onClick = {
+            val options = io.github.radumariusi.akvodhub.parser.player.PlaybackDefaults.speeds
+            choice =
+                Choice("Viteză implicită", options.map { "$it×" }, options.indexOf(prefs.defaultSpeed)) {
+                    viewModel.setDefaultSpeed(options[it])
+                }
+        }) { Text("Viteză implicită: ${prefs.defaultSpeed}×") }
+        Text("La deschiderea playerului. Viteza din player rămâne valabilă pentru sesiunea curentă.")
+        OutlinedButton(onClick = { viewModel.setAutoNext(!prefs.autoNext) }) {
+            Text("Episodul următor automat: " + if (prefs.autoNext) "da" else "nu")
+        }
+        Text("Pornește după numărătoarea de zece secunde; timerul de somn are prioritate.")
         rules.forEachIndexed { index, rule ->
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(if (index == 0) "Prima:" else "Altfel:", style = MaterialTheme.typography.bodyLarge)
                 OutlinedButton(onClick = { pickQuality(index, rule) }) { Text(qualityName(rule.quality)) }
                 OutlinedButton(onClick = { pickLanguage(index, rule) }) { Text(languageName(rule.language)) }
                 OutlinedButton(onClick = { viewModel.setRule(index, null) }) { Text("Șterge") }
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             if (rules.size < SourceProfile.MAX_RULES) {
                 OutlinedButton(onClick = {
                     viewModel.loadLanguages()

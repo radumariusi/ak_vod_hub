@@ -32,6 +32,14 @@ data class PlaybackPrefs(
     /** Mărimea subtitrărilor, în procente (100 = normal). */
     val subtitleScale: Int = 100,
     val subtitleStyle: SubtitleStyle = SubtitleStyle.WHITE_OUTLINE,
+    val homeHero: Boolean = true,
+    val defaultSpeed: Float = 1f,
+    val autoNext: Boolean = true,
+    val audioLanguage: String = "",
+    val subtitleDelayMs: Long = 0L,
+    val contentLanguages: String = "",
+    val hiddenLanguages: String = "",
+    val hiddenCategories: String = "",
     val preferOriginalLanguage: Boolean = false,
     val matchFrameRate: Boolean = false,
     val audioPassthrough: Boolean = false,
@@ -65,9 +73,17 @@ class PlaybackSettings(
     fun preferredLanguages(originalLanguage: String? = null): List<String> =
         (
             listOfNotNull(OriginalLanguage.code(originalLanguage).takeIf { state.value.preferOriginalLanguage }) +
+                io.github.radumariusi.akvodhub.parser.catalog.ContentVisibility
+                    .tokens(state.value.contentLanguages) +
                 state.value.profile.languages + listOfNotNull(systemLanguage) + "en"
         ).filter { it.length == 2 }
             .distinct()
+
+    fun audioLanguages(originalLanguage: String?): List<String> =
+        (
+            listOfNotNull(OriginalLanguage.code(originalLanguage).takeIf { state.value.preferOriginalLanguage }) +
+                listOf(state.value.audioLanguage).filter { it.length == 2 } + preferredLanguages(originalLanguage)
+        ).distinct()
 
     fun seriesTrack(key: String, type: String): String? = prefs.getString("series.$key.$type", null)
 
@@ -99,6 +115,48 @@ class PlaybackSettings(
         ) {
             prefs.edit().putString(name, endMs.toString()).apply()
         }
+    }
+
+    fun setHomeHero(value: Boolean) {
+        prefs.edit().putBoolean("home_hero", value).apply()
+        mutableState.value = read()
+    }
+
+    fun setDefaultSpeed(value: Float) {
+        prefs
+            .edit()
+            .putFloat(
+                "default_speed",
+                io.github.radumariusi.akvodhub.parser.player.PlaybackDefaults
+                    .speed(value),
+            ).apply()
+        mutableState.value = read()
+    }
+
+    fun setAutoNext(value: Boolean) {
+        prefs.edit().putBoolean("auto_next", value).apply()
+        mutableState.value = read()
+    }
+
+    fun setSubtitleDelayMs(value: Long) {
+        prefs
+            .edit()
+            .putLong(
+                "subtitle_delay_ms",
+                io.github.radumariusi.akvodhub.parser.player.PlaybackDefaults
+                    .offset(value),
+            ).apply()
+        mutableState.value = read()
+    }
+
+    fun setContent(key: String, value: String) {
+        if (key !in CONTENT_KEYS) return
+        val clean =
+            io.github.radumariusi.akvodhub.parser.catalog.ContentVisibility
+                .tokens(value, lowercase = key != "hidden_categories")
+                .joinToString(",")
+        prefs.edit().putString(key, clean).apply()
+        mutableState.value = read()
     }
 
     fun setBufferPreset(value: BufferPreset) {
@@ -181,6 +239,11 @@ class PlaybackSettings(
                     put(key, value)
                 }
             }
+            put("home_hero", state.value.homeHero.toString())
+            put("default_speed", state.value.defaultSpeed.toString())
+            put("auto_next", state.value.autoNext.toString())
+            put("subtitle_delay_ms", state.value.subtitleDelayMs.toString())
+            CONTENT_KEYS.forEach { key -> prefs.getString(key, null)?.let { put(key, it) } }
             put(BUFFER, state.value.bufferPreset.name)
             put(NIGHT, state.value.nightMode.toString())
             put(PASSTHROUGH, state.value.audioPassthrough.toString())
@@ -198,6 +261,11 @@ class PlaybackSettings(
 
     /** Restaurare din backup: doar cheile cunoscute, cu valori verificate la citire. */
     fun restore(values: Map<String, String>) {
+        values["subtitle_delay_ms"]?.toLongOrNull()?.let { setSubtitleDelayMs(it) }
+        values["auto_next"]?.toBooleanStrictOrNull()?.let { setAutoNext(it) }
+        values["default_speed"]?.toFloatOrNull()?.let { setDefaultSpeed(it) }
+        values["home_hero"]?.toBooleanStrictOrNull()?.let { setHomeHero(it) }
+        CONTENT_KEYS.forEach { key -> values[key]?.let { setContent(key, it) } }
         val edit = prefs.edit()
         values[BUFFER]?.let { edit.putString(BUFFER, BufferPreset.decode(it).name) }
         values.forEach { (key, value) ->
@@ -252,6 +320,20 @@ class PlaybackSettings(
                 }
             }
         return PlaybackPrefs(
+            homeHero = prefs.getBoolean("home_hero", true),
+            defaultSpeed =
+                io.github.radumariusi.akvodhub.parser.player.PlaybackDefaults.speed(
+                    prefs.getFloat("default_speed", 1f),
+                ),
+            autoNext = prefs.getBoolean("auto_next", true),
+            audioLanguage = prefs.getString("audio_language", "").orEmpty(),
+            subtitleDelayMs =
+                io.github.radumariusi.akvodhub.parser.player.PlaybackDefaults.offset(
+                    prefs.getLong("subtitle_delay_ms", 0L),
+                ),
+            contentLanguages = prefs.getString("content_languages", "").orEmpty(),
+            hiddenLanguages = prefs.getString("hidden_languages", "").orEmpty(),
+            hiddenCategories = prefs.getString("hidden_categories", "").orEmpty(),
             bufferPreset = BufferPreset.decode(prefs.getString(BUFFER, null)),
             nightMode = prefs.getBoolean(NIGHT, false),
             audioPassthrough = prefs.getBoolean(PASSTHROUGH, false),
@@ -271,6 +353,8 @@ class PlaybackSettings(
     }
 
     companion object {
+        private val CONTENT_KEYS =
+            listOf("content_languages", "hidden_languages", "hidden_categories", "audio_language")
         private const val BUFFER = "buffer_preset"
         private const val NIGHT = "night_mode"
         private const val PASSTHROUGH = "audio_passthrough"
