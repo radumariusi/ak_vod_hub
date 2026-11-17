@@ -147,7 +147,7 @@ private fun DetailsContent(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item("header") {
-            Header(details, state.credits) {
+            Header(details, state.credits, state.logoPath) {
                 val first = episodes?.let { EpisodeOrder.linear(it.seasons).firstOrNull() }
                 PlayActions(state, title.id, first, playFocus, onPlay)
             }
@@ -294,6 +294,7 @@ private fun DiscoverCards(
 private fun Header(
     details: TitleDetails,
     credits: Credits?,
+    logoPath: String?,
     actions: @Composable () -> Unit,
 ) {
     val title = details.title
@@ -314,12 +315,7 @@ private fun Header(
             }
         }
         Column(Modifier.widthIn(max = 620.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(
-                title.name,
-                style = MaterialTheme.typography.displaySmall,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+            TitleHeading(title.name, logoPath)
             if (title.originalName != null && title.originalName != title.name) {
                 Text(
                     title.originalName.orEmpty(),

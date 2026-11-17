@@ -31,6 +31,7 @@ data class DetailsState(
     val loadingEpisodes: Boolean = false,
     val credits: Credits? = null,
     val selectedSeason: Int? = null,
+    val logoPath: String? = null,
     /** Unde a rămas utilizatorul (pentru „Continuă”). */
     val watch: WatchStateEntity? = null,
     /** Sursa pe care o alege playerul singur (profilul din Setări → Redare). */
@@ -99,6 +100,10 @@ class DetailsViewModel
                         it.copy(loading = false, details = details, recommended = recommended, watch = watch)
                     }
                     if (details == null) return@launch
+                    launch {
+                        val logo = repository.logo(titleId)
+                        mutableState.update { if (it.titleId == titleId) it.copy(logoPath = logo) else it }
+                    }
                     launch overview@{
                         val localized = repository.romanianOverview(titleId) ?: return@overview
                         mutableState.update { state ->

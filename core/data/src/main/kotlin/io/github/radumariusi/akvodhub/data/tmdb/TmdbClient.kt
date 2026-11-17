@@ -138,6 +138,12 @@ class TmdbClient(
         return json.decodeFromString<TmdbFindResult>(body)
     }
 
+    suspend fun images(key: String, type: MediaType, tmdbId: Long): TmdbImages {
+        val path = if (type == MediaType.TV) "tv/$tmdbId/images" else "movie/$tmdbId/images"
+        val body = get(key, url(path).build(), strict = true) ?: return TmdbImages()
+        return json.decodeFromString<TmdbImages>(body)
+    }
+
     private fun url(path: String): HttpUrl.Builder = "$baseUrl/$path".toHttpUrl().newBuilder()
 
     /** GET cu cheia; întoarce corpul, null la 404; aruncă [TmdbAuthException] la 401. */

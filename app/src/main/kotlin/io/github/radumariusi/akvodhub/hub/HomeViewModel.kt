@@ -93,6 +93,8 @@ class HomeViewModel
             }
         }
 
+        suspend fun logo(titleId: Long): String? = repository.logo(titleId)
+
         fun reload() {
             viewModelScope.launch {
                 val keep = base.associate { it.key to it.items.size }

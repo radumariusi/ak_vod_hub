@@ -4,6 +4,7 @@ import androidx.room.withTransaction
 import androidx.sqlite.db.SimpleSQLiteQuery
 import io.github.radumariusi.akvodhub.data.db.AkVodDatabase
 import io.github.radumariusi.akvodhub.data.db.ContinueItem
+import io.github.radumariusi.akvodhub.data.db.DiscoverCacheEntity
 import io.github.radumariusi.akvodhub.data.db.PlaylistType
 import io.github.radumariusi.akvodhub.data.db.RawEntryEntity
 import io.github.radumariusi.akvodhub.data.db.TitleCard
@@ -23,8 +24,10 @@ import io.github.radumariusi.akvodhub.parser.catalog.EpisodeEntry
 import io.github.radumariusi.akvodhub.parser.catalog.EpisodeMerge
 import io.github.radumariusi.akvodhub.parser.catalog.Genres
 import io.github.radumariusi.akvodhub.parser.catalog.LocalizedOverview
+import io.github.radumariusi.akvodhub.parser.catalog.LogoCandidate
 import io.github.radumariusi.akvodhub.parser.catalog.MergedSeason
 import io.github.radumariusi.akvodhub.parser.catalog.PosterBadges
+import io.github.radumariusi.akvodhub.parser.catalog.TitleLogo
 import io.github.radumariusi.akvodhub.parser.match.QualityGroup
 import io.github.radumariusi.akvodhub.parser.match.SourceGrouping
 import io.github.radumariusi.akvodhub.parser.match.SourceInfo
@@ -92,6 +95,7 @@ class HubRepository(
     private val dao = db.catalogDao()
     private val playlistDao = db.playlistDao()
     private val overviewMutex = Mutex()
+    private val logoMutex = Mutex()
     private val creditsCache = ConcurrentHashMap<Long, Credits>()
 
     /** Episoadele Xtream cerute de la server în sesiunea curentă (o dată pe serial și playlist). */
@@ -206,6 +210,36 @@ class HubRepository(
             genres = Genres.names(title.genreIds),
         )
     }
+
+    /** Numai hero stabil/fișă: rezultat (inclusiv absent) salvat 30 zile, maximum 128 titluri. */
+    suspend fun logo(titleId: Long): String? =
+        logoMutex.withLock {
+            val title = dao.titleById(titleId) ?: return@withLock null
+            if (title.isLocal) return@withLock null
+            val cache = db.discoverDao()
+            val cacheKey = "logo:${title.mediaType}:${title.tmdbId}"
+            val old = cache.cached(cacheKey)
+            val now = System.currentTimeMillis()
+            if (old != null && LocalizedOverview.isCached(old.fetchedAt, now)) return@withLock old.data.ifBlank { null }
+            try {
+                val key = settings.apiKey() ?: return@withLock old?.data?.ifBlank { null }
+                val images = tmdb.images(key, title.mediaType, title.tmdbId)
+                val path =
+                    TitleLogo.choose(
+                        images.logos.map { LogoCandidate(it.path, it.language, it.votes) },
+                        title.originalLanguage,
+                    )
+                db.withTransaction {
+                    cache.putCache(DiscoverCacheEntity(cacheKey, path.orEmpty(), now))
+                    cache.trimLogos()
+                }
+                path
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                old?.data?.ifBlank { null }
+            }
+        }
 
     /** Numai fișa deschisă cere traducerea. Erorile păstrează descrierea existentă și permit reîncercarea. */
     suspend fun romanianOverview(titleId: Long): TitleEntity? =

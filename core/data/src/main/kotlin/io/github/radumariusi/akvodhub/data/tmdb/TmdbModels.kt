@@ -185,3 +185,13 @@ data class TmdbFindResult(
     @SerialName("movie_results") val movies: List<TmdbItem> = emptyList(),
     @SerialName("tv_results") val tv: List<TmdbItem> = emptyList(),
 )
+
+@Serializable
+data class TmdbImages(val logos: List<TmdbLogo> = emptyList())
+
+@Serializable
+data class TmdbLogo(
+    @SerialName("file_path") val path: String,
+    @SerialName("iso_639_1") val language: String? = null,
+    @SerialName("vote_count") val votes: Int = 0,
+)
