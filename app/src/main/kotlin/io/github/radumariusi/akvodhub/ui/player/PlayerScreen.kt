@@ -12,11 +12,13 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
@@ -45,6 +47,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -52,8 +55,10 @@ import androidx.media3.common.Player
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import androidx.tv.material3.ExperimentalTvMaterial3Api
+import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import io.github.radumariusi.akvodhub.R
 import io.github.radumariusi.akvodhub.parser.player.BufferPreset
 import io.github.radumariusi.akvodhub.parser.player.Resume
 import io.github.radumariusi.akvodhub.parser.player.SeekNavigation
@@ -319,6 +324,8 @@ private fun Controls(
     modifier: Modifier,
 ) {
     val playbackPrefs by viewModel.prefs.collectAsState()
+    var focusedCommand by remember { mutableStateOf("") }
+    val onCommandFocus: (String) -> Unit = { focusedCommand = it }
     Column(
         modifier =
             modifier
@@ -358,15 +365,42 @@ private fun Controls(
         })
         Row(
             modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 10.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Button(onClick = viewModel::togglePlay, modifier = Modifier.focusRequester(playFocus)) {
-                Text(if (isPlaying) "Pauză" else "Redă")
+            PlayerCommand(
+                if (isPlaying) R.drawable.ic_player_pause else R.drawable.ic_player_play,
+                if (isPlaying) "Pauză" else "Redă",
+                onCommandFocus,
+                modifier = Modifier.focusRequester(playFocus),
+                onClick = viewModel::togglePlay,
+            )
+            PlayerCommand(R.drawable.ic_player_rewind, "Înapoi 10 secunde", onCommandFocus) {
+                viewModel.seekBy(-PlayerFactory.SEEK_MS)
             }
-            OutlinedButton(onClick = { viewModel.seekBy(-PlayerFactory.SEEK_MS) }) { Text("−10 s") }
-            OutlinedButton(onClick = { viewModel.seekBy(PlayerFactory.SEEK_MS) }) { Text("+10 s") }
-            OutlinedButton(onClick = {
+            PlayerCommand(R.drawable.ic_player_forward, "Înainte 10 secunde", onCommandFocus) {
+                viewModel.seekBy(PlayerFactory.SEEK_MS)
+            }
+            if (state.audio.isNotEmpty()) {
+                PlayerCommand(R.drawable.ic_player_audio, "Audio (${state.audio.size})", onCommandFocus) {
+                    onChoice(
+                        Choice(
+                            "Audio",
+                            state.audio.map { it.label },
+                            state.audio.indexOfFirst { it.selected }.takeIf { it >= 0 },
+                        ) { i -> viewModel.selectTrack(state.audio[i]) },
+                    )
+                }
+            }
+            val subtitleCount = state.subtitles.size + state.addonSubtitles.size
+            PlayerCommand(R.drawable.ic_player_subtitles, if (subtitleCount == 0) "Subtitrări" else "Subtitrări ($subtitleCount)", onCommandFocus) { onChoice(subtitleChoice(state, viewModel)) }
+            if (state.externalSubtitle != null || state.subtitles.any { it.selected }) {
+                PlayerCommand(R.drawable.ic_player_adjust, "Ajustează subtitrările", onCommandFocus, onClick = onAdjust)
+            }
+            if (state.sources.size > 1) {
+                PlayerCommand(R.drawable.ic_player_source, "Sursă (${state.sources.size})", onCommandFocus) { onChoice(sourceChoice(state, viewModel)) }
+            }
+            PlayerCommand(R.drawable.ic_player_screen, "Frecvență ecran", onCommandFocus) {
                 onChoice(
                     Choice(
                         "Frecvență ecran · poate clipi la schimbare",
@@ -376,8 +410,8 @@ private fun Controls(
                         viewModel.setMatchFrameRate(it == 1)
                     },
                 )
-            }) { Text("Frecvență ecran") }
-            OutlinedButton(onClick = {
+            }
+            PlayerCommand(R.drawable.ic_player_output, "Ieșire audio · passthrough", onCommandFocus) {
                 onChoice(
                     Choice(
                         "Passthrough · la redeschiderea playerului",
@@ -387,8 +421,8 @@ private fun Controls(
                         viewModel.setAudioPassthrough(it == 1)
                     },
                 )
-            }) { Text("Passthrough") }
-            OutlinedButton(onClick = {
+            }
+            PlayerCommand(R.drawable.ic_player_night, "Mod noapte", onCommandFocus) {
                 onChoice(
                     Choice(
                         "Mod noapte · la redeschidere, fără passthrough",
@@ -398,8 +432,8 @@ private fun Controls(
                         viewModel.setNightMode(it == 1)
                     },
                 )
-            }) { Text("Mod noapte") }
-            OutlinedButton(onClick = {
+            }
+            PlayerCommand(R.drawable.ic_player_format, "Format imagine", onCommandFocus) {
                 onChoice(
                     Choice(
                         "Format imagine",
@@ -408,8 +442,8 @@ private fun Controls(
                         viewModel::setPictureMode,
                     ),
                 )
-            }) { Text("Format imagine") }
-            OutlinedButton(onClick = {
+            }
+            PlayerCommand(R.drawable.ic_player_speed, "Viteză ${state.speed}×", onCommandFocus) {
                 val speeds = listOf(0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
                 onChoice(
                     Choice(
@@ -420,8 +454,8 @@ private fun Controls(
                         viewModel.setSpeed(speeds[it])
                     },
                 )
-            }) { Text("Viteză ${state.speed}×") }
-            OutlinedButton(onClick = {
+            }
+            PlayerCommand(R.drawable.ic_player_buffer, "Buffer", onCommandFocus) {
                 onChoice(
                     Choice(
                         "Buffer · la redeschiderea playerului",
@@ -433,31 +467,8 @@ private fun Controls(
                         viewModel.setBufferPreset(BufferPreset.entries[it])
                     },
                 )
-            }) { Text("Buffer") }
-            if (state.audio.isNotEmpty()) {
-                OutlinedButton(onClick = {
-                    onChoice(
-                        Choice(
-                            "Audio",
-                            state.audio.map { it.label },
-                            state.audio.indexOfFirst { it.selected }.takeIf { it >= 0 },
-                        ) { i -> viewModel.selectTrack(state.audio[i]) },
-                    )
-                }) { Text("Audio (${state.audio.size})") }
             }
-            val subtitleCount = state.subtitles.size + state.addonSubtitles.size
-            OutlinedButton(onClick = { onChoice(subtitleChoice(state, viewModel)) }) {
-                Text(if (subtitleCount == 0) "Subtitrări" else "Subtitrări ($subtitleCount)")
-            }
-            if (state.externalSubtitle != null || state.subtitles.any { it.selected }) {
-                OutlinedButton(onClick = onAdjust) { Text("Ajustează") }
-            }
-            if (state.sources.size > 1) {
-                OutlinedButton(onClick = { onChoice(sourceChoice(state, viewModel)) }) {
-                    Text("Sursă (${state.sources.size})")
-                }
-            }
-            OutlinedButton(onClick = {
+            PlayerCommand(R.drawable.ic_player_timer, "Timer de somn · ${state.sleepLabel}", onCommandFocus) {
                 val minutes = if (state.isSeries) listOf(0, 30, 60, 90, -1) else listOf(0, 30, 60, 90)
                 val labels =
                     listOf("Oprit", "30 minute", "60 minute", "90 minute") +
@@ -469,15 +480,15 @@ private fun Controls(
                         null,
                     ) { viewModel.setSleepTimer(minutes[it]) },
                 )
-            }) { Text("Somn: ${state.sleepLabel}") }
-            OutlinedButton(onClick = onTechnical) { Text("Info tehnic") }
-            OutlinedButton(onClick = onJump) { Text("Salt la minut") }
+            }
+            PlayerCommand(R.drawable.ic_player_info, "Info tehnic", onCommandFocus, onClick = onTechnical)
+            PlayerCommand(R.drawable.ic_player_timer, "Salt la minut", onCommandFocus, onClick = onJump)
             if (state.isSeries) {
-                OutlinedButton(onClick = viewModel::resetSeriesTracks) { Text("Resetează audio/subtitrare serial") }
+                PlayerCommand(R.drawable.ic_player_reset, "Resetează audio/subtitrare serial", onCommandFocus, onClick = viewModel::resetSeriesTracks)
                 if (SeriesPlayback.canSkip(position, duration, state.introEndMs)) {
-                    OutlinedButton(onClick = viewModel::skipIntro) { Text("Sari intro") }
+                    PlayerCommand(R.drawable.ic_player_next, "Sari intro", onCommandFocus, onClick = viewModel::skipIntro)
                 }
-                OutlinedButton(onClick = {
+                PlayerCommand(R.drawable.ic_player_bookmark, "Marcaj intro serial", onCommandFocus) {
                     onChoice(
                         Choice(
                             "Intro pentru acest serial",
@@ -487,12 +498,37 @@ private fun Controls(
                             if (it == 0) viewModel.markIntro() else viewModel.clearIntro()
                         },
                     )
-                }) { Text("Intro serial") }
+                }
             }
             if (state.next != null) {
-                OutlinedButton(onClick = viewModel::playNext) { Text("Episodul următor") }
+                PlayerCommand(R.drawable.ic_player_next, "Episodul următor", onCommandFocus, onClick = viewModel::playNext)
             }
         }
+        Text(
+            focusedCommand,
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun PlayerCommand(
+    icon: Int,
+    label: String,
+    onFocus: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    var focused by remember { mutableStateOf(false) }
+    LaunchedEffect(focused, label) { if (focused) onFocus(label) }
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier.size(48.dp).onFocusChanged { focused = it.isFocused },
+        contentPadding = PaddingValues(0.dp),
+    ) {
+        Icon(painterResource(icon), contentDescription = label, modifier = Modifier.size(22.dp))
     }
 }
 
