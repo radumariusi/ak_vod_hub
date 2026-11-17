@@ -107,7 +107,11 @@ fun PosterCard(
             onFocusRequested()
         }
     }
-    Column(modifier.width(PosterWidth)) {
+    // La 144 × 216 dp, scala 1,08 extinde posterul cu aproximativ 6 × 9 dp pe fiecare latură.
+    Column(
+        modifier.width(PosterWidth + 16.dp).padding(horizontal = 8.dp, vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
         Card(
             onClick = onClick,
             modifier =
@@ -185,9 +189,11 @@ fun PosterCard(
         Text(
             card.name,
             style = MaterialTheme.typography.bodySmall,
-            maxLines = 1,
+            textAlign = TextAlign.Center,
+            minLines = 2,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 6.dp).height(18.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
         )
     }
 }
