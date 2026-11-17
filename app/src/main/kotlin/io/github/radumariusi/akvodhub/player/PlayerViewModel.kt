@@ -71,6 +71,8 @@ data class AddonSubtitleOption(
 )
 
 data class PlayerUiState(
+    val pictureMode: Int = 0,
+    val speed: Float = 1f,
     val title: String = "",
     /** La seriale: „S01E03 · Titlul episodului”. */
     val subtitle: String? = null,
@@ -597,6 +599,17 @@ class PlayerViewModel
         }
 
         fun setMatchFrameRate(enabled: Boolean) = settings.setMatchFrameRate(enabled)
+
+        fun setPictureMode(mode: Int) {
+            mutableState.update { it.copy(pictureMode = mode.coerceIn(0, 2)) }
+        }
+
+        fun setSpeed(speed: Float) {
+            if (speed !in listOf(0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)) return
+            runCatching { player.setPlaybackSpeed(speed) }
+                .onSuccess { mutableState.update { it.copy(speed = player.playbackParameters.speed) } }
+                .onFailure { showNotice("Viteza nu este acceptată de ieșirea audio. Dezactivează passthrough și redeschide playerul.") }
+        }
 
         fun togglePlay() {
             if (player.isPlaying) {

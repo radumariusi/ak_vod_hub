@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.Player
 import androidx.media3.ui.PlayerView
+import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -195,7 +196,14 @@ fun PlayerScreen(
                     this.player = player
                 }
             },
-            update = { view -> SubtitleLook.applyTo(view, prefs.subtitleScale, prefs.subtitleStyle) },
+            update = { view ->
+                SubtitleLook.applyTo(view, prefs.subtitleScale, prefs.subtitleStyle)
+                view.resizeMode = when (state.pictureMode) {
+                    1 -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                    2 -> AspectRatioFrameLayout.RESIZE_MODE_FILL
+                    else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+                }
+            },
             onRelease = { it.player = null },
             modifier = Modifier.fillMaxSize(),
         )
@@ -362,6 +370,15 @@ private fun Controls(
                     viewModel.setNightMode(it == 1)
                 })
             }) { Text("Mod noapte") }
+            OutlinedButton(onClick = {
+                onChoice(Choice("Format imagine", listOf("Potrivit", "Zoom", "Întins"), state.pictureMode, viewModel::setPictureMode))
+            }) { Text("Format imagine") }
+            OutlinedButton(onClick = {
+                val speeds = listOf(0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
+                onChoice(Choice("Viteză de redare", listOf("0,75×", "1×", "1,25×", "1,5×", "1,75×", "2×"), speeds.indexOf(state.speed)) {
+                    viewModel.setSpeed(speeds[it])
+                })
+            }) { Text("Viteză ${state.speed}×") }
             if (state.audio.isNotEmpty()) {
                 OutlinedButton(onClick = {
                     onChoice(
