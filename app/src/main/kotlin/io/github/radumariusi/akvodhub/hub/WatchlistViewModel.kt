@@ -35,6 +35,7 @@ class WatchlistViewModel
         private fun reload() {
             job?.cancel()
             val keep = maxOf(PAGE, mutableState.value.items.size)
+            mutableState.value = mutableState.value.copy(loading = true)
             job =
                 viewModelScope.launch {
                     val items = mutableListOf<TitleCard>()
