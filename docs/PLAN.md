@@ -194,6 +194,10 @@ Documentele astea, `.gitignore`, workflow de curățenie automată, reguli de lu
 - 14.4: selecție ABI și publicare universal + variante pregătite. Verificarea variantelor semnate și a tranziției TV este în așteptare.
 - Room rămâne v14. Livrarea se face după generarea profilului, CI verde și merge.
 
+## Corecții UI și player TV
+
+Vezi [planul separat al corecțiilor și verificarea pe Android 11 TV](CORECTII_TV.md).
+
 ## Idei suplimentare
 
 1. **Verificare sănătate surse**: test rapid în fundal al linkurilor; sursele moarte sunt marcate și puse la final.

@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-18 — Corecții UI și player TV
+- Spațiu de focus, contrast, titluri și distribuție centrate, un singur indicator de filă.
+- Comenzi compacte, un singur play/pauză la OK pe bară, subtitrări interne și externe și meniuri întunecate.
+- Calitatea și limba necunoscute au etichete distincte. Limbile declarate se completează în fundal, cu Room v14.
+
 ## 2026-11-17 — Etapa 14 (în curs)
 - Rândurile și grilele catalogului folosesc paginare după cheie. Cache-ul Coil are plafon de 64 MiB și poate decoda posterele JPEG TMDB în RGB565.
 - Updaterul selectează APK-ul compatibil cu procesorul și păstrează compatibilitatea cu updaterul vechi prin APK-ul universal.

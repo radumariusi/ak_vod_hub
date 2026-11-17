@@ -94,6 +94,7 @@ data class PlayerUiState(
     val failures: List<String> = emptyList(),
     val audio: List<TrackOption> = emptyList(),
     val subtitles: List<TrackOption> = emptyList(),
+    val subtitlesOff: Boolean = false,
     /** Subtitrările găsite în addon-urile Stremio (limbile preferate primele). */
     val addonSubtitles: List<AddonSubtitleOption> = emptyList(),
     /** Starea căutării în addon-uri (ex. „Caut subtitrări…”); null când lista e gata și nu e nimic de spus. */
@@ -451,6 +452,7 @@ class PlayerViewModel
 
         fun selectTrack(option: TrackOption) {
             if (option.type == C.TRACK_TYPE_TEXT) {
+                mutableState.update { it.copy(subtitlesOff = false) }
                 subtitleDecided = true
                 clearExternal()
             }
@@ -469,6 +471,7 @@ class PlayerViewModel
 
         fun resetSeriesTracks() {
             seriesKey()?.let(settings::clearSeriesTracks)
+            mutableState.update { it.copy(subtitlesOff = false) }
             clearExternal()
             player.trackSelectionParameters = PlayerFactory.apply(player.trackSelectionParameters, trackPreferences())
             subtitleDecided = false
@@ -478,9 +481,26 @@ class PlayerViewModel
 
         fun disableSubtitles() {
             seriesKey()?.let { settings.setSeriesTrack(it, "text", "off") }
+            mutableState.update { it.copy(subtitlesOff = true) }
             subtitleDecided = true
             clearExternal()
             TrackOptions.disableSubtitles(player)
+        }
+
+        fun automaticSubtitles() {
+            seriesKey()?.let(settings::clearSeriesSubtitle)
+            clearExternal()
+            val languages = settings.state.value.subtitleLanguages
+            player.trackSelectionParameters =
+                player.trackSelectionParameters
+                    .buildUpon()
+                    .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+                    .setPreferredTextLanguages(*languages.toTypedArray())
+                    .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, languages.isEmpty())
+                    .build()
+            mutableState.update { it.copy(subtitlesOff = false) }
+            subtitleDecided = false
+            autoPickSubtitle()
         }
 
         /**
@@ -505,6 +525,7 @@ class PlayerViewModel
             mutableState.update {
                 it.copy(
                     addonSubtitles = emptyList(),
+                    subtitlesOff = seriesKey()?.let { settings.seriesTrack(it, "text") } == "off",
                     addonStatus = if (addons.addons.value.isEmpty()) null else "Caut subtitrări în addon-uri…",
                     subtitleOffsetMs = settings.state.value.subtitleDelayMs,
                 )
@@ -624,7 +645,13 @@ class PlayerViewModel
                         val document = subtitleRepository.load(subtitle)
                         mutableDocument.value = document
                         TrackOptions.disableSubtitles(player)
-                        mutableState.update { it.copy(externalSubtitle = subtitle.url, externalLabel = label) }
+                        mutableState.update {
+                            it.copy(
+                                externalSubtitle = subtitle.url,
+                                externalLabel = label,
+                                subtitlesOff = false,
+                            )
+                        }
                         showNotice("Subtitrare: ${label ?: subtitle.addon}")
                     } catch (e: CancellationException) {
                         throw e
@@ -809,13 +836,11 @@ class PlayerViewModel
                 }
         }
 
-        fun togglePlay() {
-            if (player.isPlaying) {
-                player.pause()
-            } else {
-                if (player.playbackState == Player.STATE_ENDED) player.seekTo(0)
-                player.play()
-            }
+        fun togglePlay() = setPlaying(!player.playWhenReady || player.playbackState == Player.STATE_ENDED)
+
+        fun setPlaying(playing: Boolean) {
+            if (playing && player.playbackState == Player.STATE_ENDED) player.seekTo(0)
+            player.playWhenReady = playing
         }
 
         fun seekBy(deltaMs: Long) {

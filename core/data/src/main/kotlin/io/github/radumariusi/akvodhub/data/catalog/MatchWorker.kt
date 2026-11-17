@@ -33,6 +33,10 @@ class MatchWorker(
             scheduler.enqueueAfterPlaybackPause()
             return Result.success()
         }
+        if (!indexer.refreshSourceLanguages()) {
+            if (PlaybackActivityState.active) scheduler.enqueueAfterPlaybackPause() else scheduler.enqueue()
+            return Result.success()
+        }
         // Întâi titlurile locale: după un import, tot playlist-ul apare în hub în câteva minute, fără să
         // aștepte prima rundă TMDB (până la 8 min). Dacă nu s-a schimbat nimic, e doar o verificare rapidă.
         indexer.refresh()

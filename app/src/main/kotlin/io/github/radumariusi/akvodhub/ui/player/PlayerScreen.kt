@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalTvMaterial3Api::class)
+@file:OptIn(ExperimentalTvMaterial3Api::class, ExperimentalLayoutApi::class)
 
 package io.github.radumariusi.akvodhub.ui.player
 
@@ -12,13 +12,18 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -45,6 +50,9 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -52,9 +60,12 @@ import androidx.media3.common.Player
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import androidx.tv.material3.ExperimentalTvMaterial3Api
+import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import io.github.radumariusi.akvodhub.R
 import io.github.radumariusi.akvodhub.parser.player.BufferPreset
+import io.github.radumariusi.akvodhub.parser.player.PlayerKeyPress
 import io.github.radumariusi.akvodhub.parser.player.Resume
 import io.github.radumariusi.akvodhub.parser.player.SeekNavigation
 import io.github.radumariusi.akvodhub.parser.player.SeriesPlayback
@@ -63,6 +74,7 @@ import io.github.radumariusi.akvodhub.player.PlayerUiState
 import io.github.radumariusi.akvodhub.player.PlayerViewModel
 import io.github.radumariusi.akvodhub.ui.hub.Choice
 import io.github.radumariusi.akvodhub.ui.hub.ChoiceDialog
+import io.github.radumariusi.akvodhub.ui.theme.ThemedPanel
 import io.github.radumariusi.akvodhub.ui.touch.Button
 import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
 import kotlinx.coroutines.delay
@@ -88,16 +100,25 @@ fun PlayerScreen(
     val prefs by viewModel.prefs.collectAsState()
     val document by viewModel.externalDocument.collectAsState()
     var isPlaying by remember { mutableStateOf(player.isPlaying) }
+    var playWhenReady by remember { mutableStateOf(player.playWhenReady) }
     var position by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(0L) }
     val rootFocus = remember { FocusRequester() }
     val playFocus = remember { FocusRequester() }
+    var openingKey by remember { mutableStateOf<Key?>(null) }
+    var controlsHeight by remember { mutableIntStateOf(0) }
+    val adjustFocus = remember { FocusRequester() }
+    var returnToAdjust by remember { mutableStateOf(false) }
 
     DisposableEffect(player) {
         val listener =
             object : Player.Listener {
                 override fun onIsPlayingChanged(playing: Boolean) {
                     isPlaying = playing
+                }
+
+                override fun onPlayWhenReadyChanged(ready: Boolean, reason: Int) {
+                    playWhenReady = ready
                 }
             }
         player.addListener(listener)
@@ -119,43 +140,62 @@ fun PlayerScreen(
     LaunchedEffect(state.finished) { if (state.finished) onExit() }
     val overlay = state.error != null || state.countdown != null || adjusting
     LaunchedEffect(controls, overlay) {
-        if (!overlay) runCatching { if (controls) playFocus.requestFocus() else rootFocus.requestFocus() }
+        if (!overlay) {
+            runCatching {
+                when {
+                    !controls -> {
+                        rootFocus.requestFocus()
+                    }
+
+                    returnToAdjust && (state.externalSubtitle != null || state.subtitles.any { it.selected }) -> {
+                        adjustFocus.requestFocus()
+                    }
+
+                    else -> {
+                        playFocus.requestFocus()
+                    }
+                }
+            }
+            returnToAdjust = false
+        }
     }
 
     BackHandler {
         when {
             adjusting -> adjusting = false
-            controls -> controls = false
+            state.error != null -> onExit()
             state.countdown != null -> viewModel.cancelCountdown()
+            controls -> controls = false
             else -> onExit()
         }
     }
 
+    val subtitleClearance = if (controls && !overlay) controlsHeight else 0
     Box(
         Modifier
             .fillMaxSize()
             .background(Color.Black)
             .onPreviewKeyEvent { e ->
-                if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                lastInput++
+                val down = e.type == KeyEventType.KeyDown
+                if (down) lastInput++
                 when (e.key) {
-                    Key.MediaPlayPause, Key.MediaPlay, Key.MediaPause -> {
-                        viewModel.togglePlay()
+                    Key.MediaPlayPause, Key.MediaPlay, Key.MediaPause, Key.MediaNext -> {
+                        if (PlayerKeyPress.activate(down, e.nativeKeyEvent.repeatCount)) {
+                            when (e.key) {
+                                Key.MediaPlay -> viewModel.setPlaying(true)
+                                Key.MediaPause -> viewModel.setPlaying(false)
+                                Key.MediaNext -> viewModel.playNext()
+                                else -> viewModel.togglePlay()
+                            }
+                        }
                         true
                     }
 
-                    Key.MediaFastForward -> {
-                        viewModel.seekHeld(1, e.nativeKeyEvent.eventTime - e.nativeKeyEvent.downTime)
-                        true
-                    }
-
-                    Key.MediaRewind -> {
-                        viewModel.seekHeld(-1, e.nativeKeyEvent.eventTime - e.nativeKeyEvent.downTime)
-                        true
-                    }
-
-                    Key.MediaNext -> {
-                        viewModel.playNext()
+                    Key.MediaFastForward, Key.MediaRewind -> {
+                        if (down) {
+                            val direction = if (e.key == Key.MediaFastForward) 1 else -1
+                            viewModel.seekHeld(direction, e.nativeKeyEvent.eventTime - e.nativeKeyEvent.downTime)
+                        }
                         true
                     }
 
@@ -165,7 +205,17 @@ fun PlayerScreen(
                 }
             }.onKeyEvent { e ->
                 // Doar când comenzile sunt ascunse: altfel tastele mută focusul între butoane.
-                if (controls || overlay || e.type != KeyEventType.KeyDown) return@onKeyEvent false
+                if (controls || overlay) return@onKeyEvent false
+                if (e.key.isPlayerOk()) {
+                    if (PlayerKeyPress.activate(e.type == KeyEventType.KeyDown, e.nativeKeyEvent.repeatCount)) {
+                        openingKey = e.key
+                    } else if (e.type == KeyEventType.KeyUp && openingKey == e.key) {
+                        openingKey = null
+                        if (!e.nativeKeyEvent.isCanceled) controls = true
+                    }
+                    return@onKeyEvent true
+                }
+                if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
                 when (e.key) {
                     Key.DirectionLeft -> {
                         viewModel.seekHeld(-1, e.nativeKeyEvent.eventTime - e.nativeKeyEvent.downTime)
@@ -177,7 +227,7 @@ fun PlayerScreen(
                         true
                     }
 
-                    Key.DirectionCenter, Key.Enter, Key.NumPadEnter, Key.DirectionUp, Key.DirectionDown -> {
+                    Key.DirectionUp, Key.DirectionDown -> {
                         controls = true
                         true
                     }
@@ -200,7 +250,7 @@ fun PlayerScreen(
                 }
             },
             update = { view ->
-                SubtitleLook.applyTo(view, prefs.subtitleScale, prefs.subtitleStyle)
+                SubtitleLook.applyTo(view, prefs.subtitleScale, prefs.subtitleStyle, subtitleClearance)
                 view.resizeMode =
                     when (state.pictureMode) {
                         1 -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
@@ -230,7 +280,7 @@ fun PlayerScreen(
                 offsetMs = state.subtitleOffsetMs,
                 scale = prefs.subtitleScale,
                 style = prefs.subtitleStyle,
-                raised = controls && !overlay,
+                controlsHeight = with(LocalDensity.current) { subtitleClearance.toDp() },
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
         }
@@ -266,17 +316,21 @@ fun PlayerScreen(
         if (controls && !overlay) {
             Controls(
                 state = state,
-                isPlaying = isPlaying,
+                isPlaying = playWhenReady && player.playbackState != Player.STATE_ENDED,
                 position = position,
                 duration = duration,
                 playFocus = playFocus,
+                adjustFocus = adjustFocus,
                 viewModel = viewModel,
                 onInput = { lastInput++ },
                 onChoice = { choice = it },
-                onAdjust = { adjusting = true },
+                onAdjust = {
+                    returnToAdjust = true
+                    adjusting = true
+                },
                 onJump = { jumping = true },
                 onTechnical = { technical = true },
-                modifier = Modifier.align(Alignment.BottomStart),
+                modifier = Modifier.align(Alignment.BottomStart).onSizeChanged { controlsHeight = it.height },
             )
         }
 
@@ -310,6 +364,7 @@ private fun Controls(
     position: Long,
     duration: Long,
     playFocus: FocusRequester,
+    adjustFocus: FocusRequester,
     viewModel: PlayerViewModel,
     onInput: () -> Unit,
     onChoice: (Choice) -> Unit,
@@ -319,6 +374,9 @@ private fun Controls(
     modifier: Modifier,
 ) {
     val playbackPrefs by viewModel.prefs.collectAsState()
+    var focusedCommand by remember { mutableStateOf("") }
+    var seekFocused by remember { mutableStateOf(false) }
+    val onCommandFocus: (String) -> Unit = { focusedCommand = it }
     Column(
         modifier =
             modifier
@@ -352,21 +410,66 @@ private fun Controls(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        SeekBar(position, duration, onSeek = {
+        SeekBar(position, duration, onTogglePlay = viewModel::togglePlay, onFocus = { seekFocused = it }) {
             viewModel.seekBy(it)
             onInput()
-        })
+        }
         Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 10.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Button(onClick = viewModel::togglePlay, modifier = Modifier.focusRequester(playFocus)) {
-                Text(if (isPlaying) "Pauză" else "Redă")
+            PlayerCommand(
+                if (isPlaying) R.drawable.ic_player_pause else R.drawable.ic_player_play,
+                if (isPlaying) "Pauză" else "Redă",
+                onCommandFocus,
+                modifier = Modifier.focusRequester(playFocus),
+                onClick = viewModel::togglePlay,
+            )
+            PlayerCommand(R.drawable.ic_player_rewind, "Înapoi 10 secunde", onCommandFocus) {
+                viewModel.seekBy(-PlayerFactory.SEEK_MS)
             }
-            OutlinedButton(onClick = { viewModel.seekBy(-PlayerFactory.SEEK_MS) }) { Text("−10 s") }
-            OutlinedButton(onClick = { viewModel.seekBy(PlayerFactory.SEEK_MS) }) { Text("+10 s") }
-            OutlinedButton(onClick = {
+            PlayerCommand(R.drawable.ic_player_forward, "Înainte 10 secunde", onCommandFocus) {
+                viewModel.seekBy(PlayerFactory.SEEK_MS)
+            }
+            if (state.audio.isNotEmpty()) {
+                PlayerCommand(R.drawable.ic_player_audio, "Audio (${state.audio.size})", onCommandFocus) {
+                    onChoice(
+                        Choice(
+                            "Audio",
+                            state.audio.map { it.label },
+                            state.audio.indexOfFirst { it.selected }.takeIf { it >= 0 },
+                        ) { i -> viewModel.selectTrack(state.audio[i]) },
+                    )
+                }
+            }
+            val subtitleCount = state.subtitles.size + state.addonSubtitles.size
+            PlayerCommand(
+                R.drawable.ic_player_subtitles,
+                if (subtitleCount ==
+                    0
+                ) {
+                    "Subtitrări"
+                } else {
+                    "Subtitrări ($subtitleCount)"
+                },
+                onCommandFocus,
+            ) { onChoice(subtitleChoice(state, viewModel)) }
+            if (state.externalSubtitle != null || state.subtitles.any { it.selected }) {
+                PlayerCommand(
+                    R.drawable.ic_player_adjust,
+                    "Ajustează subtitrările",
+                    onCommandFocus,
+                    modifier = Modifier.focusRequester(adjustFocus),
+                    onClick = onAdjust,
+                )
+            }
+            if (state.sources.size > 1) {
+                PlayerCommand(R.drawable.ic_player_source, "Sursă (${state.sources.size})", onCommandFocus) {
+                    onChoice(sourceChoice(state, viewModel))
+                }
+            }
+            PlayerCommand(R.drawable.ic_player_screen, "Frecvență ecran", onCommandFocus) {
                 onChoice(
                     Choice(
                         "Frecvență ecran · poate clipi la schimbare",
@@ -376,8 +479,8 @@ private fun Controls(
                         viewModel.setMatchFrameRate(it == 1)
                     },
                 )
-            }) { Text("Frecvență ecran") }
-            OutlinedButton(onClick = {
+            }
+            PlayerCommand(R.drawable.ic_player_output, "Ieșire audio · passthrough", onCommandFocus) {
                 onChoice(
                     Choice(
                         "Passthrough · la redeschiderea playerului",
@@ -387,8 +490,8 @@ private fun Controls(
                         viewModel.setAudioPassthrough(it == 1)
                     },
                 )
-            }) { Text("Passthrough") }
-            OutlinedButton(onClick = {
+            }
+            PlayerCommand(R.drawable.ic_player_night, "Mod noapte", onCommandFocus) {
                 onChoice(
                     Choice(
                         "Mod noapte · la redeschidere, fără passthrough",
@@ -398,18 +501,18 @@ private fun Controls(
                         viewModel.setNightMode(it == 1)
                     },
                 )
-            }) { Text("Mod noapte") }
-            OutlinedButton(onClick = {
+            }
+            PlayerCommand(R.drawable.ic_player_format, "Format imagine", onCommandFocus) {
                 onChoice(
                     Choice(
                         "Format imagine",
                         listOf("Potrivit", "Zoom", "Întins"),
                         state.pictureMode,
-                        viewModel::setPictureMode,
+                        onPick = viewModel::setPictureMode,
                     ),
                 )
-            }) { Text("Format imagine") }
-            OutlinedButton(onClick = {
+            }
+            PlayerCommand(R.drawable.ic_player_speed, "Viteză ${state.speed}×", onCommandFocus) {
                 val speeds = listOf(0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
                 onChoice(
                     Choice(
@@ -420,8 +523,8 @@ private fun Controls(
                         viewModel.setSpeed(speeds[it])
                     },
                 )
-            }) { Text("Viteză ${state.speed}×") }
-            OutlinedButton(onClick = {
+            }
+            PlayerCommand(R.drawable.ic_player_buffer, "Buffer", onCommandFocus) {
                 onChoice(
                     Choice(
                         "Buffer · la redeschiderea playerului",
@@ -433,31 +536,8 @@ private fun Controls(
                         viewModel.setBufferPreset(BufferPreset.entries[it])
                     },
                 )
-            }) { Text("Buffer") }
-            if (state.audio.isNotEmpty()) {
-                OutlinedButton(onClick = {
-                    onChoice(
-                        Choice(
-                            "Audio",
-                            state.audio.map { it.label },
-                            state.audio.indexOfFirst { it.selected }.takeIf { it >= 0 },
-                        ) { i -> viewModel.selectTrack(state.audio[i]) },
-                    )
-                }) { Text("Audio (${state.audio.size})") }
             }
-            val subtitleCount = state.subtitles.size + state.addonSubtitles.size
-            OutlinedButton(onClick = { onChoice(subtitleChoice(state, viewModel)) }) {
-                Text(if (subtitleCount == 0) "Subtitrări" else "Subtitrări ($subtitleCount)")
-            }
-            if (state.externalSubtitle != null || state.subtitles.any { it.selected }) {
-                OutlinedButton(onClick = onAdjust) { Text("Ajustează") }
-            }
-            if (state.sources.size > 1) {
-                OutlinedButton(onClick = { onChoice(sourceChoice(state, viewModel)) }) {
-                    Text("Sursă (${state.sources.size})")
-                }
-            }
-            OutlinedButton(onClick = {
+            PlayerCommand(R.drawable.ic_player_timer, "Timer de somn · ${state.sleepLabel}", onCommandFocus) {
                 val minutes = if (state.isSeries) listOf(0, 30, 60, 90, -1) else listOf(0, 30, 60, 90)
                 val labels =
                     listOf("Oprit", "30 minute", "60 minute", "90 minute") +
@@ -469,15 +549,25 @@ private fun Controls(
                         null,
                     ) { viewModel.setSleepTimer(minutes[it]) },
                 )
-            }) { Text("Somn: ${state.sleepLabel}") }
-            OutlinedButton(onClick = onTechnical) { Text("Info tehnic") }
-            OutlinedButton(onClick = onJump) { Text("Salt la minut") }
+            }
+            PlayerCommand(R.drawable.ic_player_info, "Info tehnic", onCommandFocus, onClick = onTechnical)
+            PlayerCommand(R.drawable.ic_player_timer, "Salt la minut", onCommandFocus, onClick = onJump)
             if (state.isSeries) {
-                OutlinedButton(onClick = viewModel::resetSeriesTracks) { Text("Resetează audio/subtitrare serial") }
+                PlayerCommand(
+                    R.drawable.ic_player_reset,
+                    "Resetează audio/subtitrare serial",
+                    onCommandFocus,
+                    onClick = viewModel::resetSeriesTracks,
+                )
                 if (SeriesPlayback.canSkip(position, duration, state.introEndMs)) {
-                    OutlinedButton(onClick = viewModel::skipIntro) { Text("Sari intro") }
+                    PlayerCommand(
+                        R.drawable.ic_player_next,
+                        "Sari intro",
+                        onCommandFocus,
+                        onClick = viewModel::skipIntro,
+                    )
                 }
-                OutlinedButton(onClick = {
+                PlayerCommand(R.drawable.ic_player_bookmark, "Marcaj intro serial", onCommandFocus) {
                     onChoice(
                         Choice(
                             "Intro pentru acest serial",
@@ -487,12 +577,42 @@ private fun Controls(
                             if (it == 0) viewModel.markIntro() else viewModel.clearIntro()
                         },
                     )
-                }) { Text("Intro serial") }
+                }
             }
             if (state.next != null) {
-                OutlinedButton(onClick = viewModel::playNext) { Text("Episodul următor") }
+                PlayerCommand(
+                    R.drawable.ic_player_next,
+                    "Episodul următor",
+                    onCommandFocus,
+                    onClick = viewModel::playNext,
+                )
             }
         }
+        Text(
+            if (seekFocused) "OK redă sau pune pauză · Stânga/Dreapta derulează" else focusedCommand,
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun PlayerCommand(
+    icon: Int,
+    label: String,
+    onFocus: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    var focused by remember { mutableStateOf(false) }
+    LaunchedEffect(focused, label) { if (focused) onFocus(label) }
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier.size(48.dp).onFocusChanged { focused = it.isFocused },
+        contentPadding = PaddingValues(0.dp),
+    ) {
+        Icon(painterResource(icon), contentDescription = label, modifier = Modifier.size(22.dp))
     }
 }
 
@@ -501,6 +621,8 @@ private fun Controls(
 private fun SeekBar(
     position: Long,
     duration: Long,
+    onTogglePlay: () -> Unit,
+    onFocus: (Boolean) -> Unit,
     onSeek: (Long) -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
@@ -533,18 +655,26 @@ private fun SeekBar(
                 }
                 // Zonă de atingere mai înaltă decât bara desenată.
                 .padding(vertical = 12.dp)
-                .height(if (focused) 10.dp else 6.dp)
-                .onFocusChanged { focused = it.isFocused }
-                .onKeyEvent { e ->
-                    if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
-                    when (e.key) {
-                        Key.DirectionLeft -> {
-                            onSeek(-SeekNavigation.increment(e.nativeKeyEvent.eventTime - e.nativeKeyEvent.downTime))
+                .height(10.dp)
+                .onFocusChanged {
+                    focused = it.isFocused
+                    onFocus(focused)
+                }.onKeyEvent { e ->
+                    val down = e.type == KeyEventType.KeyDown
+                    when {
+                        e.key.isPlayerOk() -> {
+                            if (PlayerKeyPress.activate(down, e.nativeKeyEvent.repeatCount)) onTogglePlay()
                             true
                         }
 
-                        Key.DirectionRight -> {
-                            onSeek(SeekNavigation.increment(e.nativeKeyEvent.eventTime - e.nativeKeyEvent.downTime))
+                        e.key == Key.DirectionLeft || e.key == Key.DirectionRight -> {
+                            if (down) {
+                                val direction = if (e.key == Key.DirectionRight) 1 else -1
+                                onSeek(
+                                    SeekNavigation.increment(e.nativeKeyEvent.eventTime - e.nativeKeyEvent.downTime) *
+                                        direction,
+                                )
+                            }
                             true
                         }
 
@@ -555,6 +685,7 @@ private fun SeekBar(
                 }.focusable()
                 .background(Color.White.copy(alpha = 0.25f), MaterialTheme.shapes.small)
                 .then(if (focused) Modifier.border(1.dp, Color.White, MaterialTheme.shapes.small) else Modifier),
+            contentAlignment = Alignment.CenterStart,
         ) {
             Box(
                 Modifier
@@ -581,19 +712,13 @@ private fun ErrorPanel(
 ) {
     val focus = remember { FocusRequester() }
     LaunchedEffect(state.error) { runCatching { focus.requestFocus() } }
-    Column(
-        modifier
-            .widthIn(max = 900.dp)
-            .background(Color.Black.copy(alpha = 0.85f), MaterialTheme.shapes.large)
-            .padding(32.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Text(state.error.orEmpty(), style = MaterialTheme.typography.headlineSmall, color = Color.White)
+    ThemedPanel(modifier.padding(20.dp).widthIn(max = 820.dp).verticalScroll(rememberScrollState())) {
+        Text(state.error.orEmpty(), style = MaterialTheme.typography.headlineSmall)
         state.failures.take(MAX_FAILURES_SHOWN).forEach {
             Text(
                 "• $it",
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.8f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -602,10 +727,14 @@ private fun ErrorPanel(
             Text(
                 "… și încă ${state.failures.size - MAX_FAILURES_SHOWN}",
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.8f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        FlowRow(
+            Modifier.padding(top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             if (state.sources.isNotEmpty()) {
                 Button(onClick = viewModel::retry, modifier = Modifier.focusRequester(focus)) {
                     Text("Încearcă din nou")
@@ -629,23 +758,18 @@ private fun NextPanel(
 ) {
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-    Column(
-        modifier
-            .padding(40.dp)
-            .widthIn(max = 520.dp)
-            .background(Color.Black.copy(alpha = 0.85f), MaterialTheme.shapes.large)
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Text("Urmează în ${state.countdown} s", style = MaterialTheme.typography.titleMedium, color = Color.White)
+    ThemedPanel(modifier.padding(20.dp).widthIn(max = 520.dp)) {
+        Text("Urmează în ${state.countdown} s", style = MaterialTheme.typography.titleMedium)
         Text(
             state.next.orEmpty(),
             style = MaterialTheme.typography.bodyLarge,
-            color = Color.White,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             Button(onClick = viewModel::playNext, modifier = Modifier.focusRequester(focus)) { Text("Redă acum") }
             OutlinedButton(onClick = viewModel::cancelCountdown) { Text("Anulează") }
         }
@@ -659,34 +783,41 @@ private fun subtitleChoice(
 ): Choice {
     val embedded = state.subtitles
     val addon = state.addonSubtitles
-    val options =
-        listOf("Oprite") +
-            embedded.map { "Din sursă · ${it.label}" } +
-            addon.map { it.label } +
-            listOfNotNull(state.addonStatus?.let { "ℹ $it" })
+    val embeddedStart = 2
+    val addonStart = embeddedStart + embedded.size
+    val options = listOf("Oprite", "Automat") + embedded.map { it.label } + addon.map { it.label }
+    val headings =
+        buildMap {
+            if (embedded.isNotEmpty()) put(embeddedStart, "Interne")
+            if (addon.isNotEmpty()) put(addonStart, "Externe")
+        }
     val selected =
         when {
             state.externalSubtitle != null -> {
                 addon
                     .indexOfFirst { it.subtitle.url == state.externalSubtitle }
                     .takeIf { it >= 0 }
-                    ?.let { 1 + embedded.size + it }
+                    ?.let { addonStart + it }
             }
 
             embedded.any { it.selected } -> {
-                1 + embedded.indexOfFirst { it.selected }
+                embeddedStart + embedded.indexOfFirst { it.selected }
+            }
+
+            state.subtitlesOff -> {
+                0
             }
 
             else -> {
-                0
+                1
             }
         }
-    return Choice("Subtitrări", options, selected) { i ->
+    return Choice("Subtitrări", options, selected, headings, footer = state.addonStatus) { i ->
         when {
             i == 0 -> viewModel.disableSubtitles()
-            i <= embedded.size -> viewModel.selectTrack(embedded[i - 1])
-            i <= embedded.size + addon.size -> viewModel.selectAddonSubtitle(addon[i - 1 - embedded.size])
-            else -> Unit
+            i == 1 -> viewModel.automaticSubtitles()
+            i < addonStart -> viewModel.selectTrack(embedded[i - embeddedStart])
+            else -> viewModel.selectAddonSubtitle(addon[i - addonStart])
         }
     }
 }
@@ -708,3 +839,5 @@ private fun sourceChoice(
 
 private const val HIDE_AFTER_MS = 5_000L
 private const val MAX_FAILURES_SHOWN = 6
+
+private fun Key.isPlayerOk() = this == Key.DirectionCenter || this == Key.Enter || this == Key.NumPadEnter
