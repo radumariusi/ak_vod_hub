@@ -78,6 +78,52 @@ class TmdbClient(
         return json.decodeFromString<TmdbCredits>(body)
     }
 
+    /** Recomandări, similare, distribuție și colecție pentru un titlu (o cerere). null = nu există pe TMDB. */
+    suspend fun related(
+        key: String,
+        type: MediaType,
+        tmdbId: Long,
+    ): TmdbRelated? {
+        val tv = type == MediaType.TV
+        val append = if (tv) "recommendations,similar,aggregate_credits" else "recommendations,similar,credits"
+        val url =
+            url(if (tv) "tv/$tmdbId" else "movie/$tmdbId")
+                .addQueryParameter("language", METADATA_LANGUAGE)
+                .addQueryParameter("append_to_response", append)
+        val body = get(key, url.build()) ?: return null
+        return json.decodeFromString<TmdbRelated>(body)
+    }
+
+    /** Părțile unei colecții de filme. null = nu există. */
+    suspend fun collection(
+        key: String,
+        collectionId: Long,
+    ): TmdbCollection? {
+        val body =
+            get(key, url("collection/$collectionId").addQueryParameter("language", METADATA_LANGUAGE).build())
+                ?: return null
+        return json.decodeFromString<TmdbCollection>(body)
+    }
+
+    /** Filmografia unei persoane (filme și seriale, ca actor și în echipă). null = nu există. */
+    suspend fun personCredits(
+        key: String,
+        personId: Long,
+    ): TmdbPersonCredits? {
+        val body = get(key, url("person/$personId/combined_credits").build()) ?: return null
+        return json.decodeFromString<TmdbPersonCredits>(body)
+    }
+
+    /** Titlul TMDB după ID-ul IMDb (pentru cataloagele din addon-uri). */
+    suspend fun findImdb(
+        key: String,
+        imdbId: String,
+    ): TmdbFindResult? {
+        val url = url("find/$imdbId").addQueryParameter("external_source", "imdb_id").build()
+        val body = get(key, url) ?: return null
+        return json.decodeFromString<TmdbFindResult>(body)
+    }
+
     private fun url(path: String): HttpUrl.Builder = "$baseUrl/$path".toHttpUrl().newBuilder()
 
     /** GET cu cheia; întoarce corpul, null la 404; aruncă [TmdbAuthException] la 401. */

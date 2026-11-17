@@ -106,6 +106,13 @@ fun SubtitlesSection(viewModel: PlaybackSettingsViewModel) {
         }
 
         Text("Addon-uri Stremio", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Folosite pentru subtitrări, cataloage și liste (top-uri, MDBList, Trakt). Cataloagele apar ca rânduri " +
+                "pe Acasă, doar cu titlurile care există în playlist-uri.",
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.onSurfaceVariant,
+            modifier = Modifier.widthIn(max = 720.dp),
+        )
         Column(
             modifier =
                 Modifier
@@ -125,7 +132,8 @@ fun SubtitlesSection(viewModel: PlaybackSettingsViewModel) {
                     Column(Modifier.weight(1f)) {
                         Text(addon.name, style = MaterialTheme.typography.bodyLarge)
                         Text(
-                            addon.manifestUrl.removePrefix("https://").removeSuffix("/manifest.json"),
+                            addonRoles(addon.resources) +
+                                addon.manifestUrl.removePrefix("https://").removeSuffix("/manifest.json"),
                             style = MaterialTheme.typography.bodySmall,
                             color = colors.onSurfaceVariant,
                             maxLines = 1,
@@ -171,4 +179,14 @@ fun SubtitlesSection(viewModel: PlaybackSettingsViewModel) {
     }
 
     choice?.let { ChoiceDialog(it, onDismiss = { choice = null }) }
+}
+
+/** Ex. „Subtitrări · Cataloage · ” (gol dacă nu știm ce oferă addon-ul). */
+private fun addonRoles(resources: List<String>): String {
+    val roles =
+        listOfNotNull(
+            "Subtitrări".takeIf { "subtitles" in resources },
+            "Cataloage".takeIf { "catalog" in resources },
+        )
+    return if (roles.isEmpty()) "" else roles.joinToString(" · ", postfix = " · ")
 }

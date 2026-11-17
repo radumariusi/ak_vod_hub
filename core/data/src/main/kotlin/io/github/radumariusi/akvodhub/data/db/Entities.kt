@@ -154,6 +154,7 @@ object MatchState {
         Index(value = ["addedAt"]),
         Index(value = ["rating"]),
         Index(value = ["name"]),
+        Index(value = ["imdbId"]),
     ],
 )
 data class TitleEntity(
@@ -216,6 +217,41 @@ data class WatchStateEntity(
     val positionMs: Long,
     val durationMs: Long,
     val updatedAt: Long,
+)
+
+/**
+ * Istoricul de vizionare (pentru recomandări): rămâne și după ce filmul s-a terminat (spre deosebire de
+ * [WatchStateEntity], care ține doar ce e de continuat). [progress] = cât s-a văzut (0–1, maximul atins).
+ */
+@Entity(tableName = "watch_history")
+data class WatchHistoryEntity(
+    @PrimaryKey val titleId: Long,
+    val progress: Double,
+    val finished: Boolean,
+    val watchedAt: Long,
+)
+
+/**
+ * Cache pentru descoperire: listele TMDB (recomandări, similare, colecții, filmografii) și cataloagele din
+ * addon-uri, ca JSON, cu momentul descărcării. Cheia spune ce e (ex. `rel:MOVIE:603`, `cat:…`).
+ */
+@Entity(tableName = "discover_cache")
+data class DiscoverCacheEntity(
+    @PrimaryKey val cacheKey: String,
+    val data: String,
+    val fetchedAt: Long,
+)
+
+/**
+ * Legătura IMDb → TMDB pentru titlurile din cataloagele addon-urilor (aflată o dată, prin `/find`).
+ * [tmdbId] null = TMDB nu are titlul (se reverifică după o vreme).
+ */
+@Entity(tableName = "imdb_map")
+data class ImdbMapEntity(
+    @PrimaryKey val imdbId: String,
+    val mediaType: MediaType?,
+    val tmdbId: Long?,
+    val checkedAt: Long,
 )
 
 /**

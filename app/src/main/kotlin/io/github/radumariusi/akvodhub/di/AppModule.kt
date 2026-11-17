@@ -13,6 +13,7 @@ import io.github.radumariusi.akvodhub.data.catalog.HubRepository
 import io.github.radumariusi.akvodhub.data.catalog.MatchScheduler
 import io.github.radumariusi.akvodhub.data.catalog.TitleMatcher
 import io.github.radumariusi.akvodhub.data.db.AkVodDatabase
+import io.github.radumariusi.akvodhub.data.discover.DiscoverRepository
 import io.github.radumariusi.akvodhub.data.player.PlaybackSettings
 import io.github.radumariusi.akvodhub.data.playlist.PlaylistImporter
 import io.github.radumariusi.akvodhub.data.playlist.PlaylistRepository
@@ -173,4 +174,14 @@ object AppModule {
         client: StremioClient,
         addons: StremioAddons,
     ): SubtitleRepository = SubtitleRepository(client, addons)
+
+    @Provides
+    @Singleton
+    fun discoverRepository(
+        db: AkVodDatabase,
+        tmdb: TmdbClient,
+        settings: TmdbSettings,
+        stremio: StremioClient,
+        addons: StremioAddons,
+    ): DiscoverRepository = DiscoverRepository(db, tmdb, settings, stremio, addons)
 }

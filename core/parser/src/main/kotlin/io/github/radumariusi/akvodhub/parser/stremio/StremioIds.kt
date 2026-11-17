@@ -58,4 +58,36 @@ object StremioIds {
         val id = URLEncoder.encode(videoId, "UTF-8").replace("%3A", ":").replace("+", "%20")
         return "$baseUrl/subtitles/$type/$id.json"
     }
+
+    /**
+     * `{bază}/catalog/{tip}/{id}.json`, sau `{bază}/catalog/{tip}/{id}/skip=100.json` pentru pagina următoare.
+     */
+    fun catalogUrl(
+        baseUrl: String,
+        type: String,
+        catalogId: String,
+        skip: Int = 0,
+    ): String {
+        val id = encodeSegment(catalogId)
+        val t = encodeSegment(type)
+        return if (skip > 0) "$baseUrl/catalog/$t/$id/skip=$skip.json" else "$baseUrl/catalog/$t/$id.json"
+    }
+
+    /** ID-ul TMDB din ID-urile de tip `tmdb:603` (addon-ul TMDB și altele). */
+    fun tmdbId(id: String?): Long? {
+        if (id == null) return null
+        val rest = id.removePrefix("tmdb:").takeIf { it != id } ?: return null
+        return rest.substringBefore(':').toLongOrNull()?.takeIf { it > 0 }
+    }
+
+    /** ID-ul IMDb (`tt…`) dintr-un ID Stremio (`tt0133093` sau `tt0903747:1:2`). */
+    fun imdbId(id: String?): String? = id?.substringBefore(':')?.takeIf { isImdb(it) }
+
+    private val yearPattern = Regex("""(?<!\d)(18|19|20)\d{2}(?!\d)""")
+
+    /** Anul din `releaseInfo` („1999”, „2008-2013”, „2019–”) sau dintr-o dată („2019-05-01”). */
+    fun year(releaseInfo: String?): Int? = releaseInfo?.let { yearPattern.find(it)?.value?.toInt() }
+
+    private fun encodeSegment(value: String): String =
+        URLEncoder.encode(value, "UTF-8").replace("%3A", ":").replace("+", "%20")
 }
