@@ -26,6 +26,9 @@ class MatchWorker(
     private val indexer: CatalogIndexer,
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
+        // Întâi titlurile locale: după un import, tot playlist-ul apare în hub în câteva minute, fără să
+        // aștepte prima rundă TMDB (până la 8 min). Dacă nu s-a schimbat nimic, e doar o verificare rapidă.
+        indexer.refresh()
         val outcome = matcher.run(BUDGET_MS)
         // Hub-ul vede rezultatele după fiecare rundă (și titlurile locale, chiar fără cheie TMDB).
         indexer.refresh()
