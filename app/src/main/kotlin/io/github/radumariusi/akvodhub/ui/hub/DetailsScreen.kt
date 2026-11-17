@@ -39,12 +39,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ExperimentalTvMaterial3Api
@@ -69,6 +64,7 @@ import io.github.radumariusi.akvodhub.parser.player.EpisodeOrder
 import io.github.radumariusi.akvodhub.parser.player.Resume
 import io.github.radumariusi.akvodhub.player.PlayRequest
 import io.github.radumariusi.akvodhub.player.PlayerActivity
+import io.github.radumariusi.akvodhub.ui.SelectionTab
 import io.github.radumariusi.akvodhub.ui.touch.Button
 import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
 import io.github.radumariusi.akvodhub.ui.touch.Surface
@@ -257,26 +253,11 @@ private fun DetailsContent(
                     ) {
                         items(episodes.seasons, key = { it.number }) { s ->
                             val label = if (s.number == 0) "Altele" else "Sezonul ${s.number}"
-                            OutlinedButton(
+                            SelectionTab(
+                                label = label,
+                                active = s.number == state.selectedSeason,
                                 onClick = { onSelectSeason(s.number) },
-                                modifier =
-                                    Modifier.semantics {
-                                        selected = s.number == state.selectedSeason
-                                        role = Role.Tab
-                                    },
-                            ) {
-                                Text(
-                                    label,
-                                    textDecoration =
-                                        if (s.number ==
-                                            state.selectedSeason
-                                        ) {
-                                            TextDecoration.Underline
-                                        } else {
-                                            null
-                                        },
-                                )
-                            }
+                            )
                         }
                     }
                 }
