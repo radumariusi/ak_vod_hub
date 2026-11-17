@@ -28,6 +28,7 @@ import io.github.radumariusi.akvodhub.parser.match.SourceInfo
 import io.github.radumariusi.akvodhub.parser.player.EpisodeOrder
 import io.github.radumariusi.akvodhub.parser.player.FallbackQueue
 import io.github.radumariusi.akvodhub.parser.player.Resume
+import io.github.radumariusi.akvodhub.parser.player.SeriesPlayback
 import io.github.radumariusi.akvodhub.parser.stremio.AddonSubtitle
 import io.github.radumariusi.akvodhub.parser.stremio.SubtitleChoice
 import io.github.radumariusi.akvodhub.parser.stremio.SubtitleLanguages
@@ -71,6 +72,8 @@ data class AddonSubtitleOption(
 )
 
 data class PlayerUiState(
+    val isSeries: Boolean = false,
+    val introEndMs: Long = 0,
     val pictureMode: Int = 0,
     val speed: Float = 1f,
     val title: String = "",
@@ -256,7 +259,11 @@ class PlayerViewModel
                 return
             }
             title = details.title
-            mutableState.update { it.copy(title = details.title.name) }
+            mutableState.update { it.copy(
+                title = details.title.name,
+                isSeries = details.title.mediaType == MediaType.TV,
+                introEndMs = seriesKey()?.let(settings::seriesIntro) ?: 0L,
+            ) }
             if (details.title.mediaType != MediaType.TV) searchAddonSubtitles(null, null)
             val watch = repository.watchState(request.titleId)
             if (details.title.mediaType == MediaType.TV) {
@@ -599,6 +606,32 @@ class PlayerViewModel
         }
 
         fun setMatchFrameRate(enabled: Boolean) = settings.setMatchFrameRate(enabled)
+
+        private fun seriesKey(): String? = title?.takeIf { it.mediaType == MediaType.TV }?.let {
+            SeriesPlayback.key(it.tmdbId, it.originalName ?: it.name, it.year)
+        }
+
+        fun markIntro() {
+            val key = seriesKey() ?: return
+            val position = player.currentPosition
+            if (!SeriesPlayback.validIntro(position, player.duration)) {
+                showNotice("Marchează sfârșitul introului între 1 secundă și 10 minute, înainte de finalul episodului.")
+                return
+            }
+            settings.setSeriesIntro(key, position)
+            mutableState.update { it.copy(introEndMs = position) }
+            showNotice("Sfârșitul introului salvat pentru acest serial.")
+        }
+
+        fun clearIntro() {
+            seriesKey()?.let { settings.setSeriesIntro(it, 0) }
+            mutableState.update { it.copy(introEndMs = 0) }
+        }
+
+        fun skipIntro() {
+            val end = state.value.introEndMs
+            if (SeriesPlayback.canSkip(player.currentPosition, player.duration, end)) player.seekTo(end)
+        }
 
         fun setPictureMode(mode: Int) {
             mutableState.update { it.copy(pictureMode = mode.coerceIn(0, 2)) }

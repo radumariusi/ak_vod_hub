@@ -55,6 +55,7 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import io.github.radumariusi.akvodhub.parser.player.Resume
+import io.github.radumariusi.akvodhub.parser.player.SeriesPlayback
 import io.github.radumariusi.akvodhub.player.PlayerFactory
 import io.github.radumariusi.akvodhub.player.PlayerUiState
 import io.github.radumariusi.akvodhub.player.PlayerViewModel
@@ -401,6 +402,16 @@ private fun Controls(
                 OutlinedButton(onClick = { onChoice(sourceChoice(state, viewModel)) }) {
                     Text("Sursă (${state.sources.size})")
                 }
+            }
+            if (state.isSeries) {
+                if (SeriesPlayback.canSkip(position, duration, state.introEndMs)) {
+                    OutlinedButton(onClick = viewModel::skipIntro) { Text("Sari intro") }
+                }
+                OutlinedButton(onClick = {
+                    onChoice(Choice("Intro pentru acest serial", listOf("Marchează sfârșitul aici", "Șterge marcajul"), null) {
+                        if (it == 0) viewModel.markIntro() else viewModel.clearIntro()
+                    })
+                }) { Text("Intro serial") }
             }
             if (state.next != null) {
                 OutlinedButton(onClick = viewModel::playNext) { Text("Episodul următor") }

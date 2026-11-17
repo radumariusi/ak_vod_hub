@@ -67,6 +67,16 @@ class PlaybackSettings(
         ).filter { it.length == 2 }
             .distinct()
 
+    fun seriesIntro(key: String): Long = prefs.getString("series.$key.intro", null)?.toLongOrNull() ?: 0L
+
+    fun setSeriesIntro(key: String, endMs: Long) {
+        val name = "series.$key.intro"
+        if (endMs == 0L) prefs.edit().remove(name).apply()
+        else if (io.github.radumariusi.akvodhub.parser.player.SeriesPlayback.validSetting(name, endMs.toString())) {
+            prefs.edit().putString(name, endMs.toString()).apply()
+        }
+    }
+
     fun setNightMode(enabled: Boolean) {
         prefs.edit().putBoolean(NIGHT, enabled).apply()
         mutableState.value = read()
@@ -134,6 +144,9 @@ class PlaybackSettings(
     /** Preferințele salvate, ca text (pentru backup). Cheile lipsă = valorile implicite. */
     fun backup(): Map<String, String> =
         buildMap {
+            prefs.all.forEach { (key, value) ->
+                if (value is String && io.github.radumariusi.akvodhub.parser.player.SeriesPlayback.validSetting(key, value)) put(key, value)
+            }
             put(NIGHT, state.value.nightMode.toString())
             put(PASSTHROUGH, state.value.audioPassthrough.toString())
             put(FRAME_RATE, state.value.matchFrameRate.toString())
@@ -151,6 +164,9 @@ class PlaybackSettings(
     /** Restaurare din backup: doar cheile cunoscute, cu valori verificate la citire. */
     fun restore(values: Map<String, String>) {
         val edit = prefs.edit()
+        values.forEach { (key, value) ->
+            if (io.github.radumariusi.akvodhub.parser.player.SeriesPlayback.validSetting(key, value)) edit.putString(key, value)
+        }
         values[NIGHT]?.toBooleanStrictOrNull()?.let { edit.putBoolean(NIGHT, it) }
         values[PASSTHROUGH]?.toBooleanStrictOrNull()?.let { edit.putBoolean(PASSTHROUGH, it) }
         values[FRAME_RATE]?.toBooleanStrictOrNull()?.let { edit.putBoolean(FRAME_RATE, it) }
