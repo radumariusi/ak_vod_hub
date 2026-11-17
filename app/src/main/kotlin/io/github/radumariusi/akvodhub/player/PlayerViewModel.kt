@@ -809,13 +809,11 @@ class PlayerViewModel
                 }
         }
 
-        fun togglePlay() {
-            if (player.isPlaying) {
-                player.pause()
-            } else {
-                if (player.playbackState == Player.STATE_ENDED) player.seekTo(0)
-                player.play()
-            }
+        fun togglePlay() = setPlaying(!player.playWhenReady || player.playbackState == Player.STATE_ENDED)
+
+        fun setPlaying(playing: Boolean) {
+            if (playing && player.playbackState == Player.STATE_ENDED) player.seekTo(0)
+            player.playWhenReady = playing
         }
 
         fun seekBy(deltaMs: Long) {

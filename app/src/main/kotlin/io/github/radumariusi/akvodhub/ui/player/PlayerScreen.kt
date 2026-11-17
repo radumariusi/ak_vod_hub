@@ -60,6 +60,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import io.github.radumariusi.akvodhub.R
 import io.github.radumariusi.akvodhub.parser.player.BufferPreset
+import io.github.radumariusi.akvodhub.parser.player.PlayerKeyPress
 import io.github.radumariusi.akvodhub.parser.player.Resume
 import io.github.radumariusi.akvodhub.parser.player.SeekNavigation
 import io.github.radumariusi.akvodhub.parser.player.SeriesPlayback
@@ -97,6 +98,7 @@ fun PlayerScreen(
     var duration by remember { mutableLongStateOf(0L) }
     val rootFocus = remember { FocusRequester() }
     val playFocus = remember { FocusRequester() }
+    var openingKey by remember { mutableStateOf<Key?>(null) }
 
     DisposableEffect(player) {
         val listener =
@@ -141,26 +143,26 @@ fun PlayerScreen(
             .fillMaxSize()
             .background(Color.Black)
             .onPreviewKeyEvent { e ->
-                if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                lastInput++
+                val down = e.type == KeyEventType.KeyDown
+                if (down) lastInput++
                 when (e.key) {
-                    Key.MediaPlayPause, Key.MediaPlay, Key.MediaPause -> {
-                        viewModel.togglePlay()
+                    Key.MediaPlayPause, Key.MediaPlay, Key.MediaPause, Key.MediaNext -> {
+                        if (PlayerKeyPress.activate(down, e.nativeKeyEvent.repeatCount)) {
+                            when (e.key) {
+                                Key.MediaPlay -> viewModel.setPlaying(true)
+                                Key.MediaPause -> viewModel.setPlaying(false)
+                                Key.MediaNext -> viewModel.playNext()
+                                else -> viewModel.togglePlay()
+                            }
+                        }
                         true
                     }
 
-                    Key.MediaFastForward -> {
-                        viewModel.seekHeld(1, e.nativeKeyEvent.eventTime - e.nativeKeyEvent.downTime)
-                        true
-                    }
-
-                    Key.MediaRewind -> {
-                        viewModel.seekHeld(-1, e.nativeKeyEvent.eventTime - e.nativeKeyEvent.downTime)
-                        true
-                    }
-
-                    Key.MediaNext -> {
-                        viewModel.playNext()
+                    Key.MediaFastForward, Key.MediaRewind -> {
+                        if (down) {
+                            val direction = if (e.key == Key.MediaFastForward) 1 else -1
+                            viewModel.seekHeld(direction, e.nativeKeyEvent.eventTime - e.nativeKeyEvent.downTime)
+                        }
                         true
                     }
 
@@ -170,7 +172,17 @@ fun PlayerScreen(
                 }
             }.onKeyEvent { e ->
                 // Doar când comenzile sunt ascunse: altfel tastele mută focusul între butoane.
-                if (controls || overlay || e.type != KeyEventType.KeyDown) return@onKeyEvent false
+                if (controls || overlay) return@onKeyEvent false
+                if (e.key.isPlayerOk()) {
+                    if (PlayerKeyPress.activate(e.type == KeyEventType.KeyDown, e.nativeKeyEvent.repeatCount)) {
+                        openingKey = e.key
+                    } else if (e.type == KeyEventType.KeyUp && openingKey == e.key) {
+                        openingKey = null
+                        if (!e.nativeKeyEvent.isCanceled) controls = true
+                    }
+                    return@onKeyEvent true
+                }
+                if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
                 when (e.key) {
                     Key.DirectionLeft -> {
                         viewModel.seekHeld(-1, e.nativeKeyEvent.eventTime - e.nativeKeyEvent.downTime)
@@ -182,7 +194,7 @@ fun PlayerScreen(
                         true
                     }
 
-                    Key.DirectionCenter, Key.Enter, Key.NumPadEnter, Key.DirectionUp, Key.DirectionDown -> {
+                    Key.DirectionUp, Key.DirectionDown -> {
                         controls = true
                         true
                     }
@@ -359,10 +371,10 @@ private fun Controls(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        SeekBar(position, duration, onSeek = {
+        SeekBar(position, duration, onTogglePlay = viewModel::togglePlay) {
             viewModel.seekBy(it)
             onInput()
-        })
+        }
         Row(
             modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 10.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -537,6 +549,7 @@ private fun PlayerCommand(
 private fun SeekBar(
     position: Long,
     duration: Long,
+    onTogglePlay: () -> Unit,
     onSeek: (Long) -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
@@ -572,15 +585,18 @@ private fun SeekBar(
                 .height(if (focused) 10.dp else 6.dp)
                 .onFocusChanged { focused = it.isFocused }
                 .onKeyEvent { e ->
-                    if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
-                    when (e.key) {
-                        Key.DirectionLeft -> {
-                            onSeek(-SeekNavigation.increment(e.nativeKeyEvent.eventTime - e.nativeKeyEvent.downTime))
+                    val down = e.type == KeyEventType.KeyDown
+                    when {
+                        e.key.isPlayerOk() -> {
+                            if (PlayerKeyPress.activate(down, e.nativeKeyEvent.repeatCount)) onTogglePlay()
                             true
                         }
 
-                        Key.DirectionRight -> {
-                            onSeek(SeekNavigation.increment(e.nativeKeyEvent.eventTime - e.nativeKeyEvent.downTime))
+                        e.key == Key.DirectionLeft || e.key == Key.DirectionRight -> {
+                            if (down) {
+                                val direction = if (e.key == Key.DirectionRight) 1 else -1
+                                onSeek(SeekNavigation.increment(e.nativeKeyEvent.eventTime - e.nativeKeyEvent.downTime) * direction)
+                            }
                             true
                         }
 
@@ -744,3 +760,5 @@ private fun sourceChoice(
 
 private const val HIDE_AFTER_MS = 5_000L
 private const val MAX_FAILURES_SHOWN = 6
+
+private fun Key.isPlayerOk() = this == Key.DirectionCenter || this == Key.Enter || this == Key.NumPadEnter
