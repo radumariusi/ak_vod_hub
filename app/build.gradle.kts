@@ -128,6 +128,7 @@ androidComponents {
 baselineProfile {
     mergeIntoMain = true
     automaticGenerationDuringBuild = false
+    filter { include("io.github.radumariusi.akvodhub.**") }
 }
 
 dependencies {

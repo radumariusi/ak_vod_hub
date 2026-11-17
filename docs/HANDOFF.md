@@ -285,7 +285,7 @@ audio original/per serial, passthrough/noapte/buffer; subtitrări addon cu decal
 golire cache și reîncărcare postere; updater și instalare peste versiunea existentă. Testele hardware ale etapei 11
 rămân neconfirmate. Nu se începe etapa 14 în acest fir.
 
-### Etapa 14 — performanță (în curs)
+### Etapa 14 — performanță
 
 - Filme, Seriale, Căutare și rândurile de catalog de pe Acasă continuă după cheia de sortare și ID. La
   căutarea după popularitate, potrivirile de prefix au prioritate inclusiv când popularitatea este NULL.
@@ -299,13 +299,14 @@ rămân neconfirmate. Nu se începe etapa 14 în acest fir.
   verifică pornirea pe Acasă și trecerea la a doua pagină din Filme cu date sintetice. Verificarea caută regulile
   aplicației, profilul din APK și rezultatul instalării AndroidX. Datasetul și bibliotecile de măsurare sunt
   în build-urile de profilare. AndroidX ProfileInstaller intră în release pentru instalarea profilului și la sideload;
-  impactul său asupra APK-ului rămâne de măsurat. Profilul generat trebuie importat din artefactul CI înainte de livrare.
+  impactul său asupra APK-ului rămâne de măsurat. Profilele din artefactul CI 44196527542 sunt în
+  `app/src/main/generated/baselineProfiles/`. Regulile versionate vizează pachetele aplicației.
 - Updaterul citește `Build.SUPPORTED_ABIS` în ordinea dispozitivului. Acceptă variantele `armeabi-v7a`,
   `arm64-v8a` și `x86_64` denumite `ak-vod-hub-<versiune>-<abi>.apk.bin`. Conținutul este APK semnat,
   descărcat local cu extensia APK. Pentru dispozitivele cu cel puțin o arhitectură inclusă în universal, fallback-ul
   este `ak-vod-hub-<versiune>.apk`. Universalul rămâne singurul asset cu extensia `.apk` pentru updaterul vechi.
   Workflow-ul verifică arhitecturile și certificatul v0.1.14 înaintea publicării. Dimensiunile se măsoară separat.
-- Room v14, fără migrare. Baseline Profile, Android CI, release-ul și testarea TV rămân de confirmat.
+- Room v14, fără migrare. Retestarea pe televizor rămâne necesară.
 
 ### Corecții UI și player TV (2026-11-18)
 
