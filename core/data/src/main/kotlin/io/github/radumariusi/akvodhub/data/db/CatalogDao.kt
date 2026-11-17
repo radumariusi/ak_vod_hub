@@ -199,6 +199,32 @@ interface CatalogDao {
     @Query("SELECT * FROM raw_entry WHERE id = :id")
     suspend fun entry(id: Long): RawEntryEntity?
 
+    @Query("SELECT EXISTS(SELECT 1 FROM watchlist WHERE titleId = :titleId)")
+    suspend fun inWatchlist(titleId: Long): Boolean
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun addToWatchlist(entry: WatchlistEntity)
+
+    @Query("DELETE FROM watchlist WHERE titleId = :titleId")
+    suspend fun removeFromWatchlist(titleId: Long)
+
+    /** Copiere în lot înainte de legarea surselor locale la titlul TMDB. */
+    @Query(
+        "INSERT OR IGNORE INTO watchlist (titleId, addedAt) " +
+            "SELECT :titleId, MIN(w.addedAt) FROM watchlist w JOIN raw_entry r ON r.titleId = w.titleId " +
+            "WHERE r.id IN (:ids) HAVING COUNT(*) > 0",
+    )
+    suspend fun carryWatchlist(ids: List<Long>, titleId: Long)
+
+    @Query(
+        "INSERT OR REPLACE INTO watch_history (titleId, progress, finished, watchedAt) " +
+            "SELECT :titleId, MAX(progress), MAX(finished), MAX(watchedAt) FROM " +
+            "(SELECT progress, finished, watchedAt FROM watch_history WHERE titleId = :titleId UNION ALL " +
+            "SELECT h.progress, h.finished, h.watchedAt FROM watch_history h JOIN raw_entry r " +
+            "ON r.titleId = h.titleId WHERE r.id IN (:ids)) HAVING COUNT(*) > 0",
+    )
+    suspend fun carryHistory(ids: List<Long>, titleId: Long)
+
     // ------------------------------------------------------------ player (etapa 6)
 
     @Query("SELECT * FROM watch_state WHERE titleId = :titleId")
@@ -260,7 +286,10 @@ interface CatalogDao {
     suspend fun updateSummaries()
 
     /** Titlurile locale rămase fără surse (potrivite între timp pe TMDB sau scoase din playlist). */
-    @Query("DELETE FROM title WHERE tmdbId < 0 AND sourceCount = 0")
+    @Query(
+        "DELETE FROM title WHERE tmdbId < 0 AND sourceCount = 0 " +
+            "AND id NOT IN (SELECT titleId FROM watchlist) AND id NOT IN (SELECT titleId FROM watch_history)",
+    )
     suspend fun deleteEmptyLocalTitles(): Int
 
     @Query("UPDATE title SET isNew = 0 WHERE isNew = 1 AND (addedAt <= :cutoff OR addedAt > :now)")

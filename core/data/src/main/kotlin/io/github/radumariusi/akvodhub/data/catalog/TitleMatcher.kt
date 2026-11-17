@@ -103,6 +103,12 @@ class TitleMatcher(
 
     // ---------------------------------------------------------------- 1. ID-uri de la furnizor
 
+    private suspend fun linkKeepingLibrary(ids: List<Long>, titleId: Long) {
+        dao.carryWatchlist(ids, titleId)
+        dao.carryHistory(ids, titleId)
+        dao.link(ids, titleId)
+    }
+
     private suspend fun linkProviderIds() {
         while (true) {
             val batch = dao.pendingWithProviderId(BATCH)
@@ -125,7 +131,7 @@ class TitleMatcher(
                                     updatedAt = clock(),
                                 )
                             }
-                        entries.map { it.id }.chunked(SQL_CHUNK).forEach { dao.link(it, titleId) }
+                        entries.map { it.id }.chunked(SQL_CHUNK).forEach { linkKeepingLibrary(it, titleId) }
                     }
             }
         }
@@ -205,7 +211,7 @@ class TitleMatcher(
                         ) {
                             unmatched += ids
                         } else {
-                            ids.chunked(SQL_CHUNK).forEach { dao.link(it, titleId) }
+                            ids.chunked(SQL_CHUNK).forEach { linkKeepingLibrary(it, titleId) }
                         }
                     }
                 unmatched.chunked(SQL_CHUNK).forEach { dao.setState(it, MatchState.UNMATCHED) }

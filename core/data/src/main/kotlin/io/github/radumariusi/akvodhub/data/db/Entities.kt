@@ -335,3 +335,10 @@ data class PersonCreditEntity(
     val mediaType: MediaType,
     val tmdbId: Long,
 )
+
+/** Lista personală rămâne salvată și când titlul dispare temporar din playlist. */
+@Entity(tableName = "watchlist")
+data class WatchlistEntity(
+    @PrimaryKey val titleId: Long,
+    val addedAt: Long,
+)

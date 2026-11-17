@@ -11,6 +11,7 @@ import io.github.radumariusi.akvodhub.data.db.TitleCard
 import io.github.radumariusi.akvodhub.data.db.TitleEntity
 import io.github.radumariusi.akvodhub.data.db.WatchHistoryEntity
 import io.github.radumariusi.akvodhub.data.db.WatchStateEntity
+import io.github.radumariusi.akvodhub.data.db.WatchlistEntity
 import io.github.radumariusi.akvodhub.data.db.isLocal
 import io.github.radumariusi.akvodhub.data.player.PlaybackSettings
 import io.github.radumariusi.akvodhub.data.playlist.PlaylistImporter
@@ -26,6 +27,7 @@ import io.github.radumariusi.akvodhub.parser.catalog.Genres
 import io.github.radumariusi.akvodhub.parser.catalog.LocalizedOverview
 import io.github.radumariusi.akvodhub.parser.catalog.LogoCandidate
 import io.github.radumariusi.akvodhub.parser.catalog.MergedSeason
+import io.github.radumariusi.akvodhub.parser.catalog.PersonalLibrary
 import io.github.radumariusi.akvodhub.parser.catalog.PosterBadges
 import io.github.radumariusi.akvodhub.parser.catalog.TitleLogo
 import io.github.radumariusi.akvodhub.parser.match.QualityGroup
@@ -121,6 +123,36 @@ class HubRepository(
             preferredLanguages,
             originalLanguage.takeIf { playback.state.value.preferOriginalLanguage },
         )
+
+    suspend fun inWatchlist(titleId: Long): Boolean = dao.inWatchlist(titleId)
+
+    suspend fun isWatched(titleId: Long): Boolean = db.discoverDao().history(titleId)?.finished == true
+
+    suspend fun setInWatchlist(titleId: Long, included: Boolean) {
+        if (included) {
+            dao.addToWatchlist(WatchlistEntity(titleId, System.currentTimeMillis()))
+        } else {
+            dao.removeFromWatchlist(titleId)
+        }
+        watchChanged.update { it + 1 }
+    }
+
+    suspend fun markWatched(titleId: Long, watched: Boolean) {
+        val progress = PersonalLibrary.manualProgress(watched)
+        db.withTransaction {
+            db.discoverDao().putHistory(WatchHistoryEntity(titleId, progress, watched, System.currentTimeMillis()))
+            // Acțiune explicită a utilizatorului: scoate reluarea veche, fără a inventa poziția/episodul.
+            dao.deleteWatchState(titleId)
+            dao.setPosterProgress(titleId, progress)
+        }
+        mutablePosterProgress.value = titleId to progress
+        watchChanged.update { it + 1 }
+    }
+
+    suspend fun watchlistPage(afterId: Long, limit: Int): List<TitleCard> {
+        val query = PersonalLibrary.page(afterId, limit)
+        return dao.cards(SimpleSQLiteQuery(query.sql, query.args.toTypedArray()))
+    }
 
     suspend fun watchState(titleId: Long): WatchStateEntity? = dao.watchState(titleId)
 
