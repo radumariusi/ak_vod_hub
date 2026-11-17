@@ -65,6 +65,7 @@ fun TitleCard.meta(): String =
         year?.toString(),
         rating?.takeIf { it > 0 }?.let { "★ %.1f".format(it) },
         qualityLabel(bestQuality),
+        dubLabel,
     ).joinToString(" · ")
 
 /**
@@ -114,6 +115,21 @@ fun PosterCard(
                         contentDescription = card.name,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
+                    )
+                }
+                card.dubLabel?.let { label ->
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier =
+                            Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(4.dp)
+                                .background(Color(0xCC000000), MaterialTheme.shapes.extraSmall)
+                                .padding(horizontal = 4.dp, vertical = 1.dp),
                     )
                 }
                 if (card.bestQuality == VideoQuality.UHD.ordinal) {

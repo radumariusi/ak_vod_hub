@@ -66,7 +66,7 @@ data class SqlQuery(
  */
 object CatalogQuery {
     const val COLUMNS =
-        "t.id, t.mediaType, t.name, t.year, t.posterPath, t.backdropPath, t.rating, t.bestQuality, t.overview"
+        "t.id, t.mediaType, t.name, t.year, t.posterPath, t.backdropPath, t.rating, t.bestQuality, t.overview, t.dubLabel"
 
     /** Sub acest număr de voturi, nota TMDB nu e relevantă pentru „Cele mai apreciate”. */
     const val MIN_VOTES_FOR_RATING = 100

@@ -320,6 +320,7 @@ private fun Header(
                 listOfNotNull(
                     if (title.mediaType == MediaType.MOVIE) "Film" else "Serial",
                     title.year?.toString(),
+                    title.dubLabel,
                     title.rating?.takeIf { it > 0 }?.let {
                         "★ %.1f".format(it) +
                             (title.voteCount?.let { v -> " ($v voturi)" } ?: "")

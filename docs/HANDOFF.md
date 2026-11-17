@@ -74,6 +74,13 @@ Release-uri păstrate acum: **v0.1.14** (ultimul, testat) și v0.1.13.
 9. **Build:** CI rulează `ktlint` + `./gradlew :core:parser:test testDebugUnitTest lintDebug assembleDebug`. Dacă mediul tău nu poate
    descărca Android SDK, rulează măcar `:core:parser:test` și lasă CI-ul din PR să confirme restul. Un PR fără CI verde nu se mergeuiește.
 
+### Etapa 10.1 (2026-11-17)
+
+Room v6: coloana nullable `title.dubLabel`, migrare aditivă 5→6. `CatalogIndexer` compară în flux limba
+originală TMDB cu fiecare sursă (inclusiv episoade), păstrând doar limbile distincte. Original/MULTI sau
+o limbă necunoscută suprimă eticheta. Posterele și fișa citesc rezultatul salvat. Cheia amprentei v6
+forțează prima recalculare fără reimport; amprenta include și ultima rundă de import pentru schimbările limbilor audio. Eliminat fallback-ul distructiv; migrările 1→6 sunt explicite.
+
 ## 6. Ce urmează (din `docs/PROPUNERI.md`)
 
 Ordinea recomandată, **o etapă = un branch + un PR**:

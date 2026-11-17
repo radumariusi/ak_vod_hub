@@ -129,7 +129,7 @@ interface CatalogDao {
 
     @Query(
         "SELECT t.id, t.mediaType, t.name, t.year, t.posterPath, t.backdropPath, t.rating, t.bestQuality, " +
-            "t.overview FROM watch_state w JOIN title t ON t.id = w.titleId WHERE t.sourceCount > 0 " +
+            "t.overview, t.dubLabel FROM watch_state w JOIN title t ON t.id = w.titleId WHERE t.sourceCount > 0 " +
             "ORDER BY w.updatedAt DESC LIMIT :limit",
     )
     suspend fun continueWatching(limit: Int): List<TitleCard>
@@ -208,7 +208,8 @@ interface CatalogDao {
 
     /** O „amprentă” ieftină a catalogului: dacă nu s-a schimbat, indexarea nu are ce reface. */
     @Query(
-        "SELECT (SELECT COUNT(*) || ':' || TOTAL(id) || ':' || TOTAL(titleId) FROM raw_entry) || '|' || " +
+        "SELECT (SELECT COUNT(*) || ':' || TOTAL(id) || ':' || TOTAL(titleId) || ':' || " +
+            "IFNULL(MAX(seenRun), 0) FROM raw_entry) || '|' || " +
             "(SELECT COUNT(*) || ':' || IFNULL(MAX(updatedAt), 0) || ':' || TOTAL(sourceCount > 0) FROM title)",
     )
     suspend fun fingerprint(): String
