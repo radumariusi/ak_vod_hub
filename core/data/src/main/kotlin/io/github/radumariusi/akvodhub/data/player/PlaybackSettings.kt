@@ -36,6 +36,7 @@ data class PlaybackPrefs(
     val defaultSpeed: Float = 1f,
     val autoNext: Boolean = true,
     val audioLanguage: String = "",
+    val subtitleDelayMs: Long = 0L,
     val contentLanguages: String = "",
     val hiddenLanguages: String = "",
     val hiddenCategories: String = "",
@@ -125,6 +126,11 @@ class PlaybackSettings(
 
     fun setAutoNext(value: Boolean) {
         prefs.edit().putBoolean("auto_next", value).apply()
+        mutableState.value = read()
+    }
+
+    fun setSubtitleDelayMs(value: Long) {
+        prefs.edit().putLong("subtitle_delay_ms", io.github.radumariusi.akvodhub.parser.player.PlaybackDefaults.offset(value)).apply()
         mutableState.value = read()
     }
 
@@ -218,6 +224,7 @@ class PlaybackSettings(
             put("home_hero", state.value.homeHero.toString())
             put("default_speed", state.value.defaultSpeed.toString())
             put("auto_next", state.value.autoNext.toString())
+            put("subtitle_delay_ms", state.value.subtitleDelayMs.toString())
             CONTENT_KEYS.forEach { key -> prefs.getString(key, null)?.let { put(key, it) } }
             put(BUFFER, state.value.bufferPreset.name)
             put(NIGHT, state.value.nightMode.toString())
@@ -236,6 +243,7 @@ class PlaybackSettings(
 
     /** Restaurare din backup: doar cheile cunoscute, cu valori verificate la citire. */
     fun restore(values: Map<String, String>) {
+        values["subtitle_delay_ms"]?.toLongOrNull()?.let { setSubtitleDelayMs(it) }
         values["auto_next"]?.toBooleanStrictOrNull()?.let { setAutoNext(it) }
         values["default_speed"]?.toFloatOrNull()?.let { setDefaultSpeed(it) }
         values["home_hero"]?.toBooleanStrictOrNull()?.let { setHomeHero(it) }
@@ -298,6 +306,7 @@ class PlaybackSettings(
             defaultSpeed = io.github.radumariusi.akvodhub.parser.player.PlaybackDefaults.speed(prefs.getFloat("default_speed", 1f)),
             autoNext = prefs.getBoolean("auto_next", true),
             audioLanguage = prefs.getString("audio_language", "").orEmpty(),
+            subtitleDelayMs = io.github.radumariusi.akvodhub.parser.player.PlaybackDefaults.offset(prefs.getLong("subtitle_delay_ms", 0L)),
             contentLanguages = prefs.getString("content_languages", "").orEmpty(),
             hiddenLanguages = prefs.getString("hidden_languages", "").orEmpty(),
             hiddenCategories = prefs.getString("hidden_categories", "").orEmpty(),

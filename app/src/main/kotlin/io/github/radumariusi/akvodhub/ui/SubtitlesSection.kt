@@ -39,15 +39,11 @@ import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
 @Composable
 fun SubtitlesSection(viewModel: PlaybackSettingsViewModel) {
     val prefs by viewModel.prefs.collectAsState()
-    val addons by viewModel.addons.collectAsState()
-    val addState by viewModel.addState.collectAsState()
     var choice by remember { mutableStateOf<Choice?>(null) }
-    var url by rememberSaveable { mutableStateOf("") }
     val colors = MaterialTheme.colorScheme
     val languages = prefs.subtitleLanguages
     val options = viewModel.subtitleLanguageOptions
 
-    LaunchedEffect(addState) { if (addState is AddonAddState.Added) url = "" }
 
     fun pickLanguage(index: Int) {
         val current = languages.getOrNull(index)
@@ -105,6 +101,27 @@ fun SubtitlesSection(viewModel: PlaybackSettingsViewModel) {
             }) { Text("Stil: ${prefs.subtitleStyle.label}") }
         }
 
+        OutlinedButton(onClick = {
+            val offsets = (-20..20).map { it * 100L }
+            choice = Choice("Întârziere implicită addon", offsets.map { "$it ms" }, offsets.indexOf(prefs.subtitleDelayMs).takeIf { it >= 0 }) {
+                viewModel.setSubtitleDelayMs(offsets[it])
+            }
+        }) { Text("Întârziere implicită: ${prefs.subtitleDelayMs} ms") }
+        Text("Pentru subtitrările din addon-uri, la fiecare film/episod. Pozitiv = subtitrarea apare mai târziu. Ajustarea din player rămâne pe episod.")
+
+    }
+
+    choice?.let { ChoiceDialog(it, onDismiss = { choice = null }) }
+}
+
+@Composable
+fun StremioSection(viewModel: PlaybackSettingsViewModel) {
+    val addons by viewModel.addons.collectAsState()
+    val addState by viewModel.addState.collectAsState()
+    var url by rememberSaveable { mutableStateOf("") }
+    val colors = MaterialTheme.colorScheme
+    LaunchedEffect(addState) { if (addState is AddonAddState.Added) url = "" }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("Addon-uri Stremio", style = MaterialTheme.typography.titleMedium)
         Text(
             "Folosite pentru subtitrări, cataloage și liste (top-uri, MDBList, Trakt). Cataloagele apar ca rânduri " +
@@ -177,8 +194,6 @@ fun SubtitlesSection(viewModel: PlaybackSettingsViewModel) {
             ) { Text(if (addState == AddonAddState.Checking) "Se verifică…" else "Adaugă addon") }
         }
     }
-
-    choice?.let { ChoiceDialog(it, onDismiss = { choice = null }) }
 }
 
 /** Ex. „Subtitrări · Cataloage · ” (gol dacă nu știm ce oferă addon-ul). */

@@ -130,6 +130,8 @@ class PlaybackSettingsViewModel
 
         fun setAddonSubtitlesAuto(enabled: Boolean) = settings.setAddonSubtitlesAuto(enabled)
 
+        fun setSubtitleDelayMs(value: Long) = settings.setSubtitleDelayMs(value)
+
         fun setSubtitleScale(percent: Int) = settings.setSubtitleScale(percent)
 
         fun setSubtitleStyle(style: SubtitleStyle) = settings.setSubtitleStyle(style)

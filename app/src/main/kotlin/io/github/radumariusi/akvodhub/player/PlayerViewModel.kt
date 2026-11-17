@@ -502,7 +502,7 @@ class PlayerViewModel
                 it.copy(
                     addonSubtitles = emptyList(),
                     addonStatus = if (addons.addons.value.isEmpty()) null else "Caut subtitrări în addon-uri…",
-                    subtitleOffsetMs = 0,
+                    subtitleOffsetMs = settings.state.value.subtitleDelayMs,
                 )
             }
             if (addons.addons.value.isEmpty()) {
