@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-11-17 — Etapa 12.5
+- Fișă cu fundal integral, acțiuni mari, surse compacte pe calitate/limbă și file pentru sezoane.
+
 ## 2026-11-17 — Etapa 12.4
 - Lista mea salvată în DB, cu paginare după ID; adăugare/scoatere și văzut/nevăzut manual din fișă.
 
