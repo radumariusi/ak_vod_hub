@@ -586,6 +586,8 @@ class PlayerViewModel
             }
         }
 
+        fun setMatchFrameRate(enabled: Boolean) = settings.setMatchFrameRate(enabled)
+
         fun togglePlay() {
             if (player.isPlaying) {
                 player.pause()

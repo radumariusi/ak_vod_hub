@@ -347,6 +347,11 @@ private fun Controls(
             }
             OutlinedButton(onClick = { viewModel.seekBy(-PlayerFactory.SEEK_MS) }) { Text("−10 s") }
             OutlinedButton(onClick = { viewModel.seekBy(PlayerFactory.SEEK_MS) }) { Text("+10 s") }
+            OutlinedButton(onClick = {
+                onChoice(Choice("Frecvență ecran · poate clipi la schimbare", listOf("Dezactivată", "Potrivește cu filmul"), null) {
+                    viewModel.setMatchFrameRate(it == 1)
+                })
+            }) { Text("Frecvență ecran") }
             if (state.audio.isNotEmpty()) {
                 OutlinedButton(onClick = {
                     onChoice(

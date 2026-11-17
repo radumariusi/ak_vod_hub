@@ -7,6 +7,7 @@ import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.core.view.WindowCompat
@@ -22,6 +23,8 @@ import io.github.radumariusi.akvodhub.ui.theme.AkVodHubTheme
 class PlayerActivity : ComponentActivity() {
     private val viewModel: PlayerViewModel by viewModels()
 
+    private var frameRateController: FrameRateController? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -31,8 +34,15 @@ class PlayerActivity : ComponentActivity() {
             hide(WindowInsetsCompat.Type.systemBars())
         }
         viewModel.start(request(intent))
+        val frameRate = FrameRateController(this, viewModel.player)
+        frameRateController = frameRate
+        viewModel.player.addListener(frameRate)
         setContent {
             val prefs by viewModel.prefs.collectAsState()
+            DisposableEffect(prefs.matchFrameRate) {
+                frameRate.enabled = prefs.matchFrameRate
+                onDispose { frameRate.enabled = false }
+            }
             AkVodHubTheme(prefs.accentColor) {
                 PlayerScreen(viewModel, onExit = { finish() })
             }
@@ -48,6 +58,17 @@ class PlayerActivity : ComponentActivity() {
         PlaybackActivityState.active = false
         super.onStop()
         viewModel.onStop()
+        frameRateController?.enabled = false
+    }
+
+    override fun onResume() {
+        super.onResume()
+        frameRateController?.enabled = viewModel.prefs.value.matchFrameRate
+    }
+
+    override fun onDestroy() {
+        frameRateController?.let { viewModel.player.removeListener(it) }
+        super.onDestroy()
     }
 
     companion object {
