@@ -63,6 +63,7 @@ fun OutlinedButton(
     onClick = onClick,
     modifier = modifier.then(tap(enabled, onClick)),
     enabled = enabled,
+    contentPadding = contentPadding,
     content = content,
 )
 
@@ -87,11 +88,15 @@ fun ListItem(
     onClick: () -> Unit,
     headlineContent: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    colors: ListItemColors = ListItemDefaults.colors(),
+    scale: ListItemScale = ListItemDefaults.scale(),
 ) = TvListItem(
     selected = selected,
     onClick = onClick,
     headlineContent = headlineContent,
     modifier = modifier.then(tap(true, onClick)),
+    colors = colors,
+    scale = scale,
 )
 
 @Composable
