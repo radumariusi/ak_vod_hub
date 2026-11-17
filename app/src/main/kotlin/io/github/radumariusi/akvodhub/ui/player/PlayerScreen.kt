@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.nativeKeyEvent
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -54,6 +55,7 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import io.github.radumariusi.akvodhub.parser.player.SeekNavigation
 import io.github.radumariusi.akvodhub.parser.player.Resume
 import io.github.radumariusi.akvodhub.parser.player.SeriesPlayback
 import io.github.radumariusi.akvodhub.player.PlayerFactory
@@ -80,6 +82,7 @@ fun PlayerScreen(
     var controls by remember { mutableStateOf(false) }
     var lastInput by remember { mutableIntStateOf(0) }
     var choice by remember { mutableStateOf<Choice?>(null) }
+    var jumping by remember { mutableStateOf(false) }
     var adjusting by remember { mutableStateOf(false) }
     val prefs by viewModel.prefs.collectAsState()
     val document by viewModel.externalDocument.collectAsState()
@@ -106,8 +109,8 @@ fun PlayerScreen(
             delay(500)
         }
     }
-    LaunchedEffect(controls, lastInput, isPlaying, choice, adjusting) {
-        if (controls && isPlaying && choice == null && !adjusting) {
+    LaunchedEffect(controls, lastInput, isPlaying, choice, adjusting, jumping) {
+        if (controls && isPlaying && choice == null && !adjusting && !jumping) {
             delay(HIDE_AFTER_MS)
             controls = false
         }
@@ -141,12 +144,12 @@ fun PlayerScreen(
                     }
 
                     Key.MediaFastForward -> {
-                        viewModel.seekBy(PlayerFactory.SEEK_MS * 3)
+                        viewModel.seekHeld(1, e.nativeKeyEvent.eventTime - e.nativeKeyEvent.downTime)
                         true
                     }
 
                     Key.MediaRewind -> {
-                        viewModel.seekBy(-PlayerFactory.SEEK_MS * 3)
+                        viewModel.seekHeld(-1, e.nativeKeyEvent.eventTime - e.nativeKeyEvent.downTime)
                         true
                     }
 
@@ -164,14 +167,12 @@ fun PlayerScreen(
                 if (controls || overlay || e.type != KeyEventType.KeyDown) return@onKeyEvent false
                 when (e.key) {
                     Key.DirectionLeft -> {
-                        viewModel.seekBy(-PlayerFactory.SEEK_MS)
-                        controls = true
+                        viewModel.seekHeld(-1, e.nativeKeyEvent.eventTime - e.nativeKeyEvent.downTime)
                         true
                     }
 
                     Key.DirectionRight -> {
-                        viewModel.seekBy(PlayerFactory.SEEK_MS)
-                        controls = true
+                        viewModel.seekHeld(1, e.nativeKeyEvent.eventTime - e.nativeKeyEvent.downTime)
                         true
                     }
 
@@ -271,6 +272,7 @@ fun PlayerScreen(
                 onInput = { lastInput++ },
                 onChoice = { choice = it },
                 onAdjust = { adjusting = true },
+                onJump = { jumping = true },
                 modifier = Modifier.align(Alignment.BottomStart),
             )
         }
@@ -293,6 +295,7 @@ fun PlayerScreen(
         }
     }
 
+    if (jumping) JumpToMinuteDialog(viewModel, onClose = { jumping = false })
     choice?.let { ChoiceDialog(it, onDismiss = { choice = null }) }
 }
 
@@ -307,6 +310,7 @@ private fun Controls(
     onInput: () -> Unit,
     onChoice: (Choice) -> Unit,
     onAdjust: () -> Unit,
+    onJump: () -> Unit,
     modifier: Modifier,
 ) {
     Column(
@@ -403,6 +407,7 @@ private fun Controls(
                     Text("Sursă (${state.sources.size})")
                 }
             }
+            OutlinedButton(onClick = onJump) { Text("Salt la minut") }
             if (state.isSeries) {
                 OutlinedButton(onClick = viewModel::resetSeriesTracks) { Text("Resetează audio/subtitrare serial") }
                 if (SeriesPlayback.canSkip(position, duration, state.introEndMs)) {
@@ -464,12 +469,12 @@ private fun SeekBar(
                     if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
                     when (e.key) {
                         Key.DirectionLeft -> {
-                            onSeek(-PlayerFactory.SEEK_MS)
+                            onSeek(-SeekNavigation.increment(e.nativeKeyEvent.eventTime - e.nativeKeyEvent.downTime))
                             true
                         }
 
                         Key.DirectionRight -> {
-                            onSeek(PlayerFactory.SEEK_MS)
+                            onSeek(SeekNavigation.increment(e.nativeKeyEvent.eventTime - e.nativeKeyEvent.downTime))
                             true
                         }
 

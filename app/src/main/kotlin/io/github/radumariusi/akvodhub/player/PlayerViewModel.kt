@@ -28,6 +28,7 @@ import io.github.radumariusi.akvodhub.parser.match.SourceInfo
 import io.github.radumariusi.akvodhub.parser.player.EpisodeOrder
 import io.github.radumariusi.akvodhub.parser.player.FallbackQueue
 import io.github.radumariusi.akvodhub.parser.player.Resume
+import io.github.radumariusi.akvodhub.parser.player.SeekNavigation
 import io.github.radumariusi.akvodhub.parser.player.SeriesPlayback
 import io.github.radumariusi.akvodhub.parser.stremio.AddonSubtitle
 import io.github.radumariusi.akvodhub.parser.stremio.SubtitleChoice
@@ -705,9 +706,28 @@ class PlayerViewModel
         }
 
         fun seekBy(deltaMs: Long) {
-            val duration = player.duration.takeIf { it != C.TIME_UNSET && it > 0 }
-            val target = (player.currentPosition + deltaMs).coerceAtLeast(0)
-            player.seekTo(if (duration != null) target.coerceAtMost(duration - 1_000) else target)
+            if (!player.isCurrentMediaItemSeekable) {
+                showNotice("Sursa nu permite derularea.")
+                return
+            }
+            val target = SeekNavigation.target(player.currentPosition, deltaMs, player.duration) ?: return
+            player.seekTo(target)
+        }
+
+        fun seekHeld(direction: Int, heldMs: Long) {
+            val step = SeekNavigation.increment(heldMs)
+            seekBy(step * direction)
+            showNotice("${if (direction > 0) "+" else "−"}${step / 1000} s · ${Resume.format(player.currentPosition)}")
+        }
+
+        fun jumpToMinute(text: String): Boolean {
+            val position = SeekNavigation.minute(text, player.duration)
+            if (position == null || !player.isCurrentMediaItemSeekable) {
+                showNotice("Introdu un minut din durata filmului; sursa trebuie să permită derularea.")
+                return false
+            }
+            player.seekTo(position)
+            return true
         }
 
         /** Episodul următor acum (buton sau la finalul numărătorii). */
