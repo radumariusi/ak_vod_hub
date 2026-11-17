@@ -212,7 +212,7 @@ interface CatalogDao {
     @Query(
         "INSERT OR IGNORE INTO watchlist (titleId, addedAt) " +
             "SELECT :titleId, MIN(w.addedAt) FROM watchlist w JOIN raw_entry r ON r.titleId = w.titleId " +
-            "WHERE r.id IN (:ids) HAVING COUNT(*) > 0",
+            "WHERE r.id IN (:ids) GROUP BY :titleId",
     )
     suspend fun carryWatchlist(ids: List<Long>, titleId: Long)
 
@@ -221,7 +221,7 @@ interface CatalogDao {
             "SELECT :titleId, MAX(progress), MAX(finished), MAX(watchedAt) FROM " +
             "(SELECT progress, finished, watchedAt FROM watch_history WHERE titleId = :titleId UNION ALL " +
             "SELECT h.progress, h.finished, h.watchedAt FROM watch_history h JOIN raw_entry r " +
-            "ON r.titleId = h.titleId WHERE r.id IN (:ids)) HAVING COUNT(*) > 0",
+            "ON r.titleId = h.titleId WHERE r.id IN (:ids)) GROUP BY :titleId",
     )
     suspend fun carryHistory(ids: List<Long>, titleId: Long)
 
