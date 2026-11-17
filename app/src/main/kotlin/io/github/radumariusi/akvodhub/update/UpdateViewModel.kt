@@ -75,7 +75,7 @@ class UpdateViewModel
 
         fun checkOnStartup() {
             // Build-urile de test (debug) au alt applicationId, deci nu se actualizează automat.
-            if (BuildConfig.DEBUG) return
+            if (BuildConfig.DEBUG || !BuildConfig.CHECK_UPDATES_ON_STARTUP) return
             check(showDialogIfAvailable = true)
         }
 

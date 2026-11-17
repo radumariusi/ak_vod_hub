@@ -41,6 +41,7 @@ android {
         versionName = if (ciVersionCode != null) "$versionBase.$ciVersionCode" else "$versionBase.0-dev"
 
         buildConfigField("String", "UPDATE_REPO", "\"$updateRepo\"")
+        buildConfigField("boolean", "CHECK_UPDATES_ON_STARTUP", "true")
         // Căutarea globală: autoritatea providerului trebuie scrisă și în res/xml/searchable.xml.
         resValue("string", "search_authority", "io.github.radumariusi.akvodhub.search")
 
@@ -108,6 +109,19 @@ android {
                 "AndroidGradlePluginVersion",
                 "NewerVersionAvailable",
             )
+    }
+}
+
+// AndroidX copiază manifestul release când creează varianta de profilare.
+androidComponents {
+    finalizeDsl { extension ->
+        extension.buildTypes
+            .getByName("nonMinifiedRelease")
+            .buildConfigField("boolean", "CHECK_UPDATES_ON_STARTUP", "false")
+        extension.sourceSets
+            .getByName("nonMinifiedRelease")
+            .manifest
+            .srcFile("src/nonMinifiedRelease/AndroidManifest.xml")
     }
 }
 
