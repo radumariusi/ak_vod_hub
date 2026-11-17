@@ -47,7 +47,7 @@ class StremioTest {
         assertEquals("pt", SubtitleLanguages.toIso1("pob"))
         assertEquals("de", SubtitleLanguages.toIso1("ger"))
         assertEquals("pt", SubtitleLanguages.toIso1("pt-BR"))
-        assertNull(SubtitleLanguages.toIso1("xx-nonsense"))
+        assertNull(SubtitleLanguages.toIso1("nonsense"))
         assertEquals("Română", SubtitleLanguages.displayName("rum"))
         assertEquals("Portugheză (BR)", SubtitleLanguages.displayName("pob"))
     }
