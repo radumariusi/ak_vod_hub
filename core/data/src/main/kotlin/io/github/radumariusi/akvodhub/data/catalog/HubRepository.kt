@@ -93,6 +93,8 @@ class HubRepository(
 
     val catalogVersion: StateFlow<Long> get() = indexer.version
 
+    val sourcePreferences get() = playback.state
+
     /** Limbile preferate la ordonarea surselor: cele din profilul de redare, limba sistemului, apoi engleza. */
     val preferredLanguages: List<String> get() = playback.preferredLanguages()
 
@@ -100,7 +102,15 @@ class HubRepository(
     val profile: SourceProfile get() = playback.state.value.profile
 
     /** Sursele în ordinea în care le încearcă playerul (profilul, apoi calitate și limbă). */
-    fun playOrder(sources: List<SourceInfo>): List<SourceInfo> = profile.order(sources, preferredLanguages)
+    fun playOrder(
+        sources: List<SourceInfo>,
+        originalLanguage: String? = null,
+    ): List<SourceInfo> =
+        profile.order(
+            sources,
+            preferredLanguages,
+            originalLanguage.takeIf { playback.state.value.preferOriginalLanguage },
+        )
 
     suspend fun watchState(titleId: Long): WatchStateEntity? = dao.watchState(titleId)
 

@@ -1,5 +1,6 @@
 package io.github.radumariusi.akvodhub.parser.player
 
+import io.github.radumariusi.akvodhub.parser.catalog.OriginalLanguage
 import io.github.radumariusi.akvodhub.parser.match.SourceGrouping
 import io.github.radumariusi.akvodhub.parser.match.SourceInfo
 import io.github.radumariusi.akvodhub.parser.title.ParsedTitle
@@ -41,13 +42,20 @@ data class SourceProfile(
     fun order(
         sources: List<SourceInfo>,
         fallbackLanguages: List<String> = emptyList(),
+        originalLanguage: String? = null,
     ): List<SourceInfo> {
         val base = SourceGrouping.ordered(sources, (languages + fallbackLanguages).distinct())
-        if (rules.isEmpty()) return base
+        val original = OriginalLanguage.code(originalLanguage)
+        if (rules.isEmpty() && original == null) return base
         return base
             .withIndex()
-            .sortedWith(compareBy({ rank(it.value) }, { it.index }))
-            .map { it.value }
+            .sortedWith(
+                compareBy<IndexedValue<SourceInfo>> {
+                    original?.let { code -> OriginalLanguage.rank(code, it.value.languages) }
+                        ?: 0
+                }.thenBy { rank(it.value) }
+                    .thenBy { it.index },
+            ).map { it.value }
     }
 
     /** 2 × indexul primei reguli respectate (+1 dacă doar „MULTI” ar putea-o respecta); la final, restul. */

@@ -2,6 +2,10 @@
 
 Intrări noi sus. Una scurtă pentru fiecare PR (dată, etapă, ce s-a schimbat).
 
+## 2026-11-17: etapa 10.2 — limba originală
+- Setare pentru surse și piste audio originale înaintea profilului, cu rezervă MULTI și alegere manuală păstrate.
+- Filtru „Doar în limba originală” din date precalculate; migrare Room 6→7, preferință inclusă în backup.
+
 ## 2026-11-17: etapa 10.1 — eticheta DUB
 - Etichetă DUB pe postere și în fișă, numai când toate sursele declară audio într-o altă limbă decât originalul TMDB.
 - Calcul în flux la indexare, salvat în DB; migrare explicită 5→6, fără ștergerea datelor.

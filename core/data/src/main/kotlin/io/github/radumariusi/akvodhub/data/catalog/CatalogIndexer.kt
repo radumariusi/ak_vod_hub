@@ -101,7 +101,7 @@ class CatalogIndexer(
     /** Un singur parcurs după cheia titlului; nici liste complete, nici interogări pe poster. */
     private fun updateDubLabels() {
         val sql = db.openHelper.writableDatabase
-        val update = sql.compileStatement("UPDATE title SET dubLabel = ? WHERE id = ?")
+        val update = sql.compileStatement("UPDATE title SET dubLabel = ?, hasOriginalAudio = ? WHERE id = ?")
         update.use {
             sql
                 .query(
@@ -115,7 +115,8 @@ class CatalogIndexer(
                         if (titleId < 0) return
                         val value = label?.label()
                         if (value == null) update.bindNull(1) else update.bindString(1, value)
-                        update.bindLong(2, titleId)
+                        update.bindLong(2, if (label?.hasOriginalAudio == true) 1L else 0L)
+                        update.bindLong(3, titleId)
                         update.executeUpdateDelete()
                     }
                     while (cursor.moveToNext()) {
@@ -130,7 +131,7 @@ class CatalogIndexer(
                     save()
                 }
         }
-        sql.execSQL("UPDATE title SET dubLabel = NULL WHERE sourceCount = 0")
+        sql.execSQL("UPDATE title SET dubLabel = NULL, hasOriginalAudio = 0 WHERE sourceCount = 0")
     }
 
     private fun rebuildSearchIndex() {
@@ -176,7 +177,7 @@ class CatalogIndexer(
 
     companion object {
         private const val TAG = "CatalogIndexer"
-        private const val FINGERPRINT = "fingerprint_v6"
+        private const val FINGERPRINT = "fingerprint_v7"
         private const val BATCH = 2_000
     }
 }

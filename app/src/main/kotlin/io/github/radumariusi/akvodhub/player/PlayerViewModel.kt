@@ -315,7 +315,7 @@ class PlayerViewModel
         ) {
             countdownJob?.cancel()
             sources = list.associateBy { it.id }
-            val ordered = repository.playOrder(list).map { it.id }
+            val ordered = repository.playOrder(list, title?.originalLanguage).map { it.id }
             queue = FallbackQueue(ordered, chosen?.takeIf { it in sources })
             mutableState.update { it.copy(error = null, failures = emptyList(), countdown = null) }
             playCurrent(positionMs)
@@ -570,7 +570,10 @@ class PlayerViewModel
         fun setSubtitleStyle(style: SubtitleStyle) = settings.setSubtitleStyle(style)
 
         private fun trackPreferences() =
-            TrackPreferences(settings.preferredLanguages(), settings.state.value.subtitleLanguages)
+            TrackPreferences(
+                settings.preferredLanguages(title?.originalLanguage),
+                settings.state.value.subtitleLanguages,
+            )
 
         /** „Română 1 · OpenSubtitles v3”, „Română 2 · …”, „Engleză 1 · …”. */
         private fun addonLabels(list: List<AddonSubtitle>): List<AddonSubtitleOption> {
@@ -649,7 +652,7 @@ class PlayerViewModel
             val now = System.currentTimeMillis()
             val current = episode
             val next = current?.let { EpisodeOrder.next(seasons, it.season, it.number) }
-            val nextEntry = next?.let { repository.playOrder(it.sources).firstOrNull()?.id }
+            val nextEntry = next?.let { repository.playOrder(it.sources, title.originalLanguage).firstOrNull()?.id }
             saveScope.launch {
                 if (finished || position >= Resume.MIN_POSITION_MS) {
                     repository.recordWatch(title.id, position.toDouble() / duration, finished, now)
