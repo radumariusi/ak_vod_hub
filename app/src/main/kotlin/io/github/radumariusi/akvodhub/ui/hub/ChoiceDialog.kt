@@ -4,6 +4,7 @@ package io.github.radumariusi.akvodhub.ui.hub
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -40,8 +41,8 @@ fun ChoiceDialog(
 ) {
     val focus = remember { FocusRequester() }
     val initial = (choice.selected ?: 0).coerceIn(0, (choice.options.size - 1).coerceAtLeast(0))
-    LaunchedEffect(choice) { runCatching { focus.requestFocus() } }
     Dialog(onDismissRequest = onDismiss) {
+        LaunchedEffect(choice) { runCatching { focus.requestFocus() } }
         Surface(
             modifier = Modifier.width(520.dp),
             shape = MaterialTheme.shapes.large,
@@ -51,7 +52,8 @@ fun ChoiceDialog(
                 Text(choice.title, style = MaterialTheme.typography.headlineSmall)
                 LazyColumn(
                     state = rememberLazyListState(initialFirstVisibleItemIndex = initial),
-                    modifier = Modifier.heightIn(max = 400.dp),
+                    modifier = Modifier.heightIn(max = 400.dp).weight(1f, fill = false),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     itemsIndexed(choice.options) { index, label ->

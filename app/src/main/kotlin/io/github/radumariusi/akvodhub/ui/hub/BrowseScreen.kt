@@ -164,7 +164,7 @@ private fun FilterBar(
     val types = listOf(MediaType.MOVIE, MediaType.TV)
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
-        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
     ) {
         if (search) {
             item("type") {

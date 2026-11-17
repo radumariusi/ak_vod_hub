@@ -222,7 +222,7 @@ private fun DetailsContent(
         item("personal-library") {
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(vertical = 8.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
             ) {
                 item {
                     OutlinedButton(onClick = onWatchlist, enabled = !state.changingLibrary) {
@@ -251,7 +251,7 @@ private fun DetailsContent(
                 item("seasons") {
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        contentPadding = PaddingValues(vertical = 4.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
                     ) {
                         items(episodes.seasons, key = { it.number }) { s ->
                             val label = if (s.number == 0) "Altele" else "Sezonul ${s.number}"
@@ -295,7 +295,7 @@ private fun DetailsContent(
                     Text("Distribuție", style = MaterialTheme.typography.titleMedium)
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        contentPadding = PaddingValues(vertical = 4.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
                     ) {
                         items(cast) { person ->
                             Surface(onClick = {
@@ -473,7 +473,7 @@ private fun QualityRow(
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)) {
             items(group.languages, key = { it.language ?: "unknown" }) { language ->
                 OutlinedButton(onClick = {
                     val variants = language.sources
