@@ -34,6 +34,7 @@ data class PlaybackPrefs(
     val preferOriginalLanguage: Boolean = false,
     val matchFrameRate: Boolean = false,
     val audioPassthrough: Boolean = false,
+    val nightMode: Boolean = false,
     val posterBadges: Set<PosterBadge> = PosterBadges.defaults,
     val posterSize: PosterSize = PosterSize.MEDIUM,
     val accentColor: AccentColor = AccentColor.RED,
@@ -65,6 +66,11 @@ class PlaybackSettings(
                 state.value.profile.languages + listOfNotNull(systemLanguage) + "en"
         ).filter { it.length == 2 }
             .distinct()
+
+    fun setNightMode(enabled: Boolean) {
+        prefs.edit().putBoolean(NIGHT, enabled).apply()
+        mutableState.value = read()
+    }
 
     fun setAudioPassthrough(enabled: Boolean) {
         prefs.edit().putBoolean(PASSTHROUGH, enabled).apply()
@@ -128,6 +134,7 @@ class PlaybackSettings(
     /** Preferințele salvate, ca text (pentru backup). Cheile lipsă = valorile implicite. */
     fun backup(): Map<String, String> =
         buildMap {
+            put(NIGHT, state.value.nightMode.toString())
             put(PASSTHROUGH, state.value.audioPassthrough.toString())
             put(FRAME_RATE, state.value.matchFrameRate.toString())
             prefs.getString(PROFILE, null)?.let { put(PROFILE, it) }
@@ -144,6 +151,7 @@ class PlaybackSettings(
     /** Restaurare din backup: doar cheile cunoscute, cu valori verificate la citire. */
     fun restore(values: Map<String, String>) {
         val edit = prefs.edit()
+        values[NIGHT]?.toBooleanStrictOrNull()?.let { edit.putBoolean(NIGHT, it) }
         values[PASSTHROUGH]?.toBooleanStrictOrNull()?.let { edit.putBoolean(PASSTHROUGH, it) }
         values[FRAME_RATE]?.toBooleanStrictOrNull()?.let { edit.putBoolean(FRAME_RATE, it) }
         values[POSTER_SIZE]?.let { edit.putString(POSTER_SIZE, PosterSize.decode(it).name) }
@@ -186,6 +194,7 @@ class PlaybackSettings(
                 }
             }
         return PlaybackPrefs(
+            nightMode = prefs.getBoolean(NIGHT, false),
             audioPassthrough = prefs.getBoolean(PASSTHROUGH, false),
             matchFrameRate = prefs.getBoolean(FRAME_RATE, false),
             preferOriginalLanguage = prefs.getBoolean(ORIGINAL, false),
@@ -203,6 +212,7 @@ class PlaybackSettings(
     }
 
     companion object {
+        private const val NIGHT = "night_mode"
         private const val PASSTHROUGH = "audio_passthrough"
         private const val FRAME_RATE = "match_frame_rate"
         private const val POSTER_SIZE = "poster_size"

@@ -357,6 +357,11 @@ private fun Controls(
                     viewModel.setAudioPassthrough(it == 1)
                 })
             }) { Text("Passthrough") }
+            OutlinedButton(onClick = {
+                onChoice(Choice("Mod noapte · la redeschidere, fără passthrough", listOf("Dezactivat", "Dialog mai clar · compresie PCM"), null) {
+                    viewModel.setNightMode(it == 1)
+                })
+            }) { Text("Mod noapte") }
             if (state.audio.isNotEmpty()) {
                 OutlinedButton(onClick = {
                     onChoice(

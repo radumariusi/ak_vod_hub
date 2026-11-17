@@ -36,6 +36,7 @@ object PlayerFactory {
         context: Context,
         preferences: TrackPreferences,
         passthrough: Boolean = false,
+        nightMode: Boolean = false,
     ): ExoPlayer {
         val http =
             DefaultHttpDataSource
@@ -52,13 +53,15 @@ object PlayerFactory {
                     enableFloatOutput: Boolean,
                     enableAudioOutputPlaybackParams: Boolean,
                 ): AudioSink {
-                    val sink = DefaultAudioSink.Builder(context).build()
+                    val sink = DefaultAudioSink.Builder(context)
+                        .setAudioProcessors(if (nightMode) arrayOf(NightAudioProcessor()) else emptyArray())
+                        .build()
                     return object : ForwardingAudioSink(sink) {
                         override fun supportsFormat(format: Format): Boolean =
                             getFormatSupport(format) != AudioSink.SINK_FORMAT_UNSUPPORTED
 
                         override fun getFormatSupport(format: Format): Int =
-                            if (!passthrough && format.sampleMimeType != "audio/raw") {
+                            if ((!passthrough || nightMode) && format.sampleMimeType != "audio/raw") {
                                 AudioSink.SINK_FORMAT_UNSUPPORTED
                             } else {
                                 super.getFormatSupport(format)

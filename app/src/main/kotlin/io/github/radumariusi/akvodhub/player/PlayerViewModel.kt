@@ -117,7 +117,7 @@ class PlayerViewModel
         private val subtitleRepository: SubtitleRepository,
         private val addons: StremioAddons,
     ) : ViewModel() {
-        val player: ExoPlayer = PlayerFactory.create(context, trackPreferences(), settings.state.value.audioPassthrough)
+        val player: ExoPlayer = PlayerFactory.create(context, trackPreferences(), settings.state.value.audioPassthrough, settings.state.value.nightMode)
 
         /** Mărimea și stilul subtitrărilor (Setări → Subtitrări; se pot schimba și din player). */
         val prefs: StateFlow<PlaybackPrefs> = settings.state
@@ -584,6 +584,11 @@ class PlayerViewModel
                 counts[language] = n
                 AddonSubtitleOption(sub, "$language $n · ${sub.addon}")
             }
+        }
+
+        fun setNightMode(enabled: Boolean) {
+            settings.setNightMode(enabled)
+            showNotice("Modul noapte se aplică la redeschiderea playerului, cu audio PCM (fără passthrough).")
         }
 
         fun setAudioPassthrough(enabled: Boolean) {
