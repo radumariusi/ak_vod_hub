@@ -1,6 +1,7 @@
 package io.github.radumariusi.akvodhub.di
 
 import android.content.Context
+import android.os.Build
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -53,7 +54,9 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun updateChecker(client: OkHttpClient): UpdateChecker = UpdateChecker(client, BuildConfig.UPDATE_REPO)
+    fun updateChecker(
+        client: OkHttpClient,
+    ): UpdateChecker = UpdateChecker(client, BuildConfig.UPDATE_REPO, supportedAbis = Build.SUPPORTED_ABIS.toList())
 
     @Provides
     @Singleton

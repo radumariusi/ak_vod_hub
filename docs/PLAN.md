@@ -187,6 +187,13 @@ Documentele astea, `.gitignore`, workflow de curățenie automată, reguli de lu
 - Preferințe existente păstrate, opțiuni noi incluse în backup; statistici SQL în fundal, cache imagini golit la cerere.
 - Room v14, fără migrare sau biblioteci noi. Verificarea pe Android 11 TV rămâne de efectuat.
 
+### Etapa 14: performanță (în curs)
+
+- 14.1–14.2: paginare după cheie și optimizări Coil implementate. Validarea Android și verificarea pe TV sunt în așteptare.
+- 14.3: generator AndroidX pregătit. Colectarea profilului pe Android 11 și verificarea instalării pe emulator sunt în așteptare.
+- 14.4: selecție ABI și publicare universal + variante pregătite. Verificarea variantelor semnate și a tranziției TV este în așteptare.
+- Room rămâne v14. Livrarea se face după generarea profilului, CI verde și merge.
+
 ## Idei suplimentare
 
 1. **Verificare sănătate surse**: test rapid în fundal al linkurilor; sursele moarte sunt marcate și puse la final.

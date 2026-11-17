@@ -56,13 +56,12 @@ jobs:
           java-version: "21"
           cache: gradle
 
-      - name: Build APK semnat
+      - name: Construiește și verifică APK-urile semnate
         if: steps.key.outputs.ok == 'true' && steps.version.outputs.exists == 'false'
-        run: |
-          ./gradlew --no-daemon --stacktrace :app:assembleRelease -Pakvod.versionCode=${{ steps.version.outputs.code }}
-          apk=app/build/outputs/apk/release/app-release.apk
-          test -f "$apk" || { echo "::error::APK-ul nu a fost semnat (lipsește $apk)."; exit 1; }
-          cp "$apk" "$RUNNER_TEMP/ak-vod-hub-${{ steps.version.outputs.name }}.apk"
+        env:
+          RELEASE_CODE: ${{ steps.version.outputs.code }}
+          RELEASE_NAME: ${{ steps.version.outputs.name }}
+        run: bash scripts/build-release-apks.sh
 
       - name: Publică release-ul
         if: steps.key.outputs.ok == 'true' && steps.version.outputs.exists == 'false'
@@ -74,7 +73,7 @@ jobs:
           else
             git log -1 --pretty='- %s' > "$RUNNER_TEMP/notes.md"
           fi
-          gh release create "v$name" "$RUNNER_TEMP/ak-vod-hub-$name.apk" \
+          gh release create "v$name" "$RUNNER_TEMP/ak-vod-hub-$name.apk" "$RUNNER_TEMP/ak-vod-hub-$name-"*.apk.bin \
             --target "$GITHUB_SHA" --title "AK VOD Hub $name" --notes-file "$RUNNER_TEMP/notes.md"
 
       - name: Păstrează baza v0.1.14 și cea mai nouă versiune

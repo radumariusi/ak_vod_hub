@@ -284,3 +284,25 @@ backup vechi și nou/restaurare; ascundere/dezascundere fără pierderi; hero ș
 audio original/per serial, passthrough/noapte/buffer; subtitrări addon cu decalaj; statistici după import;
 golire cache și reîncărcare postere; updater și instalare peste versiunea existentă. Testele hardware ale etapei 11
 rămân neconfirmate. Nu se începe etapa 14 în acest fir.
+
+### Etapa 14 — performanță (în curs)
+
+- Filme, Seriale, Căutare și rândurile de catalog de pe Acasă continuă după cheia de sortare și ID. La
+  căutarea după popularitate, potrivirile de prefix au prioritate inclusiv când popularitatea este NULL.
+  Segmentul NULL are continuare după ID. Interogările folosesc indexurile existente și comparații compatibile
+  cu SQLite de pe API 23. Se folosesc cardurile încărcate și cheile ID pentru revenirea din fișă.
+  O actualizare a catalogului reîncarcă grilele conform fluxului existent.
+- Coil permite RGB565 numai pentru JPEG TMDB din carduri. Formatul final depinde de decodor. Logo-urile,
+  fundalurile, distribuția și imaginile furnizorilor folosesc configurația existentă. Cache-ul pe disc are plafon
+  de 64 MiB, cu același director și aceeași opțiune de golire din Setări.
+- Workflow-ul Baseline Profile folosește AndroidX Macrobenchmark pe emulator x86_64 API 30. Generatorul
+  verifică pornirea pe Acasă și trecerea la a doua pagină din Filme cu date sintetice. Verificarea caută regulile
+  aplicației, profilul din APK și rezultatul instalării AndroidX. Datasetul și bibliotecile de măsurare sunt
+  în build-urile de profilare. AndroidX ProfileInstaller intră în release pentru instalarea profilului și la sideload;
+  impactul său asupra APK-ului rămâne de măsurat. Profilul generat trebuie importat din artefactul CI înainte de livrare.
+- Updaterul citește `Build.SUPPORTED_ABIS` în ordinea dispozitivului. Acceptă variantele `armeabi-v7a`,
+  `arm64-v8a` și `x86_64` denumite `ak-vod-hub-<versiune>-<abi>.apk.bin`. Conținutul este APK semnat,
+  descărcat local cu extensia APK. Pentru dispozitivele cu cel puțin o arhitectură inclusă în universal, fallback-ul
+  este `ak-vod-hub-<versiune>.apk`. Universalul rămâne singurul asset cu extensia `.apk` pentru updaterul vechi.
+  Workflow-ul verifică arhitecturile și certificatul v0.1.14 înaintea publicării. Dimensiunile se măsoară separat.
+- Room v14, fără migrare. Baseline Profile, Android CI, release-ul și testarea TV rămân de confirmat.

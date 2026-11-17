@@ -23,6 +23,15 @@ Excepția autorizată la interdicția modificării workflow-urilor privește exc
 - Prima dată, Android cere permisiunea **„Instalează aplicații necunoscute”** pentru AK VOD Hub. Aplicația deschide singură ecranul respectiv, dacă box-ul îl are.
 - Build-ul de test (debug) are alt ID (`.debug`), deci stă alături de cel de release și nu se actualizează automat.
 
+## Contractul APK-urilor pe arhitectură (Etapa 14)
+
+Release-ul pregătit pentru etapa 14 include mereu universalul `ak-vod-hub-<versiune>.apk`, singurul
+asset al cărui nume se termină în `.apk`. Updaterele vechi îl găsesc indiferent de ordinea asseturilor.
+Cele trei variante `ak-vod-hub-<versiune>-<abi>.apk.bin` conțin APK-uri semnate și pot fi redenumite
+cu extensia `.apk` pentru instalare manuală. Updaterul nou încearcă arhitecturile declarate de Android,
+apoi universalul dacă dispozitivul acceptă una dintre arhitecturile lui.
+Workflow-ul verifică arhitecturile din fișiere, certificatul față de v0.1.14 și dimensiunile înainte de publicare.
+
 ## Cheia de semnare
 
 - O singură cheie (PKCS12, alias `akvodhub`), ținută doar în secretul GitHub `AK_SIGNING_KEY`, cu forma `<parolă>:<keystore în base64>`. Nu e niciodată în repo.

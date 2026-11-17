@@ -11,6 +11,10 @@ plugins {
 // Versiunea: CI trimite -Pakvod.versionCode=<număr build>; local rămâne 1 / "-dev".
 val versionBase = providers.gradleProperty("akvod.versionBase").getOrElse("0.1")
 val ciVersionCode = providers.gradleProperty("akvod.versionCode").orNull?.toIntOrNull()
+val supportedAbis = listOf("armeabi-v7a", "arm64-v8a", "x86_64")
+val releaseAbi = providers.gradleProperty("akvod.releaseAbi").orNull
+require(releaseAbi == null || releaseAbi in supportedAbis) { "Arhitectură APK necunoscută: $releaseAbi" }
+
 val updateRepo = providers.gradleProperty("akvod.updateRepo").getOrElse("radumariusi/ak_vod_hub")
 
 // Semnare: secretul AK_SIGNING_KEY are forma "<parolă>:<keystore PKCS12 în base64>". Doar în CI.
@@ -42,7 +46,7 @@ android {
 
         // FFmpeg are biblioteci native: doar procesoarele ARM ale TV-urilor (+ x86_64 pentru emulator).
         ndk {
-            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64")
+            abiFilters += releaseAbi?.let(::listOf) ?: supportedAbis
         }
     }
 

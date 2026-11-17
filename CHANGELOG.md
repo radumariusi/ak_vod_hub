@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-17 — Etapa 14 (în curs)
+- Rândurile și grilele catalogului folosesc paginare după cheie. Cache-ul Coil are plafon de 64 MiB și poate decoda posterele JPEG TMDB în RGB565.
+- Updaterul selectează APK-ul compatibil cu procesorul și păstrează compatibilitatea cu updaterul vechi prin APK-ul universal.
+- Generatorul AndroidX este pregătit pentru colectarea și verificarea profilului în CI.
+
 ## 2026-11-17 — Etapa 13
 - Setări în două panouri, opt categorii, telecomandă și touch; valori curente și explicații în română.
 - Preferințe noi funcționale cu backup, statistici SQL în fundal și golire cache imagini. Room v14 neschimbat.
