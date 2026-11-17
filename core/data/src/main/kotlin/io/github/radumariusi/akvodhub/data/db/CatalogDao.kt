@@ -86,6 +86,12 @@ interface CatalogDao {
     @Query("SELECT * FROM title WHERE id = :id")
     suspend fun titleById(id: Long): TitleEntity?
 
+    @Query("UPDATE title SET imdbId = :imdbId WHERE id = :id")
+    suspend fun setImdbId(
+        id: Long,
+        imdbId: String,
+    )
+
     /** Întoarce -1 dacă titlul există deja. */
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertTitle(title: TitleEntity): Long

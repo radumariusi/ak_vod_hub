@@ -79,6 +79,8 @@ fun SettingsScreen(
 
         PlaybackSection(playbackViewModel)
 
+        SubtitlesSection(playbackViewModel)
+
         Text("Actualizări", style = MaterialTheme.typography.titleLarge)
         Text("Versiunea instalată: ${viewModel.currentVersion}", style = MaterialTheme.typography.bodyLarge)
         UpdateStatusText(state)

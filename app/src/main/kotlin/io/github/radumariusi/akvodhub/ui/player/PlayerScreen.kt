@@ -70,6 +70,9 @@ fun PlayerScreen(
     var controls by remember { mutableStateOf(false) }
     var lastInput by remember { mutableIntStateOf(0) }
     var choice by remember { mutableStateOf<Choice?>(null) }
+    var adjusting by remember { mutableStateOf(false) }
+    val prefs by viewModel.prefs.collectAsState()
+    val document by viewModel.externalDocument.collectAsState()
     var isPlaying by remember { mutableStateOf(player.isPlaying) }
     var position by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(0L) }
@@ -93,20 +96,21 @@ fun PlayerScreen(
             delay(500)
         }
     }
-    LaunchedEffect(controls, lastInput, isPlaying, choice) {
-        if (controls && isPlaying && choice == null) {
+    LaunchedEffect(controls, lastInput, isPlaying, choice, adjusting) {
+        if (controls && isPlaying && choice == null && !adjusting) {
             delay(HIDE_AFTER_MS)
             controls = false
         }
     }
     LaunchedEffect(state.finished) { if (state.finished) onExit() }
-    val overlay = state.error != null || state.countdown != null
+    val overlay = state.error != null || state.countdown != null || adjusting
     LaunchedEffect(controls, overlay) {
         if (!overlay) runCatching { if (controls) playFocus.requestFocus() else rootFocus.requestFocus() }
     }
 
     BackHandler {
         when {
+            adjusting -> adjusting = false
             controls -> controls = false
             state.countdown != null -> viewModel.cancelCountdown()
             else -> onExit()
@@ -183,9 +187,22 @@ fun PlayerScreen(
                     this.player = player
                 }
             },
+            update = { view -> SubtitleLook.applyTo(view, prefs.subtitleScale, prefs.subtitleStyle) },
             onRelease = { it.player = null },
             modifier = Modifier.fillMaxSize(),
         )
+
+        document?.let {
+            ExternalSubtitles(
+                document = it,
+                player = player,
+                offsetMs = state.subtitleOffsetMs,
+                scale = prefs.subtitleScale,
+                style = prefs.subtitleStyle,
+                raised = controls && !overlay,
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        }
 
         if (state.loading && state.error == null) {
             Column(
@@ -225,7 +242,19 @@ fun PlayerScreen(
                 viewModel = viewModel,
                 onInput = { lastInput++ },
                 onChoice = { choice = it },
+                onAdjust = { adjusting = true },
                 modifier = Modifier.align(Alignment.BottomStart),
+            )
+        }
+
+        if (adjusting) {
+            SubtitleAdjustPanel(
+                state = state,
+                scale = prefs.subtitleScale,
+                style = prefs.subtitleStyle,
+                viewModel = viewModel,
+                onClose = { adjusting = false },
+                modifier = Modifier.align(Alignment.TopCenter),
             )
         }
 
@@ -249,6 +278,7 @@ private fun Controls(
     viewModel: PlayerViewModel,
     onInput: () -> Unit,
     onChoice: (Choice) -> Unit,
+    onAdjust: () -> Unit,
     modifier: Modifier,
 ) {
     Column(
@@ -297,22 +327,13 @@ private fun Controls(
                     )
                 }) { Text("Audio (${state.audio.size})") }
             }
-            OutlinedButton(onClick = {
-                val selected = state.subtitles.indexOfFirst { it.selected }
-                onChoice(
-                    Choice(
-                        "Subtitrări",
-                        listOf("Oprite") + state.subtitles.map { it.label },
-                        selected + 1,
-                    ) { i ->
-                        if (i == 0) {
-                            viewModel.disableSubtitles()
-                        } else {
-                            viewModel.selectTrack(state.subtitles[i - 1])
-                        }
-                    },
-                )
-            }) { Text(if (state.subtitles.isEmpty()) "Subtitrări" else "Subtitrări (${state.subtitles.size})") }
+            val subtitleCount = state.subtitles.size + state.addonSubtitles.size
+            OutlinedButton(onClick = { onChoice(subtitleChoice(state, viewModel)) }) {
+                Text(if (subtitleCount == 0) "Subtitrări" else "Subtitrări ($subtitleCount)")
+            }
+            if (state.externalSubtitle != null || state.subtitles.any { it.selected }) {
+                OutlinedButton(onClick = onAdjust) { Text("Ajustează") }
+            }
             if (state.sources.size > 1) {
                 OutlinedButton(onClick = { onChoice(sourceChoice(state, viewModel)) }) {
                     Text("Sursă (${state.sources.size})")
@@ -453,6 +474,45 @@ private fun NextPanel(
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Button(onClick = viewModel::playNext, modifier = Modifier.focusRequester(focus)) { Text("Redă acum") }
             OutlinedButton(onClick = viewModel::cancelCountdown) { Text("Anulează") }
+        }
+    }
+}
+
+/** Meniul „Subtitrări”: oprite, pistele din sursă, apoi cele din addon-uri (limbile preferate primele). */
+private fun subtitleChoice(
+    state: PlayerUiState,
+    viewModel: PlayerViewModel,
+): Choice {
+    val embedded = state.subtitles
+    val addon = state.addonSubtitles
+    val options =
+        listOf("Oprite") +
+            embedded.map { "Din sursă · ${it.label}" } +
+            addon.map { it.label } +
+            listOfNotNull(state.addonStatus?.let { "ℹ $it" })
+    val selected =
+        when {
+            state.externalSubtitle != null -> {
+                addon
+                    .indexOfFirst { it.subtitle.url == state.externalSubtitle }
+                    .takeIf { it >= 0 }
+                    ?.let { 1 + embedded.size + it }
+            }
+
+            embedded.any { it.selected } -> {
+                1 + embedded.indexOfFirst { it.selected }
+            }
+
+            else -> {
+                0
+            }
+        }
+    return Choice("Subtitrări", options, selected) { i ->
+        when {
+            i == 0 -> viewModel.disableSubtitles()
+            i <= embedded.size -> viewModel.selectTrack(embedded[i - 1])
+            i <= embedded.size + addon.size -> viewModel.selectAddonSubtitle(addon[i - 1 - embedded.size])
+            else -> Unit
         }
     }
 }

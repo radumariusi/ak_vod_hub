@@ -21,6 +21,9 @@ import io.github.radumariusi.akvodhub.data.playlist.PlaylistWorkerFactory
 import io.github.radumariusi.akvodhub.data.playlist.xtream.XtreamClient
 import io.github.radumariusi.akvodhub.data.security.KeystoreSecretCipher
 import io.github.radumariusi.akvodhub.data.security.SecretCipher
+import io.github.radumariusi.akvodhub.data.stremio.StremioAddons
+import io.github.radumariusi.akvodhub.data.stremio.StremioClient
+import io.github.radumariusi.akvodhub.data.stremio.SubtitleRepository
 import io.github.radumariusi.akvodhub.data.tmdb.TmdbClient
 import io.github.radumariusi.akvodhub.data.tmdb.TmdbSettings
 import io.github.radumariusi.akvodhub.data.update.UpdateChecker
@@ -153,4 +156,21 @@ object AppModule {
     fun playbackSettings(
         @ApplicationContext context: Context,
     ): PlaybackSettings = PlaybackSettings(context)
+
+    @Provides
+    @Singleton
+    fun stremioClient(client: OkHttpClient): StremioClient = StremioClient(client)
+
+    @Provides
+    @Singleton
+    fun stremioAddons(
+        @ApplicationContext context: Context,
+    ): StremioAddons = StremioAddons(context)
+
+    @Provides
+    @Singleton
+    fun subtitleRepository(
+        client: StremioClient,
+        addons: StremioAddons,
+    ): SubtitleRepository = SubtitleRepository(client, addons)
 }

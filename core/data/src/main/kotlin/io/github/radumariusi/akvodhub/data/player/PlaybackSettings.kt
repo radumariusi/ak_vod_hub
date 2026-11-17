@@ -7,12 +7,29 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.Locale
 
+/** Cum arată subtitrările: culoarea textului și conturul / fundalul. */
+enum class SubtitleStyle(
+    val label: String,
+) {
+    WHITE_OUTLINE("Alb cu contur"),
+    YELLOW_OUTLINE("Galben cu contur"),
+    WHITE_BOX("Alb pe fundal negru"),
+}
+
 data class PlaybackPrefs(
     /** Profilul de alegere a sursei, ex. „4K EN, altfel 1080p RO”. */
     val profile: SourceProfile,
-    /** Limba subtitrării pornite automat (ISO 639-1); null = subtitrări oprite. */
-    val subtitleLanguage: String?,
-)
+    /** Limbile subtitrărilor, în ordinea preferinței (ISO 639-1); goală = subtitrări oprite. */
+    val subtitleLanguages: List<String>,
+    /** Dacă sursa nu are subtitrare într-o limbă preferată, pornește una din addon-uri. */
+    val addonSubtitlesAuto: Boolean = true,
+    /** Mărimea subtitrărilor, în procente (100 = normal). */
+    val subtitleScale: Int = 100,
+    val subtitleStyle: SubtitleStyle = SubtitleStyle.WHITE_OUTLINE,
+) {
+    /** Prima limbă a subtitrărilor (pentru pistele încorporate), null = oprite. */
+    val subtitleLanguage: String? get() = subtitleLanguages.firstOrNull()
+}
 
 /** Preferințele de redare (doar pe dispozitiv). */
 class PlaybackSettings(
@@ -41,36 +58,75 @@ class PlaybackSettings(
         mutableState.value = read()
     }
 
-    fun setSubtitleLanguage(language: String?) {
-        prefs.edit().putString(SUBTITLES, language ?: OFF).apply()
+    /** Limbile subtitrărilor în ordinea preferinței; listă goală = oprite. */
+    fun setSubtitleLanguages(languages: List<String>) {
+        val clean = languages.filter { it.length == 2 }.distinct().take(MAX_SUBTITLE_LANGUAGES)
+        prefs.edit().putString(SUBTITLES, if (clean.isEmpty()) OFF else clean.joinToString(",")).apply()
+        mutableState.value = read()
+    }
+
+    fun setAddonSubtitlesAuto(enabled: Boolean) {
+        prefs.edit().putBoolean(ADDON_AUTO, enabled).apply()
+        mutableState.value = read()
+    }
+
+    fun setSubtitleScale(percent: Int) {
+        prefs.edit().putInt(SCALE, percent.coerceIn(MIN_SCALE, MAX_SCALE)).apply()
+        mutableState.value = read()
+    }
+
+    fun setSubtitleStyle(style: SubtitleStyle) {
+        prefs.edit().putString(STYLE, style.name).apply()
         mutableState.value = read()
     }
 
     private fun read(): PlaybackPrefs {
+        // Până la etapa 7 se salva o singură limbă („ro”); acum o listă („ro,en”), compatibilă.
         val subtitles =
             when (val saved = prefs.getString(SUBTITLES, null)) {
                 null -> {
-                    Locale
-                        .getDefault()
-                        .language
-                        .lowercase()
-                        .takeIf { it.length == 2 && it != "en" }
+                    listOfNotNull(
+                        Locale
+                            .getDefault()
+                            .language
+                            .lowercase()
+                            .takeIf { it.length == 2 && it != "en" },
+                    )
                 }
 
                 OFF -> {
-                    null
+                    emptyList()
                 }
 
                 else -> {
                     saved
+                        .split(',')
+                        .map { it.trim() }
+                        .filter { it.length == 2 }
+                        .distinct()
                 }
             }
-        return PlaybackPrefs(SourceProfile.decode(prefs.getString(PROFILE, null)), subtitles)
+        return PlaybackPrefs(
+            profile = SourceProfile.decode(prefs.getString(PROFILE, null)),
+            subtitleLanguages = subtitles,
+            addonSubtitlesAuto = prefs.getBoolean(ADDON_AUTO, true),
+            subtitleScale = prefs.getInt(SCALE, 100).coerceIn(MIN_SCALE, MAX_SCALE),
+            subtitleStyle =
+                prefs.getString(STYLE, null)?.let { s -> SubtitleStyle.entries.firstOrNull { it.name == s } }
+                    ?: SubtitleStyle.WHITE_OUTLINE,
+        )
     }
 
-    private companion object {
-        const val PROFILE = "profile"
-        const val SUBTITLES = "subtitles"
-        const val OFF = "off"
+    companion object {
+        private const val PROFILE = "profile"
+        private const val SUBTITLES = "subtitles"
+        private const val ADDON_AUTO = "subtitles_addon_auto"
+        private const val SCALE = "subtitles_scale"
+        private const val STYLE = "subtitles_style"
+        private const val OFF = "off"
+        const val MAX_SUBTITLE_LANGUAGES = 3
+        const val MIN_SCALE = 50
+        const val MAX_SCALE = 250
+        val SCALES = listOf(75, 100, 125, 150, 175, 200)
     }
 }

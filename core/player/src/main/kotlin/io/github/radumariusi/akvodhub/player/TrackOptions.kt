@@ -49,6 +49,19 @@ object TrackOptions {
         return result
     }
 
+    /** Limbile pistelor de tipul dat, așa cum le dă sursa (null = nedeclarată). */
+    fun languages(
+        tracks: Tracks,
+        type: Int,
+    ): List<String?> =
+        tracks.groups
+            .filter { it.type == type }
+            .flatMap { g ->
+                (0 until g.length)
+                    .filter { g.isTrackSupported(it) }
+                    .map { i -> g.getTrackFormat(i).language?.takeIf { it != C.LANGUAGE_UNDETERMINED } }
+            }
+
     fun select(
         player: Player,
         option: TrackOption,
