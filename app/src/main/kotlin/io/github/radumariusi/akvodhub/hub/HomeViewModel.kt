@@ -63,6 +63,9 @@ class HomeViewModel
             viewModelScope.launch {
                 repository.catalogVersion.drop(1).collect { reload() }
             }
+            viewModelScope.launch {
+                repository.watchVersion.drop(1).collect { refreshContinueWatching() }
+            }
         }
 
         fun reload() {
@@ -80,6 +83,19 @@ class HomeViewModel
                     if (items.isNotEmpty()) rows += HomeRow(key, title, items, filter, items.size < size)
                 }
                 mutableState.value = HomeState(loading = false, rows = rows)
+            }
+        }
+
+        /** După player: actualizează doar rândul „Continuă vizionarea”. */
+        fun refreshContinueWatching() {
+            viewModelScope.launch {
+                val watching = repository.continueWatching()
+                mutableState.update { s ->
+                    if (s.loading) return@update s
+                    val rest = s.rows.filter { it.key != CONTINUE }
+                    val row = HomeRow(CONTINUE, "Continuă vizionarea", watching, null, endReached = true)
+                    s.copy(rows = if (watching.isEmpty()) rest else listOf(row) + rest)
+                }
             }
         }
 

@@ -1,0 +1,530 @@
+package io.github.radumariusi.akvodhub.player
+
+import android.content.Context
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.common.Tracks
+import androidx.media3.exoplayer.ExoPlayer
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.radumariusi.akvodhub.data.catalog.HubRepository
+import io.github.radumariusi.akvodhub.data.catalog.SourceDetails
+import io.github.radumariusi.akvodhub.data.db.TitleEntity
+import io.github.radumariusi.akvodhub.data.db.WatchStateEntity
+import io.github.radumariusi.akvodhub.data.player.PlaybackSettings
+import io.github.radumariusi.akvodhub.parser.catalog.MergedEpisode
+import io.github.radumariusi.akvodhub.parser.catalog.MergedSeason
+import io.github.radumariusi.akvodhub.parser.match.MediaType
+import io.github.radumariusi.akvodhub.parser.match.SourceInfo
+import io.github.radumariusi.akvodhub.parser.player.EpisodeOrder
+import io.github.radumariusi.akvodhub.parser.player.FallbackQueue
+import io.github.radumariusi.akvodhub.parser.player.Resume
+import io.github.radumariusi.akvodhub.ui.hub.sourceLabel
+import io.github.radumariusi.akvodhub.ui.hub.sourceShortLabel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+/** Ce trebuie redat: titlul, opțional sursa aleasă, episodul (la seriale) și dacă reluăm de unde ai rămas. */
+data class PlayRequest(
+    val titleId: Long,
+    val entryId: Long? = null,
+    val season: Int? = null,
+    val episode: Int? = null,
+    val resume: Boolean = false,
+)
+
+/** O sursă în meniul „Sursă” al playerului. */
+data class SourceOption(
+    val entryId: Long,
+    val label: String,
+    val failedReason: String?,
+    val current: Boolean,
+)
+
+data class PlayerUiState(
+    val title: String = "",
+    /** La seriale: „S01E03 · Titlul episodului”. */
+    val subtitle: String? = null,
+    /** Sursa curentă, ex. „Sursa 1 din 5 · 4K · EN · H265 · MKV — Playlist A”. */
+    val sourceLabel: String? = null,
+    val loading: Boolean = true,
+    /** Mesaj trecător, ex. „4K EN nu merge (HTTP 404). Încerc sursa 2 din 5: 1080p RO”. */
+    val notice: String? = null,
+    /** Nicio sursă nu a pornit (sau titlul lipsește). */
+    val error: String? = null,
+    val failures: List<String> = emptyList(),
+    val audio: List<TrackOption> = emptyList(),
+    val subtitles: List<TrackOption> = emptyList(),
+    val sources: List<SourceOption> = emptyList(),
+    /** Eticheta episodului următor, dacă există. */
+    val next: String? = null,
+    /** Secundele rămase până pornește singur episodul următor. */
+    val countdown: Int? = null,
+    /** Redarea s-a încheiat: ecranul se închide. */
+    val finished: Boolean = false,
+)
+
+/**
+ * Playerul: pornește sursa cea mai potrivită (profilul din Setări → Redare) și, dacă nu merge (eroare,
+ * nu pornește în [START_TIMEOUT_MS], se blochează, codec nesuportat), trece singur la următoarea sursă de la
+ * aceeași poziție. Salvează progresul pentru „Continuă vizionarea” și pornește automat episodul următor.
+ */
+@HiltViewModel
+class PlayerViewModel
+    @Inject
+    constructor(
+        @ApplicationContext context: Context,
+        private val repository: HubRepository,
+        private val settings: PlaybackSettings,
+    ) : ViewModel() {
+        val player: ExoPlayer =
+            PlayerFactory.create(
+                context,
+                TrackPreferences(settings.preferredLanguages(), settings.state.value.subtitleLanguage),
+            )
+
+        private val mutableState = MutableStateFlow(PlayerUiState())
+        val state: StateFlow<PlayerUiState> = mutableState.asStateFlow()
+
+        /** Scrierile progresului nu se anulează când se închide ecranul. */
+        private val saveScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+        private var request: PlayRequest? = null
+        private var title: TitleEntity? = null
+        private var seasons: List<MergedSeason> = emptyList()
+        private var details: Map<Long, SourceDetails> = emptyMap()
+        private var sources: Map<Long, SourceInfo> = emptyMap()
+        private var episode: MergedEpisode? = null
+        private var queue: FallbackQueue? = null
+
+        /** Sursa curentă a ajuns măcar o dată „gata de redare”. */
+        private var started = false
+        private var retriedSame = false
+        private var startPosition = 0L
+        private var generation = 0
+        private var watchdog: Job? = null
+        private var countdownJob: Job? = null
+        private var noticeJob: Job? = null
+
+        private val listener =
+            object : Player.Listener {
+                override fun onPlaybackStateChanged(playbackState: Int) {
+                    when (playbackState) {
+                        Player.STATE_READY -> {
+                            watchdog?.cancel()
+                            if (!started) {
+                                started = true
+                                retriedSame = false
+                            }
+                            mutableState.update { it.copy(loading = false) }
+                        }
+
+                        Player.STATE_BUFFERING -> {
+                            mutableState.update { it.copy(loading = true) }
+                            if (started) startWatchdog(STALL_TIMEOUT_MS, "s-a blocat (nu mai vin date)")
+                        }
+
+                        Player.STATE_ENDED -> {
+                            onEnded()
+                        }
+
+                        else -> {}
+                    }
+                }
+
+                override fun onPlayerError(error: PlaybackException) {
+                    if (started && !retriedSame && PlaybackErrors.isNetwork(error)) {
+                        // Mergea: întâi o reîncercare a aceleiași surse (o întrerupere scurtă a rețelei).
+                        retriedSame = true
+                        showNotice("Conexiunea s-a întrerupt, reiau sursa…")
+                        player.prepare()
+                        startWatchdog(START_TIMEOUT_MS, "nu mai răspunde")
+                        return
+                    }
+                    sourceFailed(PlaybackErrors.describe(error))
+                }
+
+                override fun onTracksChanged(tracks: Tracks) {
+                    if (tracks.containsType(C.TRACK_TYPE_VIDEO) && !tracks.isTypeSupported(C.TRACK_TYPE_VIDEO)) {
+                        val codec = TrackOptions.videoCodec(tracks)?.let { "$it " }.orEmpty()
+                        sourceFailed("video ${codec}nesuportat de acest TV")
+                        return
+                    }
+                    if (tracks.containsType(C.TRACK_TYPE_AUDIO) &&
+                        !tracks.isTypeSupported(C.TRACK_TYPE_AUDIO) &&
+                        queue?.hasMore == true
+                    ) {
+                        sourceFailed("audio nesuportat de acest TV")
+                        return
+                    }
+                    mutableState.update {
+                        it.copy(
+                            audio = TrackOptions.list(tracks, C.TRACK_TYPE_AUDIO),
+                            subtitles = TrackOptions.list(tracks, C.TRACK_TYPE_TEXT),
+                        )
+                    }
+                }
+
+                override fun onIsPlayingChanged(isPlaying: Boolean) {
+                    if (!isPlaying) save()
+                }
+            }
+
+        init {
+            player.addListener(listener)
+            viewModelScope.launch {
+                while (true) {
+                    delay(SAVE_EVERY_MS)
+                    if (player.isPlaying) save()
+                }
+            }
+        }
+
+        fun start(request: PlayRequest) {
+            if (this.request != null) return
+            this.request = request
+            viewModelScope.launch { load(request) }
+        }
+
+        private suspend fun load(request: PlayRequest) {
+            val details = repository.details(request.titleId)
+            if (details == null) {
+                fatal("Titlul nu mai există în playlist-uri.")
+                return
+            }
+            title = details.title
+            mutableState.update { it.copy(title = details.title.name) }
+            val watch = repository.watchState(request.titleId)
+            if (details.title.mediaType == MediaType.TV) {
+                val episodes = repository.episodes(request.titleId, refresh = false)
+                seasons = episodes.seasons
+                this.details = episodes.sources
+                val all = seasons.flatMap { it.episodes }
+                val episode =
+                    (if (request.episode != null) EpisodeOrder.find(seasons, request.season, request.episode) else null)
+                        ?: request.entryId?.let { id -> all.firstOrNull { e -> e.sources.any { it.id == id } } }
+                        ?: EpisodeOrder.linear(seasons).firstOrNull()
+                        ?: all.firstOrNull()
+                if (episode == null) {
+                    fatal("Nu am găsit episoade pentru acest serial.")
+                    return
+                }
+                val resumeAt =
+                    if (request.resume && watch != null && watch.season == episode.season &&
+                        watch.episode == episode.number
+                    ) {
+                        watch.positionMs
+                    } else {
+                        0L
+                    }
+                val chosen = request.entryId ?: watch?.entryId?.takeIf { request.resume && resumeAt > 0 }
+                playEpisode(episode, chosen, resumeAt)
+            } else {
+                this.details = details.sources
+                val all = details.groups.flatMap { g -> g.languages.flatMap { it.sources } }
+                if (all.isEmpty()) {
+                    fatal("Filmul nu mai are surse în playlist-uri.")
+                    return
+                }
+                val resumeAt = if (request.resume) watch?.positionMs ?: 0L else 0L
+                val chosen = request.entryId ?: watch?.entryId?.takeIf { request.resume }
+                play(all, chosen, resumeAt)
+            }
+        }
+
+        private fun playEpisode(
+            episode: MergedEpisode,
+            chosen: Long?,
+            positionMs: Long,
+        ) {
+            this.episode = episode
+            val next = EpisodeOrder.next(seasons, episode.season, episode.number)
+            mutableState.update {
+                it.copy(subtitle = episodeLabel(episode), next = next?.let(::episodeLabel), countdown = null)
+            }
+            play(episode.sources, chosen, positionMs)
+        }
+
+        private fun play(
+            list: List<SourceInfo>,
+            chosen: Long?,
+            positionMs: Long,
+        ) {
+            countdownJob?.cancel()
+            sources = list.associateBy { it.id }
+            val ordered = repository.playOrder(list).map { it.id }
+            queue = FallbackQueue(ordered, chosen?.takeIf { it in sources })
+            mutableState.update { it.copy(error = null, failures = emptyList(), countdown = null) }
+            playCurrent(positionMs)
+        }
+
+        private fun playCurrent(positionMs: Long) {
+            val q = queue ?: return
+            val id = q.current ?: return
+            generation++
+            val gen = generation
+            started = false
+            retriedSame = false
+            startPosition = positionMs
+            mutableState.update {
+                it.copy(loading = true, sourceLabel = currentLabel(), sources = sourceOptions(), audio = emptyList())
+            }
+            viewModelScope.launch {
+                val url = repository.streamUrl(id)
+                if (gen != generation) return@launch
+                if (url == null) {
+                    sourceFailed("linkul nu se poate construi (playlist șters?)")
+                    return@launch
+                }
+                player.setMediaItem(
+                    MediaItem
+                        .Builder()
+                        .setUri(url)
+                        .setMediaId(id.toString())
+                        .build(),
+                    positionMs,
+                )
+                player.prepare()
+                player.playWhenReady = true
+                startWatchdog(START_TIMEOUT_MS, "nu pornește în ${START_TIMEOUT_MS / 1000} s")
+            }
+        }
+
+        private fun startWatchdog(
+            timeoutMs: Long,
+            reason: String,
+        ) {
+            watchdog?.cancel()
+            val gen = generation
+            watchdog =
+                viewModelScope.launch {
+                    delay(timeoutMs)
+                    if (gen == generation) sourceFailed(reason)
+                }
+        }
+
+        /** Sursa curentă nu merge: trecem la următoarea, de la aceeași poziție. */
+        private fun sourceFailed(reason: String) {
+            val q = queue ?: return
+            val failed = q.current ?: return
+            watchdog?.cancel()
+            val position = if (started) player.currentPosition.coerceAtLeast(0) else startPosition
+            val next = q.fail(reason)
+            generation++
+            player.stop()
+            if (next == null) {
+                mutableState.update {
+                    it.copy(
+                        loading = false,
+                        error =
+                            if (q.size == 1) {
+                                "Sursa nu a pornit."
+                            } else {
+                                "Niciuna din cele ${q.size} surse nu a pornit."
+                            },
+                        failures = q.failures.map { f -> "${label(f.entryId)}: ${f.reason}" },
+                        sources = sourceOptions(),
+                    )
+                }
+                return
+            }
+            showNotice(
+                "${short(failed)} nu merge ($reason). Încerc sursa ${q.position} din ${q.size}: ${short(next)}",
+            )
+            playCurrent(position)
+        }
+
+        /** Utilizatorul alege altă sursă din meniu: continuăm de la aceeași poziție. */
+        fun selectSource(entryId: Long) {
+            val q = queue ?: return
+            if (entryId == q.current && mutableState.value.error == null) return
+            val position = if (started) player.currentPosition.coerceAtLeast(0) else startPosition
+            if (!q.switchTo(entryId)) return
+            mutableState.update { it.copy(error = null, failures = emptyList()) }
+            playCurrent(position)
+        }
+
+        /** Toate au eșuat: încercăm din nou lista, de la prima sursă. */
+        fun retry() {
+            val q = queue ?: return
+            q.reset()
+            mutableState.update { it.copy(error = null, failures = emptyList()) }
+            playCurrent(startPosition)
+        }
+
+        fun selectTrack(option: TrackOption) = TrackOptions.select(player, option)
+
+        fun disableSubtitles() = TrackOptions.disableSubtitles(player)
+
+        fun togglePlay() {
+            if (player.isPlaying) {
+                player.pause()
+            } else {
+                if (player.playbackState == Player.STATE_ENDED) player.seekTo(0)
+                player.play()
+            }
+        }
+
+        fun seekBy(deltaMs: Long) {
+            val duration = player.duration.takeIf { it != C.TIME_UNSET && it > 0 }
+            val target = (player.currentPosition + deltaMs).coerceAtLeast(0)
+            player.seekTo(if (duration != null) target.coerceAtMost(duration - 1_000) else target)
+        }
+
+        /** Episodul următor acum (buton sau la finalul numărătorii). */
+        fun playNext() {
+            val current = episode ?: return
+            val next = EpisodeOrder.next(seasons, current.season, current.number) ?: return
+            save()
+            playEpisode(next, null, 0L)
+        }
+
+        fun cancelCountdown() {
+            countdownJob?.cancel()
+            mutableState.update { it.copy(countdown = null) }
+        }
+
+        /** Ecranul nu mai e vizibil (ex. butonul Home): pauză și salvăm progresul. */
+        fun onStop() {
+            save()
+            player.pause()
+        }
+
+        private fun onEnded() {
+            watchdog?.cancel()
+            save()
+            val current = episode
+            val next = current?.let { EpisodeOrder.next(seasons, it.season, it.number) }
+            if (next == null) {
+                mutableState.update { it.copy(finished = true) }
+                return
+            }
+            countdownJob?.cancel()
+            countdownJob =
+                viewModelScope.launch {
+                    for (s in NEXT_COUNTDOWN_S downTo 1) {
+                        mutableState.update { it.copy(countdown = s) }
+                        delay(1_000)
+                    }
+                    mutableState.update { it.copy(countdown = null) }
+                    playNext()
+                }
+        }
+
+        /** Salvează unde a rămas utilizatorul (sau șterge, dacă filmul / serialul s-a terminat). */
+        private fun save() {
+            val title = title ?: return
+            val entryId = queue?.current ?: return
+            if (!started) return
+            val duration = player.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: return
+            val position = player.currentPosition.coerceAtLeast(0)
+            val finished = Resume.isFinished(position, duration)
+            val now = System.currentTimeMillis()
+            val current = episode
+            val next = current?.let { EpisodeOrder.next(seasons, it.season, it.number) }
+            val nextEntry = next?.let { repository.playOrder(it.sources).firstOrNull()?.id }
+            saveScope.launch {
+                when {
+                    !finished && position >= Resume.MIN_POSITION_MS -> {
+                        repository.saveWatchState(
+                            WatchStateEntity(
+                                titleId = title.id,
+                                entryId = entryId,
+                                season = current?.season,
+                                episode = current?.number,
+                                positionMs = position,
+                                durationMs = duration,
+                                updatedAt = now,
+                            ),
+                        )
+                    }
+
+                    finished && next != null && nextEntry != null -> {
+                        repository.saveWatchState(
+                            WatchStateEntity(
+                                titleId = title.id,
+                                entryId = nextEntry,
+                                season = next.season,
+                                episode = next.number,
+                                positionMs = 0,
+                                durationMs = 0,
+                                updatedAt = now,
+                            ),
+                        )
+                    }
+
+                    finished -> {
+                        repository.clearWatchState(title.id)
+                    }
+
+                    else -> {}
+                }
+            }
+        }
+
+        private fun fatal(message: String) {
+            mutableState.update { it.copy(loading = false, error = message) }
+        }
+
+        private fun showNotice(text: String) {
+            noticeJob?.cancel()
+            mutableState.update { it.copy(notice = text) }
+            noticeJob =
+                viewModelScope.launch {
+                    delay(NOTICE_MS)
+                    mutableState.update { it.copy(notice = null) }
+                }
+        }
+
+        private fun label(entryId: Long): String =
+            sources[entryId]?.let { sourceLabel(it, details[entryId]) } ?: "Sursa $entryId"
+
+        private fun short(entryId: Long): String = sources[entryId]?.let(::sourceShortLabel) ?: "Sursa"
+
+        private fun currentLabel(): String? {
+            val q = queue ?: return null
+            val id = q.current ?: return null
+            val prefix = if (q.size > 1) "Sursa ${q.position} din ${q.size} · " else ""
+            return prefix + label(id)
+        }
+
+        private fun sourceOptions(): List<SourceOption> {
+            val q = queue ?: return emptyList()
+            return q.candidates.map { id -> SourceOption(id, label(id), q.reasonFor(id), id == q.current) }
+        }
+
+        override fun onCleared() {
+            save()
+            watchdog?.cancel()
+            countdownJob?.cancel()
+            player.removeListener(listener)
+            player.release()
+        }
+
+        companion object {
+            const val START_TIMEOUT_MS = 25_000L
+            const val STALL_TIMEOUT_MS = 45_000L
+            const val SAVE_EVERY_MS = 15_000L
+            const val NOTICE_MS = 7_000L
+            const val NEXT_COUNTDOWN_S = 10
+
+            fun episodeLabel(episode: MergedEpisode): String {
+                val code =
+                    if (episode.number != null) "S%02dE%02d".format(episode.season, episode.number) else null
+                return listOfNotNull(code, episode.title).joinToString(" · ").ifEmpty { "Episod" }
+            }
+        }
+    }

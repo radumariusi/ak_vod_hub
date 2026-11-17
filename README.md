@@ -26,7 +26,7 @@ Ai nevoie de JDK 21 și Android SDK (Android Studio). Apoi:
 ./gradlew :core:parser:test testDebugUnitTest lintDebug
 ```
 
-Module: `app` (UI TV), `core:parser` (Kotlin pur), `core:data` (rețea, date, updater), `core:player` (player, din etapa 6).
+Module: `app` (UI TV), `core:parser` (Kotlin pur), `core:data` (rețea, date, updater), `core:player` (Media3 + FFmpeg audio).
 
 ## Stare
 

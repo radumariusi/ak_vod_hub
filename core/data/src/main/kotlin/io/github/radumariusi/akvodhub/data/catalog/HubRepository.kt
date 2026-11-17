@@ -6,7 +6,9 @@ import io.github.radumariusi.akvodhub.data.db.PlaylistType
 import io.github.radumariusi.akvodhub.data.db.RawEntryEntity
 import io.github.radumariusi.akvodhub.data.db.TitleCard
 import io.github.radumariusi.akvodhub.data.db.TitleEntity
+import io.github.radumariusi.akvodhub.data.db.WatchStateEntity
 import io.github.radumariusi.akvodhub.data.db.isLocal
+import io.github.radumariusi.akvodhub.data.player.PlaybackSettings
 import io.github.radumariusi.akvodhub.data.playlist.PlaylistImporter
 import io.github.radumariusi.akvodhub.data.playlist.xtream.XtreamClient
 import io.github.radumariusi.akvodhub.data.tmdb.TmdbClient
@@ -20,13 +22,17 @@ import io.github.radumariusi.akvodhub.parser.catalog.Genres
 import io.github.radumariusi.akvodhub.parser.catalog.MergedSeason
 import io.github.radumariusi.akvodhub.parser.match.QualityGroup
 import io.github.radumariusi.akvodhub.parser.match.SourceGrouping
+import io.github.radumariusi.akvodhub.parser.match.SourceInfo
+import io.github.radumariusi.akvodhub.parser.player.SourceProfile
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import java.util.Collections
-import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 
 /** Un actor (sau regizor) de pe pagina de detalii. */
@@ -72,6 +78,7 @@ class HubRepository(
     private val importer: PlaylistImporter,
     private val tmdb: TmdbClient,
     private val settings: TmdbSettings,
+    private val playback: PlaybackSettings,
 ) {
     private val dao = db.catalogDao()
     private val playlistDao = db.playlistDao()
@@ -82,9 +89,31 @@ class HubRepository(
 
     val catalogVersion: StateFlow<Long> get() = indexer.version
 
-    /** Limbile preferate la ordonarea surselor: limba sistemului, apoi engleza (profilul vine în etapa 6). */
-    val preferredLanguages: List<String> =
-        listOf(Locale.getDefault().language.lowercase(), "en").distinct().filter { it.length == 2 }
+    /** Limbile preferate la ordonarea surselor: cele din profilul de redare, limba sistemului, apoi engleza. */
+    val preferredLanguages: List<String> get() = playback.preferredLanguages()
+
+    /** Profilul de alegere automată a sursei (Setări → Redare). */
+    val profile: SourceProfile get() = playback.state.value.profile
+
+    /** Sursele în ordinea în care le încearcă playerul (profilul, apoi calitate și limbă). */
+    fun playOrder(sources: List<SourceInfo>): List<SourceInfo> = profile.order(sources, preferredLanguages)
+
+    suspend fun watchState(titleId: Long): WatchStateEntity? = dao.watchState(titleId)
+
+    private val watchChanged = MutableStateFlow(0L)
+
+    /** Crește după fiecare salvare a progresului (Acasă și Detalii își reîncarcă „Continuă”). */
+    val watchVersion: StateFlow<Long> = watchChanged.asStateFlow()
+
+    suspend fun saveWatchState(state: WatchStateEntity) {
+        dao.putWatchState(state)
+        watchChanged.update { it + 1 }
+    }
+
+    suspend fun clearWatchState(titleId: Long) {
+        dao.deleteWatchState(titleId)
+        watchChanged.update { it + 1 }
+    }
 
     /** Pregătește catalogul (rezumate, titluri locale, căutare) dacă s-a schimbat ceva de la ultima dată. */
     suspend fun prepare() = indexer.refresh()

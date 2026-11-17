@@ -9,6 +9,7 @@ import io.github.radumariusi.akvodhub.catalog.TmdbViewModel
 import io.github.radumariusi.akvodhub.hub.BrowseViewModel
 import io.github.radumariusi.akvodhub.hub.DetailsViewModel
 import io.github.radumariusi.akvodhub.hub.HomeViewModel
+import io.github.radumariusi.akvodhub.player.PlaybackSettingsViewModel
 import io.github.radumariusi.akvodhub.playlist.PlaylistsViewModel
 import io.github.radumariusi.akvodhub.ui.AppRoot
 import io.github.radumariusi.akvodhub.ui.HubViewModels
@@ -23,6 +24,7 @@ class MainActivity : ComponentActivity() {
     private val homeViewModel: HomeViewModel by viewModels()
     private val browseViewModel: BrowseViewModel by viewModels()
     private val detailsViewModel: DetailsViewModel by viewModels()
+    private val playbackViewModel: PlaybackSettingsViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,7 +35,7 @@ class MainActivity : ComponentActivity() {
                     updateViewModel,
                     playlistsViewModel,
                     tmdbViewModel,
-                    HubViewModels(homeViewModel, browseViewModel, detailsViewModel),
+                    HubViewModels(homeViewModel, browseViewModel, detailsViewModel, playbackViewModel),
                 )
             }
         }

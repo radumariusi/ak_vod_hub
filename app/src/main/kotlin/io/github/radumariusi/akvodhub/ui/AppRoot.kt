@@ -37,6 +37,7 @@ import io.github.radumariusi.akvodhub.data.db.TitleCard
 import io.github.radumariusi.akvodhub.hub.BrowseViewModel
 import io.github.radumariusi.akvodhub.hub.DetailsViewModel
 import io.github.radumariusi.akvodhub.hub.HomeViewModel
+import io.github.radumariusi.akvodhub.player.PlaybackSettingsViewModel
 import io.github.radumariusi.akvodhub.playlist.PlaylistsViewModel
 import io.github.radumariusi.akvodhub.ui.hub.BrowseScreen
 import io.github.radumariusi.akvodhub.ui.hub.DetailsScreen
@@ -60,6 +61,7 @@ class HubViewModels(
     val home: HomeViewModel,
     val browse: BrowseViewModel,
     val details: DetailsViewModel,
+    val playback: PlaybackSettingsViewModel,
 )
 
 /**
@@ -184,7 +186,13 @@ fun AppRoot(
                             }
 
                             Destination.SETTINGS -> {
-                                SettingsScreen(updateViewModel, updateState, playlistsViewModel, tmdbViewModel)
+                                SettingsScreen(
+                                    updateViewModel,
+                                    updateState,
+                                    playlistsViewModel,
+                                    tmdbViewModel,
+                                    hub.playback,
+                                )
                             }
                         }
                     }
