@@ -352,6 +352,11 @@ private fun Controls(
                     viewModel.setMatchFrameRate(it == 1)
                 })
             }) { Text("Frecvență ecran") }
+            OutlinedButton(onClick = {
+                onChoice(Choice("Passthrough · la redeschiderea playerului", listOf("Dezactivat · PCM", "Automat · ieșire compatibilă"), null) {
+                    viewModel.setAudioPassthrough(it == 1)
+                })
+            }) { Text("Passthrough") }
             if (state.audio.isNotEmpty()) {
                 OutlinedButton(onClick = {
                     onChoice(

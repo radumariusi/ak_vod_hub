@@ -33,6 +33,7 @@ data class PlaybackPrefs(
     val subtitleStyle: SubtitleStyle = SubtitleStyle.WHITE_OUTLINE,
     val preferOriginalLanguage: Boolean = false,
     val matchFrameRate: Boolean = false,
+    val audioPassthrough: Boolean = false,
     val posterBadges: Set<PosterBadge> = PosterBadges.defaults,
     val posterSize: PosterSize = PosterSize.MEDIUM,
     val accentColor: AccentColor = AccentColor.RED,
@@ -64,6 +65,11 @@ class PlaybackSettings(
                 state.value.profile.languages + listOfNotNull(systemLanguage) + "en"
         ).filter { it.length == 2 }
             .distinct()
+
+    fun setAudioPassthrough(enabled: Boolean) {
+        prefs.edit().putBoolean(PASSTHROUGH, enabled).apply()
+        mutableState.value = read()
+    }
 
     fun setMatchFrameRate(enabled: Boolean) {
         prefs.edit().putBoolean(FRAME_RATE, enabled).apply()
@@ -122,6 +128,7 @@ class PlaybackSettings(
     /** Preferințele salvate, ca text (pentru backup). Cheile lipsă = valorile implicite. */
     fun backup(): Map<String, String> =
         buildMap {
+            put(PASSTHROUGH, state.value.audioPassthrough.toString())
             put(FRAME_RATE, state.value.matchFrameRate.toString())
             prefs.getString(PROFILE, null)?.let { put(PROFILE, it) }
             prefs.getString(BADGES, null)?.let { put(BADGES, it) }
@@ -137,6 +144,7 @@ class PlaybackSettings(
     /** Restaurare din backup: doar cheile cunoscute, cu valori verificate la citire. */
     fun restore(values: Map<String, String>) {
         val edit = prefs.edit()
+        values[PASSTHROUGH]?.toBooleanStrictOrNull()?.let { edit.putBoolean(PASSTHROUGH, it) }
         values[FRAME_RATE]?.toBooleanStrictOrNull()?.let { edit.putBoolean(FRAME_RATE, it) }
         values[POSTER_SIZE]?.let { edit.putString(POSTER_SIZE, PosterSize.decode(it).name) }
         values[ACCENT]?.let { edit.putString(ACCENT, AccentColor.decode(it).name) }
@@ -178,6 +186,7 @@ class PlaybackSettings(
                 }
             }
         return PlaybackPrefs(
+            audioPassthrough = prefs.getBoolean(PASSTHROUGH, false),
             matchFrameRate = prefs.getBoolean(FRAME_RATE, false),
             preferOriginalLanguage = prefs.getBoolean(ORIGINAL, false),
             posterBadges = PosterBadges.decode(prefs.getString(BADGES, null)),
@@ -194,6 +203,7 @@ class PlaybackSettings(
     }
 
     companion object {
+        private const val PASSTHROUGH = "audio_passthrough"
         private const val FRAME_RATE = "match_frame_rate"
         private const val POSTER_SIZE = "poster_size"
         private const val ACCENT = "accent_color"

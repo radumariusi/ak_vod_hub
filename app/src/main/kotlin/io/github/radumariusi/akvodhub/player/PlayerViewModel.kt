@@ -117,7 +117,7 @@ class PlayerViewModel
         private val subtitleRepository: SubtitleRepository,
         private val addons: StremioAddons,
     ) : ViewModel() {
-        val player: ExoPlayer = PlayerFactory.create(context, trackPreferences())
+        val player: ExoPlayer = PlayerFactory.create(context, trackPreferences(), settings.state.value.audioPassthrough)
 
         /** Mărimea și stilul subtitrărilor (Setări → Subtitrări; se pot schimba și din player). */
         val prefs: StateFlow<PlaybackPrefs> = settings.state
@@ -584,6 +584,11 @@ class PlayerViewModel
                 counts[language] = n
                 AddonSubtitleOption(sub, "$language $n · ${sub.addon}")
             }
+        }
+
+        fun setAudioPassthrough(enabled: Boolean) {
+            settings.setAudioPassthrough(enabled)
+            showNotice("Passthrough se aplică la redeschiderea playerului; numai pe ieșiri compatibile.")
         }
 
         fun setMatchFrameRate(enabled: Boolean) = settings.setMatchFrameRate(enabled)

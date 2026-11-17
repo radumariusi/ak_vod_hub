@@ -4,6 +4,10 @@ import android.content.Context
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.Format
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
+import androidx.media3.exoplayer.audio.ForwardingAudioSink
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
@@ -31,6 +35,7 @@ object PlayerFactory {
     fun create(
         context: Context,
         preferences: TrackPreferences,
+        passthrough: Boolean = false,
     ): ExoPlayer {
         val http =
             DefaultHttpDataSource
@@ -41,7 +46,26 @@ object PlayerFactory {
                 .setReadTimeoutMs(30_000)
         val dataSource = DefaultDataSource.Factory(context, http)
         val renderers =
-            DefaultRenderersFactory(context)
+            object : DefaultRenderersFactory(context) {
+                override fun buildAudioSink(
+                    context: Context,
+                    enableFloatOutput: Boolean,
+                    enableAudioOutputPlaybackParams: Boolean,
+                ): AudioSink {
+                    val sink = DefaultAudioSink.Builder(context).build()
+                    return object : ForwardingAudioSink(sink) {
+                        override fun supportsFormat(format: Format): Boolean =
+                            getFormatSupport(format) != AudioSink.SINK_FORMAT_UNSUPPORTED
+
+                        override fun getFormatSupport(format: Format): Int =
+                            if (!passthrough && format.sampleMimeType != "audio/raw") {
+                                AudioSink.SINK_FORMAT_UNSUPPORTED
+                            } else {
+                                super.getFormatSupport(format)
+                            }
+                    }
+                }
+            }
                 .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
                 .setEnableDecoderFallback(true)
         val player =
