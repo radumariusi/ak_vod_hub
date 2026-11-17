@@ -146,6 +146,21 @@ Documentele astea, `.gitignore`, workflow de curățenie automată, reguli de lu
 - ✅ 10.8: descrieri RO la cerere, cache 30 zile și fallback la engleza existentă (Room v12).
 - Etapa 10 completă; build și testare pe dispozitiv înainte de etapa 12.
 
+### ✅ Etapa 11: player (11.1–11.10)
+
+- ✅ 11.1: frecvență opțională potrivită cu filmul, numai moduri de aceeași rezoluție, restaurare la ieșire.
+- ✅ 11.2: passthrough opțional, detectarea ieșirii Media3 și decodare PCM pe ieșiri incompatibile.
+- ✅ 11.3: compresor PCM pentru mod noapte/dialog; suspendă passthrough.
+- ✅ 11.4: potrivit/zoom/întins și viteză 0,75×–2× pe sesiune.
+- ✅ 11.5: sfârșit intro marcat manual per serial, buton contextual și ștergere marcaj.
+- ✅ 11.6: limbi audio/subtitrare per serial, inclusiv oprite, resetare la preferințele globale.
+- ✅ 11.7: apăsare lungă 10 s/30 s/1 min/5 min și salt validat la minut.
+- ✅ 11.8: info tehnic la cerere, actualizat numai cât dialogul este deschis.
+- ✅ 11.9: timer 30/60/90 min sau final episod, cu prioritate față de episodul următor.
+- ✅ 11.10: buffer mic/normal/mare, limite 12/32/64 MiB și backup.
+- 11.11 rămâne respins. Room v14 neschimbat, fără dependențe noi. Validarea pe TV este încă necesară.
+- Livrare numai după CI verde și merge; etapa 13 rămâne pentru un fir separat.
+
 ### ✅ Etapa 12: interfață
 
 - ✅ 12.1: hero existent extins cu debounce de 300 ms și backdrop TMDB de 780 px; gradient întunecat, fără blur.

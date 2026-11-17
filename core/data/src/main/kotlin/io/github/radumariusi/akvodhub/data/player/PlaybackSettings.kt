@@ -6,6 +6,7 @@ import io.github.radumariusi.akvodhub.parser.catalog.OriginalLanguage
 import io.github.radumariusi.akvodhub.parser.catalog.PosterBadge
 import io.github.radumariusi.akvodhub.parser.catalog.PosterBadges
 import io.github.radumariusi.akvodhub.parser.catalog.PosterSize
+import io.github.radumariusi.akvodhub.parser.player.BufferPreset
 import io.github.radumariusi.akvodhub.parser.player.SourceProfile
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,6 +33,10 @@ data class PlaybackPrefs(
     val subtitleScale: Int = 100,
     val subtitleStyle: SubtitleStyle = SubtitleStyle.WHITE_OUTLINE,
     val preferOriginalLanguage: Boolean = false,
+    val matchFrameRate: Boolean = false,
+    val audioPassthrough: Boolean = false,
+    val nightMode: Boolean = false,
+    val bufferPreset: BufferPreset = BufferPreset.NORMAL,
     val posterBadges: Set<PosterBadge> = PosterBadges.defaults,
     val posterSize: PosterSize = PosterSize.MEDIUM,
     val accentColor: AccentColor = AccentColor.RED,
@@ -63,6 +68,58 @@ class PlaybackSettings(
                 state.value.profile.languages + listOfNotNull(systemLanguage) + "en"
         ).filter { it.length == 2 }
             .distinct()
+
+    fun seriesTrack(key: String, type: String): String? = prefs.getString("series.$key.$type", null)
+
+    fun setSeriesTrack(key: String, type: String, value: String) {
+        val name = "series.$key.$type"
+        if (io.github.radumariusi.akvodhub.parser.player.SeriesPlayback
+                .validSetting(name, value)
+        ) {
+            prefs.edit().putString(name, value).apply()
+        }
+    }
+
+    fun clearSeriesTracks(key: String) {
+        prefs
+            .edit()
+            .remove("series.$key.audio")
+            .remove("series.$key.text")
+            .apply()
+    }
+
+    fun seriesIntro(key: String): Long = prefs.getString("series.$key.intro", null)?.toLongOrNull() ?: 0L
+
+    fun setSeriesIntro(key: String, endMs: Long) {
+        val name = "series.$key.intro"
+        if (endMs == 0L) {
+            prefs.edit().remove(name).apply()
+        } else if (io.github.radumariusi.akvodhub.parser.player.SeriesPlayback
+                .validSetting(name, endMs.toString())
+        ) {
+            prefs.edit().putString(name, endMs.toString()).apply()
+        }
+    }
+
+    fun setBufferPreset(value: BufferPreset) {
+        prefs.edit().putString(BUFFER, value.name).apply()
+        mutableState.value = read()
+    }
+
+    fun setNightMode(enabled: Boolean) {
+        prefs.edit().putBoolean(NIGHT, enabled).apply()
+        mutableState.value = read()
+    }
+
+    fun setAudioPassthrough(enabled: Boolean) {
+        prefs.edit().putBoolean(PASSTHROUGH, enabled).apply()
+        mutableState.value = read()
+    }
+
+    fun setMatchFrameRate(enabled: Boolean) {
+        prefs.edit().putBoolean(FRAME_RATE, enabled).apply()
+        mutableState.value = read()
+    }
 
     fun setPosterSize(size: PosterSize) {
         prefs.edit().putString(POSTER_SIZE, size.name).apply()
@@ -116,6 +173,18 @@ class PlaybackSettings(
     /** Preferințele salvate, ca text (pentru backup). Cheile lipsă = valorile implicite. */
     fun backup(): Map<String, String> =
         buildMap {
+            prefs.all.forEach { (key, value) ->
+                if (value is String &&
+                    io.github.radumariusi.akvodhub.parser.player.SeriesPlayback
+                        .validSetting(key, value)
+                ) {
+                    put(key, value)
+                }
+            }
+            put(BUFFER, state.value.bufferPreset.name)
+            put(NIGHT, state.value.nightMode.toString())
+            put(PASSTHROUGH, state.value.audioPassthrough.toString())
+            put(FRAME_RATE, state.value.matchFrameRate.toString())
             prefs.getString(PROFILE, null)?.let { put(PROFILE, it) }
             prefs.getString(BADGES, null)?.let { put(BADGES, it) }
             prefs.getString(POSTER_SIZE, null)?.let { put(POSTER_SIZE, it) }
@@ -130,6 +199,19 @@ class PlaybackSettings(
     /** Restaurare din backup: doar cheile cunoscute, cu valori verificate la citire. */
     fun restore(values: Map<String, String>) {
         val edit = prefs.edit()
+        values[BUFFER]?.let { edit.putString(BUFFER, BufferPreset.decode(it).name) }
+        values.forEach { (key, value) ->
+            if (io.github.radumariusi.akvodhub.parser.player.SeriesPlayback.validSetting(
+                    key,
+                    value,
+                )
+            ) {
+                edit.putString(key, value)
+            }
+        }
+        values[NIGHT]?.toBooleanStrictOrNull()?.let { edit.putBoolean(NIGHT, it) }
+        values[PASSTHROUGH]?.toBooleanStrictOrNull()?.let { edit.putBoolean(PASSTHROUGH, it) }
+        values[FRAME_RATE]?.toBooleanStrictOrNull()?.let { edit.putBoolean(FRAME_RATE, it) }
         values[POSTER_SIZE]?.let { edit.putString(POSTER_SIZE, PosterSize.decode(it).name) }
         values[ACCENT]?.let { edit.putString(ACCENT, AccentColor.decode(it).name) }
         values[PROFILE]?.let { edit.putString(PROFILE, it) }
@@ -170,6 +252,10 @@ class PlaybackSettings(
                 }
             }
         return PlaybackPrefs(
+            bufferPreset = BufferPreset.decode(prefs.getString(BUFFER, null)),
+            nightMode = prefs.getBoolean(NIGHT, false),
+            audioPassthrough = prefs.getBoolean(PASSTHROUGH, false),
+            matchFrameRate = prefs.getBoolean(FRAME_RATE, false),
             preferOriginalLanguage = prefs.getBoolean(ORIGINAL, false),
             posterBadges = PosterBadges.decode(prefs.getString(BADGES, null)),
             posterSize = PosterSize.decode(prefs.getString(POSTER_SIZE, null)),
@@ -185,6 +271,10 @@ class PlaybackSettings(
     }
 
     companion object {
+        private const val BUFFER = "buffer_preset"
+        private const val NIGHT = "night_mode"
+        private const val PASSTHROUGH = "audio_passthrough"
+        private const val FRAME_RATE = "match_frame_rate"
         private const val POSTER_SIZE = "poster_size"
         private const val ACCENT = "accent_color"
         private const val BADGES = "poster_badges"

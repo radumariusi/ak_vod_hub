@@ -1,6 +1,7 @@
 package io.github.radumariusi.akvodhub.player
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.C
@@ -25,9 +26,13 @@ import io.github.radumariusi.akvodhub.parser.catalog.MergedEpisode
 import io.github.radumariusi.akvodhub.parser.catalog.MergedSeason
 import io.github.radumariusi.akvodhub.parser.match.MediaType
 import io.github.radumariusi.akvodhub.parser.match.SourceInfo
+import io.github.radumariusi.akvodhub.parser.player.BufferPreset
 import io.github.radumariusi.akvodhub.parser.player.EpisodeOrder
 import io.github.radumariusi.akvodhub.parser.player.FallbackQueue
 import io.github.radumariusi.akvodhub.parser.player.Resume
+import io.github.radumariusi.akvodhub.parser.player.SeekNavigation
+import io.github.radumariusi.akvodhub.parser.player.SeriesPlayback
+import io.github.radumariusi.akvodhub.parser.player.SleepTimer
 import io.github.radumariusi.akvodhub.parser.stremio.AddonSubtitle
 import io.github.radumariusi.akvodhub.parser.stremio.SubtitleChoice
 import io.github.radumariusi.akvodhub.parser.stremio.SubtitleLanguages
@@ -71,6 +76,11 @@ data class AddonSubtitleOption(
 )
 
 data class PlayerUiState(
+    val sleepLabel: String = "Oprit",
+    val isSeries: Boolean = false,
+    val introEndMs: Long = 0,
+    val pictureMode: Int = 0,
+    val speed: Float = 1f,
     val title: String = "",
     /** La seriale: „S01E03 · Titlul episodului”. */
     val subtitle: String? = null,
@@ -117,7 +127,16 @@ class PlayerViewModel
         private val subtitleRepository: SubtitleRepository,
         private val addons: StremioAddons,
     ) : ViewModel() {
-        val player: ExoPlayer = PlayerFactory.create(context, trackPreferences())
+        private val passthroughRequested = settings.state.value.audioPassthrough && !settings.state.value.nightMode
+        private val nightModeEnabled = settings.state.value.nightMode
+        val player: ExoPlayer =
+            PlayerFactory.create(
+                context,
+                trackPreferences(),
+                settings.state.value.audioPassthrough,
+                settings.state.value.nightMode,
+                settings.state.value.bufferPreset,
+            )
 
         /** Mărimea și stilul subtitrărilor (Setări → Subtitrări; se pot schimba și din player). */
         val prefs: StateFlow<PlaybackPrefs> = settings.state
@@ -148,6 +167,8 @@ class PlayerViewModel
         private var generation = 0
         private var watchdog: Job? = null
         private var countdownJob: Job? = null
+        private var sleepJob: Job? = null
+        private var sleepTimer = SleepTimer()
         private var noticeJob: Job? = null
 
         private var addonJob: Job? = null
@@ -254,7 +275,13 @@ class PlayerViewModel
                 return
             }
             title = details.title
-            mutableState.update { it.copy(title = details.title.name) }
+            mutableState.update {
+                it.copy(
+                    title = details.title.name,
+                    isSeries = details.title.mediaType == MediaType.TV,
+                    introEndMs = seriesKey()?.let(settings::seriesIntro) ?: 0L,
+                )
+            }
             if (details.title.mediaType != MediaType.TV) searchAddonSubtitles(null, null)
             val watch = repository.watchState(request.titleId)
             if (details.title.mediaType == MediaType.TV) {
@@ -329,6 +356,7 @@ class PlayerViewModel
             started = false
             retriedSame = false
             embeddedTextLanguages = null
+            player.trackSelectionParameters = PlayerFactory.apply(player.trackSelectionParameters, trackPreferences())
             startPosition = positionMs
             mutableState.update {
                 it.copy(loading = true, sourceLabel = currentLabel(), sources = sourceOptions(), audio = emptyList())
@@ -421,10 +449,30 @@ class PlayerViewModel
                 subtitleDecided = true
                 clearExternal()
             }
+            val language = SubtitleLanguages.toIso1(option.group.getFormat(option.index).language)
+            if (language != null) {
+                seriesKey()?.let { key ->
+                    settings.setSeriesTrack(
+                        key,
+                        if (option.type == C.TRACK_TYPE_AUDIO) "audio" else "text",
+                        if (option.type == C.TRACK_TYPE_AUDIO) language else "embedded:$language",
+                    )
+                }
+            }
             TrackOptions.select(player, option)
         }
 
+        fun resetSeriesTracks() {
+            seriesKey()?.let(settings::clearSeriesTracks)
+            clearExternal()
+            player.trackSelectionParameters = PlayerFactory.apply(player.trackSelectionParameters, trackPreferences())
+            subtitleDecided = false
+            autoPickSubtitle()
+            showNotice("Preferințele globale se aplică din nou acestui serial.")
+        }
+
         fun disableSubtitles() {
+            seriesKey()?.let { settings.setSeriesTrack(it, "text", "off") }
             subtitleDecided = true
             clearExternal()
             TrackOptions.disableSubtitles(player)
@@ -510,6 +558,36 @@ class PlayerViewModel
             val embedded = embeddedTextLanguages ?: return
             val found = addonResults ?: return
             subtitleDecided = true
+            val remembered = seriesKey()?.let { settings.seriesTrack(it, "text") }
+            val selected =
+                SeriesPlayback.subtitleChoice(
+                    remembered,
+                    embedded.mapNotNull(SubtitleLanguages::toIso1).toSet(),
+                    found.mapNotNull { it.language }.toSet(),
+                )
+            if (selected == "off") {
+                clearExternal()
+                TrackOptions.disableSubtitles(player)
+                return
+            }
+            val language = selected?.substringAfter(':')
+            if (selected?.startsWith("embedded:") == true) {
+                val track =
+                    state.value.subtitles.firstOrNull {
+                        it.supported && SubtitleLanguages.toIso1(it.group.getFormat(it.index).language) == language
+                    }
+                if (track != null) {
+                    clearExternal()
+                    TrackOptions.select(player, track)
+                    return
+                }
+            }
+            if (selected?.startsWith("addon:") == true) {
+                found.firstOrNull { it.language == language }?.let {
+                    loadAddonSubtitle(it, automatic = true)
+                    return
+                }
+            }
             val prefs = settings.state.value
             if (!prefs.addonSubtitlesAuto) return
             val pick = SubtitleChoice.autoPick(embedded, found, prefs.subtitleLanguages) ?: return
@@ -519,6 +597,9 @@ class PlayerViewModel
         /** Utilizatorul alege o subtitrare din addon-uri în meniu. */
         fun selectAddonSubtitle(option: AddonSubtitleOption) {
             subtitleDecided = true
+            option.subtitle.language?.let { language ->
+                seriesKey()?.let { settings.setSeriesTrack(it, "text", "addon:$language") }
+            }
             loadAddonSubtitle(option.subtitle, automatic = false)
         }
 
@@ -569,11 +650,19 @@ class PlayerViewModel
 
         fun setSubtitleStyle(style: SubtitleStyle) = settings.setSubtitleStyle(style)
 
-        private fun trackPreferences() =
-            TrackPreferences(
-                settings.preferredLanguages(title?.originalLanguage),
-                settings.state.value.subtitleLanguages,
+        private fun trackPreferences(): TrackPreferences {
+            val key = seriesKey()
+            val audio = key?.let { settings.seriesTrack(it, "audio") }
+            val text = key?.let { settings.seriesTrack(it, "text") }
+            return TrackPreferences(
+                SeriesPlayback.audioLanguages(audio, settings.preferredLanguages(title?.originalLanguage)),
+                if (text == "off") {
+                    emptyList()
+                } else {
+                    listOfNotNull(text?.substringAfter(':')) + settings.state.value.subtitleLanguages
+                },
             )
+        }
 
         /** „Română 1 · OpenSubtitles v3”, „Română 2 · …”, „Engleză 1 · …”. */
         private fun addonLabels(list: List<AddonSubtitle>): List<AddonSubtitleOption> {
@@ -586,6 +675,135 @@ class PlayerViewModel
             }
         }
 
+        fun setBufferPreset(value: BufferPreset) {
+            settings.setBufferPreset(value)
+            showNotice("Buffer ${value.label}: se aplică la redeschiderea playerului.")
+        }
+
+        fun setNightMode(enabled: Boolean) {
+            settings.setNightMode(enabled)
+            showNotice("Modul noapte se aplică la redeschiderea playerului, cu audio PCM (fără passthrough).")
+        }
+
+        fun setAudioPassthrough(enabled: Boolean) {
+            settings.setAudioPassthrough(enabled)
+            showNotice("Passthrough se aplică la redeschiderea playerului; numai pe ieșiri compatibile.")
+        }
+
+        fun setMatchFrameRate(enabled: Boolean) = settings.setMatchFrameRate(enabled)
+
+        private fun seriesKey(): String? =
+            title?.takeIf { it.mediaType == MediaType.TV }?.let {
+                SeriesPlayback.key(it.tmdbId, it.originalName ?: it.name, it.year)
+            }
+
+        fun markIntro() {
+            val key = seriesKey() ?: return
+            val position = player.currentPosition
+            if (!SeriesPlayback.validIntro(position, player.duration)) {
+                showNotice("Marchează sfârșitul introului între 1 secundă și 10 minute, înainte de finalul episodului.")
+                return
+            }
+            settings.setSeriesIntro(key, position)
+            mutableState.update { it.copy(introEndMs = position) }
+            showNotice("Sfârșitul introului salvat pentru acest serial.")
+        }
+
+        fun clearIntro() {
+            seriesKey()?.let { settings.setSeriesIntro(it, 0) }
+            mutableState.update { it.copy(introEndMs = 0) }
+        }
+
+        fun skipIntro() {
+            val end = state.value.introEndMs
+            if (player.isCurrentMediaItemSeekable &&
+                SeriesPlayback.canSkip(player.currentPosition, player.duration, end)
+            ) {
+                player.seekTo(end)
+            }
+        }
+
+        fun setSleepTimer(minutes: Int) {
+            sleepJob?.cancel()
+            sleepTimer =
+                if (minutes == -1 && state.value.isSeries) {
+                    SleepTimer(endOfEpisode = true)
+                } else {
+                    SleepTimer.after(minutes, SystemClock.elapsedRealtime())
+                }
+            val label =
+                when {
+                    sleepTimer.endOfEpisode -> "Sfârșitul episodului"
+                    sleepTimer.deadlineMs != null -> "$minutes min"
+                    else -> "Oprit"
+                }
+            mutableState.update { it.copy(sleepLabel = label) }
+            if (sleepTimer.endOfEpisode && player.playbackState == Player.STATE_ENDED) stopForSleep()
+            sleepTimer.deadlineMs?.let { deadline ->
+                sleepJob =
+                    viewModelScope.launch {
+                        delay((deadline - SystemClock.elapsedRealtime()).coerceAtLeast(0))
+                        if (sleepTimer.shouldStop(SystemClock.elapsedRealtime(), false)) stopForSleep()
+                    }
+            }
+        }
+
+        private fun stopForSleep() {
+            countdownJob?.cancel()
+            watchdog?.cancel()
+            generation++
+            save()
+            player.pause()
+            mutableState.update { it.copy(finished = true, countdown = null) }
+        }
+
+        fun technicalInfo(): String {
+            val video = player.videoFormat
+            val audio = player.audioFormat
+            val counters = player.videoDecoderCounters
+            counters?.ensureUpdated()
+
+            fun bitrate(value: Int?): String =
+                value?.takeIf { it > 0 }?.let { "${it / 1000} kb/s (declarat)" } ?: "necunoscut"
+            val hdr =
+                when (video?.colorInfo?.colorTransfer) {
+                    C.COLOR_TRANSFER_ST2084 -> "HDR PQ"
+                    C.COLOR_TRANSFER_HLG -> "HDR HLG"
+                    else -> "SDR / nespecificat"
+                }
+            return listOf(
+                "Video: ${video?.sampleMimeType ?: "necunoscut"} · ${video?.codecs ?: "codec nespecificat"}",
+                "Rezoluție: ${video?.width?.takeIf {
+                    it > 0
+                } ?: "?"} × ${video?.height?.takeIf { it > 0 } ?: "?"} · $hdr",
+                "Cadre/s: ${video?.frameRate?.takeIf { it > 0 } ?: "?"} · viteză ${player.playbackParameters.speed}×",
+                "Bitrate video: ${bitrate(video?.averageBitrate)}",
+                "Audio: ${audio?.sampleMimeType ?: "necunoscut"} · ${audio?.channelCount?.takeIf {
+                    it > 0
+                } ?: "?"} canale · ${audio?.sampleRate?.takeIf { it > 0 } ?: "?"} Hz",
+                "Bitrate audio: ${bitrate(audio?.averageBitrate)}",
+                "Cadre pierdute: ${counters?.droppedBufferCount ?: 0} (sursa curentă)",
+                "Buffer disponibil: ${player.totalBufferedDuration.coerceAtLeast(0) / 1000} s",
+                "Passthrough solicitat la deschidere: ${if (passthroughRequested) "da, dacă ieșirea permite" else "nu"}",
+                "Compresie PCM: ${if (nightModeEnabled) "mod noapte" else "dezactivată"}",
+            ).joinToString("\n")
+        }
+
+        fun setPictureMode(mode: Int) {
+            mutableState.update { it.copy(pictureMode = mode.coerceIn(0, 2)) }
+        }
+
+        fun setSpeed(speed: Float) {
+            if (speed !in listOf(0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)) return
+            runCatching { player.setPlaybackSpeed(speed) }
+                .onSuccess { mutableState.update { it.copy(speed = player.playbackParameters.speed) } }
+                .onFailure {
+                    showNotice(
+                        "Viteza nu este acceptată de ieșirea audio. Dezactivează passthrough și redeschide playerul.",
+                    )
+                }
+        }
+
         fun togglePlay() {
             if (player.isPlaying) {
                 player.pause()
@@ -596,9 +814,28 @@ class PlayerViewModel
         }
 
         fun seekBy(deltaMs: Long) {
-            val duration = player.duration.takeIf { it != C.TIME_UNSET && it > 0 }
-            val target = (player.currentPosition + deltaMs).coerceAtLeast(0)
-            player.seekTo(if (duration != null) target.coerceAtMost(duration - 1_000) else target)
+            if (!player.isCurrentMediaItemSeekable) {
+                showNotice("Sursa nu permite derularea.")
+                return
+            }
+            val target = SeekNavigation.target(player.currentPosition, deltaMs, player.duration) ?: return
+            player.seekTo(target)
+        }
+
+        fun seekHeld(direction: Int, heldMs: Long) {
+            val step = SeekNavigation.increment(heldMs)
+            seekBy(step * direction)
+            showNotice("${if (direction > 0) "+" else "−"}${step / 1000} s · ${Resume.format(player.currentPosition)}")
+        }
+
+        fun jumpToMinute(text: String): Boolean {
+            val position = SeekNavigation.minute(text, player.duration)
+            if (position == null || !player.isCurrentMediaItemSeekable) {
+                showNotice("Introdu un minut din durata filmului; sursa trebuie să permită derularea.")
+                return false
+            }
+            player.seekTo(position)
+            return true
         }
 
         /** Episodul următor acum (buton sau la finalul numărătorii). */
@@ -621,6 +858,10 @@ class PlayerViewModel
         }
 
         private fun onEnded() {
+            if (sleepTimer.shouldStop(SystemClock.elapsedRealtime(), true)) {
+                stopForSleep()
+                return
+            }
             watchdog?.cancel()
             save()
             val current = episode
@@ -732,6 +973,7 @@ class PlayerViewModel
             addonLoadJob?.cancel()
             watchdog?.cancel()
             countdownJob?.cancel()
+            sleepJob?.cancel()
             player.removeListener(listener)
             player.release()
         }

@@ -49,11 +49,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.Player
+import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import io.github.radumariusi.akvodhub.parser.player.BufferPreset
 import io.github.radumariusi.akvodhub.parser.player.Resume
+import io.github.radumariusi.akvodhub.parser.player.SeekNavigation
+import io.github.radumariusi.akvodhub.parser.player.SeriesPlayback
 import io.github.radumariusi.akvodhub.player.PlayerFactory
 import io.github.radumariusi.akvodhub.player.PlayerUiState
 import io.github.radumariusi.akvodhub.player.PlayerViewModel
@@ -78,6 +82,8 @@ fun PlayerScreen(
     var controls by remember { mutableStateOf(false) }
     var lastInput by remember { mutableIntStateOf(0) }
     var choice by remember { mutableStateOf<Choice?>(null) }
+    var technical by remember { mutableStateOf(false) }
+    var jumping by remember { mutableStateOf(false) }
     var adjusting by remember { mutableStateOf(false) }
     val prefs by viewModel.prefs.collectAsState()
     val document by viewModel.externalDocument.collectAsState()
@@ -104,8 +110,8 @@ fun PlayerScreen(
             delay(500)
         }
     }
-    LaunchedEffect(controls, lastInput, isPlaying, choice, adjusting) {
-        if (controls && isPlaying && choice == null && !adjusting) {
+    LaunchedEffect(controls, lastInput, isPlaying, choice, adjusting, jumping, technical) {
+        if (controls && isPlaying && choice == null && !adjusting && !jumping && !technical) {
             delay(HIDE_AFTER_MS)
             controls = false
         }
@@ -139,12 +145,12 @@ fun PlayerScreen(
                     }
 
                     Key.MediaFastForward -> {
-                        viewModel.seekBy(PlayerFactory.SEEK_MS * 3)
+                        viewModel.seekHeld(1, e.nativeKeyEvent.eventTime - e.nativeKeyEvent.downTime)
                         true
                     }
 
                     Key.MediaRewind -> {
-                        viewModel.seekBy(-PlayerFactory.SEEK_MS * 3)
+                        viewModel.seekHeld(-1, e.nativeKeyEvent.eventTime - e.nativeKeyEvent.downTime)
                         true
                     }
 
@@ -162,14 +168,12 @@ fun PlayerScreen(
                 if (controls || overlay || e.type != KeyEventType.KeyDown) return@onKeyEvent false
                 when (e.key) {
                     Key.DirectionLeft -> {
-                        viewModel.seekBy(-PlayerFactory.SEEK_MS)
-                        controls = true
+                        viewModel.seekHeld(-1, e.nativeKeyEvent.eventTime - e.nativeKeyEvent.downTime)
                         true
                     }
 
                     Key.DirectionRight -> {
-                        viewModel.seekBy(PlayerFactory.SEEK_MS)
-                        controls = true
+                        viewModel.seekHeld(1, e.nativeKeyEvent.eventTime - e.nativeKeyEvent.downTime)
                         true
                     }
 
@@ -195,7 +199,15 @@ fun PlayerScreen(
                     this.player = player
                 }
             },
-            update = { view -> SubtitleLook.applyTo(view, prefs.subtitleScale, prefs.subtitleStyle) },
+            update = { view ->
+                SubtitleLook.applyTo(view, prefs.subtitleScale, prefs.subtitleStyle)
+                view.resizeMode =
+                    when (state.pictureMode) {
+                        1 -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                        2 -> AspectRatioFrameLayout.RESIZE_MODE_FILL
+                        else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+                    }
+            },
             onRelease = { it.player = null },
             modifier = Modifier.fillMaxSize(),
         )
@@ -262,6 +274,8 @@ fun PlayerScreen(
                 onInput = { lastInput++ },
                 onChoice = { choice = it },
                 onAdjust = { adjusting = true },
+                onJump = { jumping = true },
+                onTechnical = { technical = true },
                 modifier = Modifier.align(Alignment.BottomStart),
             )
         }
@@ -284,6 +298,8 @@ fun PlayerScreen(
         }
     }
 
+    if (technical) TechnicalInfoDialog(viewModel, onClose = { technical = false })
+    if (jumping) JumpToMinuteDialog(viewModel, onClose = { jumping = false })
     choice?.let { ChoiceDialog(it, onDismiss = { choice = null }) }
 }
 
@@ -298,8 +314,11 @@ private fun Controls(
     onInput: () -> Unit,
     onChoice: (Choice) -> Unit,
     onAdjust: () -> Unit,
+    onJump: () -> Unit,
+    onTechnical: () -> Unit,
     modifier: Modifier,
 ) {
+    val playbackPrefs by viewModel.prefs.collectAsState()
     Column(
         modifier =
             modifier
@@ -347,6 +366,74 @@ private fun Controls(
             }
             OutlinedButton(onClick = { viewModel.seekBy(-PlayerFactory.SEEK_MS) }) { Text("−10 s") }
             OutlinedButton(onClick = { viewModel.seekBy(PlayerFactory.SEEK_MS) }) { Text("+10 s") }
+            OutlinedButton(onClick = {
+                onChoice(
+                    Choice(
+                        "Frecvență ecran · poate clipi la schimbare",
+                        listOf("Dezactivată", "Potrivește cu filmul"),
+                        if (playbackPrefs.matchFrameRate) 1 else 0,
+                    ) {
+                        viewModel.setMatchFrameRate(it == 1)
+                    },
+                )
+            }) { Text("Frecvență ecran") }
+            OutlinedButton(onClick = {
+                onChoice(
+                    Choice(
+                        "Passthrough · la redeschiderea playerului",
+                        listOf("Dezactivat · PCM", "Automat · ieșire compatibilă"),
+                        if (playbackPrefs.audioPassthrough) 1 else 0,
+                    ) {
+                        viewModel.setAudioPassthrough(it == 1)
+                    },
+                )
+            }) { Text("Passthrough") }
+            OutlinedButton(onClick = {
+                onChoice(
+                    Choice(
+                        "Mod noapte · la redeschidere, fără passthrough",
+                        listOf("Dezactivat", "Dialog mai clar · compresie PCM"),
+                        if (playbackPrefs.nightMode) 1 else 0,
+                    ) {
+                        viewModel.setNightMode(it == 1)
+                    },
+                )
+            }) { Text("Mod noapte") }
+            OutlinedButton(onClick = {
+                onChoice(
+                    Choice(
+                        "Format imagine",
+                        listOf("Potrivit", "Zoom", "Întins"),
+                        state.pictureMode,
+                        viewModel::setPictureMode,
+                    ),
+                )
+            }) { Text("Format imagine") }
+            OutlinedButton(onClick = {
+                val speeds = listOf(0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
+                onChoice(
+                    Choice(
+                        "Viteză de redare",
+                        listOf("0,75×", "1×", "1,25×", "1,5×", "1,75×", "2×"),
+                        speeds.indexOf(state.speed),
+                    ) {
+                        viewModel.setSpeed(speeds[it])
+                    },
+                )
+            }) { Text("Viteză ${state.speed}×") }
+            OutlinedButton(onClick = {
+                onChoice(
+                    Choice(
+                        "Buffer · la redeschiderea playerului",
+                        BufferPreset.entries.map {
+                            it.label
+                        },
+                        BufferPreset.entries.indexOf(playbackPrefs.bufferPreset),
+                    ) {
+                        viewModel.setBufferPreset(BufferPreset.entries[it])
+                    },
+                )
+            }) { Text("Buffer") }
             if (state.audio.isNotEmpty()) {
                 OutlinedButton(onClick = {
                     onChoice(
@@ -369,6 +456,38 @@ private fun Controls(
                 OutlinedButton(onClick = { onChoice(sourceChoice(state, viewModel)) }) {
                     Text("Sursă (${state.sources.size})")
                 }
+            }
+            OutlinedButton(onClick = {
+                val minutes = if (state.isSeries) listOf(0, 30, 60, 90, -1) else listOf(0, 30, 60, 90)
+                val labels =
+                    listOf("Oprit", "30 minute", "60 minute", "90 minute") +
+                        if (state.isSeries) listOf("Sfârșitul episodului") else emptyList()
+                onChoice(
+                    Choice(
+                        "Timer de somn · ${state.sleepLabel}",
+                        labels,
+                        null,
+                    ) { viewModel.setSleepTimer(minutes[it]) },
+                )
+            }) { Text("Somn: ${state.sleepLabel}") }
+            OutlinedButton(onClick = onTechnical) { Text("Info tehnic") }
+            OutlinedButton(onClick = onJump) { Text("Salt la minut") }
+            if (state.isSeries) {
+                OutlinedButton(onClick = viewModel::resetSeriesTracks) { Text("Resetează audio/subtitrare serial") }
+                if (SeriesPlayback.canSkip(position, duration, state.introEndMs)) {
+                    OutlinedButton(onClick = viewModel::skipIntro) { Text("Sari intro") }
+                }
+                OutlinedButton(onClick = {
+                    onChoice(
+                        Choice(
+                            "Intro pentru acest serial",
+                            listOf("Marchează sfârșitul aici", "Șterge marcajul"),
+                            null,
+                        ) {
+                            if (it == 0) viewModel.markIntro() else viewModel.clearIntro()
+                        },
+                    )
+                }) { Text("Intro serial") }
             }
             if (state.next != null) {
                 OutlinedButton(onClick = viewModel::playNext) { Text("Episodul următor") }
@@ -420,12 +539,12 @@ private fun SeekBar(
                     if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
                     when (e.key) {
                         Key.DirectionLeft -> {
-                            onSeek(-PlayerFactory.SEEK_MS)
+                            onSeek(-SeekNavigation.increment(e.nativeKeyEvent.eventTime - e.nativeKeyEvent.downTime))
                             true
                         }
 
                         Key.DirectionRight -> {
-                            onSeek(PlayerFactory.SEEK_MS)
+                            onSeek(SeekNavigation.increment(e.nativeKeyEvent.eventTime - e.nativeKeyEvent.downTime))
                             true
                         }
 

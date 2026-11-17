@@ -202,3 +202,52 @@ După importul reușit, `PlaylistNewsWorker` reîmprospătează numai serialele 
 ### Etapa 12.8 și predare
 Setări → Aspect: postere Mic/Mediu/Mare (92/112/144 dp, raport 2:3) și accent Roșu/Albastru/Verde/Violet/Auriu. Valorile implicite păstrează aspectul vechi: Mediu și Roșu. Preferințele existente `playback` salvează `poster_size`/`accent_color` și le includ în backup; valorile necunoscute au fallback sigur. `LocalPosterSize` aplică dimensiunile în toate rândurile/grilele, inclusiv actori și Lista mea; posterele mici cer w185, restul w342. Tema hub/player și indicatorul filei active folosesc accentul ales. Fără schemă DB nouă în 12.8, fără biblioteci.
 Toate 12.1–12.8 sunt implementate, 12.9/12.10 rămân respinse. După CI verde și merge la ultimul PR: workflow-ul Release existent din main, verificare APK semnat/updater și păstrare v0.1.14 + tag. Apoi se așteaptă testarea proprietarului pe Android 11 TV; aceasta nu este considerată efectuată. Nu se începe etapa 11 în acest fir.
+
+### Etapa 11 — player (11.1–11.10)
+
+Implementarea extinde exclusiv playerul existent; hub-ul etapei 12 este păstrat. Room rămâne **v14**,
+fără migrare sau dependențe noi. `FrameRateMatch`, `NightCompressor`, `SeriesPlayback`, `SeekNavigation`,
+`SleepTimer` și `BufferPreset` sunt logică JVM pură în core:parser, cu teste.
+
+Opțiunile sunt în comenzile playerului, accesibile cu telecomanda/touch. Preferințele `match_frame_rate`,
+`audio_passthrough`, `night_mode`, `buffer_preset` se salvează în SharedPreferences `playback` și în backup.
+Implicit: frecvență/passthrough/noapte oprite, buffer normal. Valorile de backup necunoscute au fallback sigur.
+Frecvența solicită numai un multiplu compatibil al FPS-ului, la aceeași rezoluție; sistemul poate refuza.
+La pauză/ieșire se restaurează modul inițial. Este posibil un ecran negru temporar pe TV-uri care schimbă modul.
+
+Passthrough folosește capabilitățile ieșirii Media3, fără forțarea formatelor nesuportate. Dezactivarea îl
+blochează în sink, păstrând decodoarele hardware/FFmpeg. `NightAudioProcessor` comprimă PCM 16 biți cu
+anvelopă comună canalelor și limitare a vârfurilor; nu izolează vocile. Cât este activ, passthrough este suspendat.
+Passthrough, noapte și buffer se aplică **la redeschiderea playerului** (mesaj explicit în UI).
+Buffer mic/normal/mare: 15/50/120 s maxime și ținte de 12/32/64 MiB pentru allocator; nu sunt limite ale întregului proces.
+Formatul imaginii și viteza sunt pe sesiune; viteza depinde de suportul ieșirii. Panoul tehnic arată bitrate-ul
+**declarat**, nu o măsurătoare a rețelei; passthrough este indicat ca solicitat, nu confirmat pe receiver.
+
+Setările per serial sunt chei `series.<identitate>.intro|audio|text` în același mecanism de backup validat.
+Identitate: ID TMDB pozitiv; pentru seriale locale, SHA-256 din numele original normalizat + an (fără catalog în RAM).
+Schimbarea identității la potrivirea local→TMDB sau corectarea numelui unui serial local cere refacerea preferinței.
+Intro: sfârșit manual între 1 s și 10 min, numai înaintea finalului; „Sari intro” apare în comenzi cât poziția
+este înainte de marcaj. Marcajul este comun serialului, nu pe sezon; se poate șterge/remarca.
+Audio: limba selectată manual. Subtitrare: oprite sau limbă + încorporată/addon; nu se păstrează URL-uri, indecși
+sau fișiere între episoade. Pistele fără limbă declarată nu pot fi memorate. Limbile globale sunt fallback când
+alegerea nu există. Butonul de resetare șterge numai memoria audio/subtitrare a serialului, nu și introul.
+
+Apăsarea lungă trece la 30 s după 1 s, 1 min după 3 s, 5 min după 6 s. Saltul la minut cere o durată cunoscută
+și o sursă care permite derularea. Timerul folosește ceas monoton, continuă în pauză, nu se persistă și se
+anulează la închiderea playerului. La expirare salvează progresul, oprește numărătoarea episodului următor,
+pune pauză și închide ecranul de redare; nu stinge televizorul. „Sfârșitul episodului” are prioritate față de autoplay.
+
+**Testare Android 11 TV — de efectuat de proprietar, neconfirmată:**
+1. 23,976/24/25/50 FPS, opțiune oprită/pornită, păstrarea rezoluției și restaurare după pauză/Home/ieșire.
+2. AC3/E-AC3/DTS cu și fără receiver, deconectare HDMI, passthrough oprit și fallback hardware/FFmpeg.
+3. Noapte cu dialog/explozii, stereo/5.1, lipsă distorsiuni și suspendare passthrough.
+4. Potrivit/zoom/întins și 0,75×–2×, cu subtitrări încorporate și addon/sincronizare.
+5. Intro marcat, alt episod, repornire aplicație, ștergere și episod mai scurt decât marcajul.
+6. Audio/subtitrare RO/EN/oprite, alt episod/sursă, limbă absentă, resetare și backup/restaurare.
+7. Telecomandă ținută 1/3/6 s, bara de progres, salt la 0/minut valid/invalid, sursă fără seek.
+8. Info tehnic pe surse diferite, buffer/cadre pierdute, închidere și focusul telecomenzii.
+9. Timer 30/60/90 min, anulare, pauză/Home, final episod fără autoplay, păstrarea reluării.
+10. Buffer mic/normal/mare după redeschidere, furnizor lent, sursă 4K, fallback și memoria pe TV.
+11. Regresii: reluare, sursă manuală/rezervă, episod următor, subtitrări și interfața etapei 12.
+
+Nu se consideră testate pe TV funcțiile validate numai în CI. Etapa 13 nu începe în acest fir.
