@@ -451,7 +451,7 @@ private fun Controls(
                         "Format imagine",
                         listOf("Potrivit", "Zoom", "Întins"),
                         state.pictureMode,
-                        viewModel::setPictureMode,
+                        onPick = viewModel::setPictureMode,
                     ),
                 )
             }
@@ -711,34 +711,33 @@ private fun subtitleChoice(
 ): Choice {
     val embedded = state.subtitles
     val addon = state.addonSubtitles
-    val options =
-        listOf("Oprite") +
-            embedded.map { "Din sursă · ${it.label}" } +
-            addon.map { it.label } +
-            listOfNotNull(state.addonStatus?.let { "ℹ $it" })
+    val embeddedStart = 2
+    val addonStart = embeddedStart + embedded.size
+    val options = listOf("Oprite", "Automat") + embedded.map { it.label } + addon.map { it.label }
+    val headings =
+        buildMap {
+            if (embedded.isNotEmpty()) put(embeddedStart, "Interne")
+            if (addon.isNotEmpty()) put(addonStart, "Externe")
+        }
     val selected =
         when {
             state.externalSubtitle != null -> {
                 addon
                     .indexOfFirst { it.subtitle.url == state.externalSubtitle }
                     .takeIf { it >= 0 }
-                    ?.let { 1 + embedded.size + it }
+                    ?.let { addonStart + it }
             }
 
-            embedded.any { it.selected } -> {
-                1 + embedded.indexOfFirst { it.selected }
-            }
-
-            else -> {
-                0
-            }
+            embedded.any { it.selected } -> embeddedStart + embedded.indexOfFirst { it.selected }
+            state.subtitlesOff -> 0
+            else -> 1
         }
-    return Choice("Subtitrări", options, selected) { i ->
+    return Choice("Subtitrări", options, selected, headings, footer = state.addonStatus) { i ->
         when {
             i == 0 -> viewModel.disableSubtitles()
-            i <= embedded.size -> viewModel.selectTrack(embedded[i - 1])
-            i <= embedded.size + addon.size -> viewModel.selectAddonSubtitle(addon[i - 1 - embedded.size])
-            else -> Unit
+            i == 1 -> viewModel.automaticSubtitles()
+            i < addonStart -> viewModel.selectTrack(embedded[i - embeddedStart])
+            else -> viewModel.selectAddonSubtitle(addon[i - addonStart])
         }
     }
 }

@@ -96,6 +96,10 @@ class PlaybackSettings(
         }
     }
 
+    fun clearSeriesSubtitle(key: String) {
+        prefs.edit().remove("series.$key.text").apply()
+    }
+
     fun clearSeriesTracks(key: String) {
         prefs
             .edit()

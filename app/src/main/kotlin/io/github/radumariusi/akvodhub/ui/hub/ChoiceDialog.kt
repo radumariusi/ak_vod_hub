@@ -4,6 +4,7 @@ package io.github.radumariusi.akvodhub.ui.hub
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -17,6 +18,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.tv.material3.ExperimentalTvMaterial3Api
@@ -31,6 +34,8 @@ data class Choice(
     val title: String,
     val options: List<String>,
     val selected: Int?,
+    val headings: Map<Int, String> = emptyMap(),
+    val footer: String? = null,
     val onPick: (Int) -> Unit,
 )
 
@@ -60,15 +65,35 @@ fun ChoiceDialog(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     itemsIndexed(choice.options) { index, label ->
-                        ListItem(
-                            selected = index == choice.selected,
-                            onClick = {
-                                choice.onPick(index)
-                                onDismiss()
-                            },
-                            headlineContent = { Text(label) },
-                            modifier = if (index == initial) Modifier.focusRequester(focus) else Modifier,
-                        )
+                        Column {
+                            choice.headings[index]?.let { labelHeading ->
+                                Text(
+                                    labelHeading,
+                                    modifier = Modifier.fillMaxWidth().semantics { heading() }.padding(12.dp),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            ListItem(
+                                selected = index == choice.selected,
+                                onClick = {
+                                    choice.onPick(index)
+                                    onDismiss()
+                                },
+                                headlineContent = { Text(label) },
+                                modifier = if (index == initial) Modifier.focusRequester(focus) else Modifier,
+                            )
+                        }
+                    }
+                    choice.footer?.let { message ->
+                        item {
+                            Text(
+                                message,
+                                modifier = Modifier.padding(12.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
             }
