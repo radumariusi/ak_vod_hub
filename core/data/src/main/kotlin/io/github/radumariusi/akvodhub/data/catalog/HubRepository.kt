@@ -1,11 +1,13 @@
 package io.github.radumariusi.akvodhub.data.catalog
 
+import androidx.room.withTransaction
 import androidx.sqlite.db.SimpleSQLiteQuery
 import io.github.radumariusi.akvodhub.data.db.AkVodDatabase
 import io.github.radumariusi.akvodhub.data.db.PlaylistType
 import io.github.radumariusi.akvodhub.data.db.RawEntryEntity
 import io.github.radumariusi.akvodhub.data.db.TitleCard
 import io.github.radumariusi.akvodhub.data.db.TitleEntity
+import io.github.radumariusi.akvodhub.data.db.WatchHistoryEntity
 import io.github.radumariusi.akvodhub.data.db.WatchStateEntity
 import io.github.radumariusi.akvodhub.data.db.isLocal
 import io.github.radumariusi.akvodhub.data.player.PlaybackSettings
@@ -109,6 +111,29 @@ class HubRepository(
     suspend fun saveWatchState(state: WatchStateEntity) {
         dao.putWatchState(state)
         watchChanged.update { it + 1 }
+    }
+
+    /** Istoricul pentru recomandări: cât s-a văzut din titlu ([progress] 0–1) și dacă s-a terminat. */
+    suspend fun recordWatch(
+        titleId: Long,
+        progress: Double,
+        finished: Boolean,
+        at: Long,
+    ) {
+        val history = db.discoverDao()
+        db.withTransaction {
+            // Păstrăm maximul progresului și „terminat”: o revedere parțială nu șterge ce s-a văzut.
+            val old = history.history(titleId)
+            val value = progress.coerceIn(0.0, 1.0)
+            history.putHistory(
+                WatchHistoryEntity(
+                    titleId = titleId,
+                    progress = maxOf(old?.progress ?: 0.0, value),
+                    finished = finished || old?.finished == true,
+                    watchedAt = at,
+                ),
+            )
+        }
     }
 
     suspend fun clearWatchState(titleId: Long) {

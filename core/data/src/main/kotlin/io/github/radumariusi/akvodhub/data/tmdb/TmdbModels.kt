@@ -84,3 +84,57 @@ data class TmdbCrewMember(
 
 /** Cheia TMDB lipsește sau a fost respinsă (401). */
 class TmdbAuthException : Exception("Cheia TMDB nu e validă.")
+
+/** Colecția (francize) din care face parte un film. */
+@Serializable
+data class TmdbCollectionRef(
+    val id: Long,
+    val name: String? = null,
+)
+
+/**
+ * Detaliile unui titlu cu tot ce trebuie pentru descoperire, dintr-o singură cerere (`append_to_response`):
+ * recomandări, similare, distribuție și colecția.
+ */
+@Serializable
+data class TmdbRelated(
+    val id: Long,
+    val genres: List<TmdbGenre>? = null,
+    @SerialName("belongs_to_collection") val collection: TmdbCollectionRef? = null,
+    val recommendations: TmdbPage? = null,
+    val similar: TmdbPage? = null,
+    val credits: TmdbCredits? = null,
+    @SerialName("aggregate_credits") val aggregateCredits: TmdbCredits? = null,
+) {
+    val allCredits: TmdbCredits get() = credits ?: aggregateCredits ?: TmdbCredits()
+}
+
+@Serializable
+data class TmdbCollection(
+    val id: Long,
+    val name: String? = null,
+    val parts: List<TmdbItem> = emptyList(),
+)
+
+/** Un titlu din filmografia unei persoane (`/person/{id}/combined_credits`). */
+@Serializable
+data class TmdbPersonCredit(
+    val id: Long,
+    @SerialName("media_type") val mediaType: String? = null,
+    val job: String? = null,
+    val popularity: Double? = null,
+    @SerialName("vote_count") val voteCount: Int? = null,
+)
+
+@Serializable
+data class TmdbPersonCredits(
+    val cast: List<TmdbPersonCredit> = emptyList(),
+    val crew: List<TmdbPersonCredit> = emptyList(),
+)
+
+/** Rezultatul `/find/{imdb_id}`. */
+@Serializable
+data class TmdbFindResult(
+    @SerialName("movie_results") val movies: List<TmdbItem> = emptyList(),
+    @SerialName("tv_results") val tv: List<TmdbItem> = emptyList(),
+)

@@ -14,8 +14,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         TitleEntity::class,
         MatchCacheEntity::class,
         WatchStateEntity::class,
+        WatchHistoryEntity::class,
+        DiscoverCacheEntity::class,
+        ImdbMapEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 abstract class AkVodDatabase : RoomDatabase() {
@@ -23,12 +26,14 @@ abstract class AkVodDatabase : RoomDatabase() {
 
     abstract fun catalogDao(): CatalogDao
 
+    abstract fun discoverDao(): DiscoverDao
+
     companion object {
         fun create(context: Context): AkVodDatabase =
             Room
                 .databaseBuilder(context, AkVodDatabase::class.java, "akvodhub.db")
                 // Până la prima versiune stabilă, o schimbare de schemă reface baza (playlist-ul se reimportă).
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .fallbackToDestructiveMigration(dropAllTables = true)
                 .addCallback(
                     object : RoomDatabase.Callback() {
@@ -117,6 +122,35 @@ abstract class AkVodDatabase : RoomDatabase() {
                             "`updatedAt` INTEGER NOT NULL, PRIMARY KEY(`titleId`))",
                     )
                     createSearchTable(db)
+                }
+            }
+
+        /**
+         * Etapa 8: istoricul de vizionare, cache-ul pentru descoperire, legătura IMDb → TMDB și indexul pe `imdbId`.
+         * Istoricul pornește din ce era deja în „Continuă vizionarea”.
+         */
+        val MIGRATION_4_5 =
+            object : Migration(4, 5) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `watch_history` (`titleId` INTEGER NOT NULL, " +
+                            "`progress` REAL NOT NULL, `finished` INTEGER NOT NULL, `watchedAt` INTEGER NOT NULL, " +
+                            "PRIMARY KEY(`titleId`))",
+                    )
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `discover_cache` (`cacheKey` TEXT NOT NULL, " +
+                            "`data` TEXT NOT NULL, `fetchedAt` INTEGER NOT NULL, PRIMARY KEY(`cacheKey`))",
+                    )
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `imdb_map` (`imdbId` TEXT NOT NULL, `mediaType` TEXT, " +
+                            "`tmdbId` INTEGER, `checkedAt` INTEGER NOT NULL, PRIMARY KEY(`imdbId`))",
+                    )
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_title_imdbId` ON `title` (`imdbId`)")
+                    db.execSQL(
+                        "INSERT OR IGNORE INTO watch_history (titleId, progress, finished, watchedAt) " +
+                            "SELECT titleId, CASE WHEN durationMs > 0 THEN MIN(1.0, positionMs * 1.0 / durationMs) " +
+                            "ELSE 0.5 END, 0, updatedAt FROM watch_state",
+                    )
                 }
             }
     }

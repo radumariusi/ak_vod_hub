@@ -14,7 +14,7 @@ class StremioException(
     message: String,
 ) : IOException(message)
 
-/** Client pentru protocolul addon-urilor Stremio: manifestul, lista de subtitrări și descărcarea lor. */
+/** Client pentru protocolul addon-urilor Stremio: manifestul, cataloagele, lista de subtitrări și descărcarea lor. */
 class StremioClient(
     client: OkHttpClient,
 ) {
@@ -33,6 +33,16 @@ class StremioClient(
     ): List<AddonSubtitle> {
         val url = StremioIds.subtitlesUrl(StremioIds.baseUrl(addon.manifestUrl), type, videoId)
         return StremioJson.subtitles(getText(url, MAX_JSON_BYTES), addon.name)
+    }
+
+    /** O pagină dintr-un catalog ([skip] = câte titluri sărim; 0 = prima pagină). */
+    suspend fun catalog(
+        addon: StremioAddon,
+        catalog: StremioCatalog,
+        skip: Int = 0,
+    ): List<StremioMeta> {
+        val url = StremioIds.catalogUrl(StremioIds.baseUrl(addon.manifestUrl), catalog.type, catalog.id, skip)
+        return StremioJson.metas(getText(url, MAX_JSON_BYTES))
     }
 
     /** Fișierul subtitrării (cel mult [MAX_SUBTITLE_BYTES]). */

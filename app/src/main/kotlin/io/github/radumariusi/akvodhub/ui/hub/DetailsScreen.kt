@@ -45,6 +45,7 @@ import coil3.compose.AsyncImage
 import io.github.radumariusi.akvodhub.data.catalog.Credits
 import io.github.radumariusi.akvodhub.data.catalog.SourceDetails
 import io.github.radumariusi.akvodhub.data.catalog.TitleDetails
+import io.github.radumariusi.akvodhub.data.db.TitleCard
 import io.github.radumariusi.akvodhub.data.db.isLocal
 import io.github.radumariusi.akvodhub.hub.DetailsState
 import io.github.radumariusi.akvodhub.hub.DetailsViewModel
@@ -67,6 +68,7 @@ import io.github.radumariusi.akvodhub.player.PlayerActivity
 fun DetailsScreen(
     viewModel: DetailsViewModel,
     titleId: Long,
+    onOpen: (TitleCard) -> Unit,
 ) {
     LaunchedEffect(titleId) { viewModel.open(titleId) }
     val state by viewModel.state.collectAsState()
@@ -85,6 +87,7 @@ fun DetailsScreen(
                     details = details,
                     onPlay = ::play,
                     onSelectSeason = viewModel::selectSeason,
+                    onOpen = onOpen,
                 )
             }
 
@@ -105,6 +108,7 @@ private fun DetailsContent(
     details: TitleDetails,
     onPlay: (PlayRequest) -> Unit,
     onSelectSeason: (Int) -> Unit,
+    onOpen: (TitleCard) -> Unit,
 ) {
     val title = details.title
     val background = MaterialTheme.colorScheme.background
@@ -226,6 +230,50 @@ private fun DetailsContent(
                         }
                     }
                 }
+            }
+        }
+
+        // Descoperire: doar titluri care există în playlist-uri.
+        val discovery = state.discovery
+        discovery?.collection?.let { c ->
+            item("collection") {
+                DiscoverCards(
+                    title = c.name.ifBlank { "Colecția" },
+                    subtitle = c.summary,
+                    cards = c.available,
+                    onOpen = onOpen,
+                )
+            }
+        }
+        discovery?.rows.orEmpty().forEach { row ->
+            item("discover:${row.key}") { DiscoverCards(row.title, null, row.items, onOpen) }
+        }
+    }
+}
+
+/** Un rând de postere pe pagina de detalii (colecție, recomandate, similare). */
+@Composable
+private fun DiscoverCards(
+    title: String,
+    subtitle: String?,
+    cards: List<TitleCard>,
+    onOpen: (TitleCard) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(title, style = MaterialTheme.typography.titleMedium)
+        subtitle?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (cards.isNotEmpty()) {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 10.dp),
+            ) {
+                items(cards, key = { it.id }) { card -> PosterCard(card, onClick = { onOpen(card) }, onFocused = {}) }
             }
         }
     }

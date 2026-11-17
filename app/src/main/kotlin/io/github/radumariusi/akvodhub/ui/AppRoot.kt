@@ -77,6 +77,9 @@ fun AppRoot(
 ) {
     var current by rememberSaveable { mutableStateOf(Destination.HOME) }
     var openTitle by rememberSaveable { mutableStateOf<Long?>(null) }
+
+    // Titlurile deschise din pagina de detalii (recomandate, colecție…): „Înapoi” revine la cel dinainte.
+    var titleStack by rememberSaveable { mutableStateOf(LongArray(0)) }
     var openedFrom by rememberSaveable { mutableStateOf<String?>(null) }
     var restoreKey by rememberSaveable { mutableStateOf<String?>(null) }
     val updateState by updateViewModel.state.collectAsState()
@@ -87,6 +90,7 @@ fun AppRoot(
 
     val open: (TitleCard, String) -> Unit = { card, key ->
         openedFrom = key
+        titleStack = LongArray(0)
         openTitle = card.id
     }
     val onRestored = { restoreKey = null }
@@ -101,10 +105,20 @@ fun AppRoot(
     val titleId = openTitle
     if (titleId != null) {
         BackHandler {
-            openTitle = null
-            restoreKey = openedFrom
+            if (titleStack.isNotEmpty()) {
+                openTitle = titleStack.last()
+                titleStack = titleStack.copyOf(titleStack.size - 1)
+            } else {
+                openTitle = null
+                restoreKey = openedFrom
+            }
         }
-        DetailsScreen(hub.details, titleId)
+        DetailsScreen(hub.details, titleId) { card ->
+            if (card.id != titleId) {
+                titleStack = (titleStack + titleId).takeLast(MAX_TITLE_STACK).toLongArray()
+                openTitle = card.id
+            }
+        }
     } else {
         BackHandler(enabled = current != Destination.HOME) { current = Destination.HOME }
         states.SaveableStateProvider("main") {
@@ -209,3 +223,5 @@ fun AppRoot(
         )
     }
 }
+
+private const val MAX_TITLE_STACK = 20

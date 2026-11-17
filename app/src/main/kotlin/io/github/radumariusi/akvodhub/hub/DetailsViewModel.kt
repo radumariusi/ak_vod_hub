@@ -8,6 +8,8 @@ import io.github.radumariusi.akvodhub.data.catalog.HubRepository
 import io.github.radumariusi.akvodhub.data.catalog.SeriesEpisodes
 import io.github.radumariusi.akvodhub.data.catalog.TitleDetails
 import io.github.radumariusi.akvodhub.data.db.WatchStateEntity
+import io.github.radumariusi.akvodhub.data.discover.DiscoverRepository
+import io.github.radumariusi.akvodhub.data.discover.TitleDiscovery
 import io.github.radumariusi.akvodhub.parser.match.MediaType
 import io.github.radumariusi.akvodhub.parser.match.SourceInfo
 import kotlinx.coroutines.Job
@@ -32,6 +34,8 @@ data class DetailsState(
     val watch: WatchStateEntity? = null,
     /** Sursa pe care o alege playerul singur (profilul din Setări → Redare). */
     val recommended: SourceInfo? = null,
+    /** Colecția, „Recomandate”, „Similare”, alte titluri ale regizorului (doar ce există în playlist). */
+    val discovery: TitleDiscovery? = null,
 )
 
 /** Pagina de detalii a unui film sau serial: fișa, sursele grupate, episoadele unite, distribuția. */
@@ -40,6 +44,7 @@ class DetailsViewModel
     @Inject
     constructor(
         private val repository: HubRepository,
+        private val discover: DiscoverRepository,
     ) : ViewModel() {
         private val mutableState = MutableStateFlow(DetailsState())
         val state: StateFlow<DetailsState> = mutableState.asStateFlow()
@@ -66,6 +71,10 @@ class DetailsViewModel
                     launch {
                         val credits = repository.credits(details.title)
                         mutableState.update { it.copy(credits = credits) }
+                    }
+                    launch {
+                        val discovery = runCatching { discover.forTitle(details.title) }.getOrNull()
+                        mutableState.update { if (it.titleId == titleId) it.copy(discovery = discovery) else it }
                     }
                     if (details.title.mediaType == MediaType.TV) {
                         // Întâi ce știm deja (instant), apoi lista completă de la server.

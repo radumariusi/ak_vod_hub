@@ -651,6 +651,9 @@ class PlayerViewModel
             val next = current?.let { EpisodeOrder.next(seasons, it.season, it.number) }
             val nextEntry = next?.let { repository.playOrder(it.sources).firstOrNull()?.id }
             saveScope.launch {
+                if (finished || position >= Resume.MIN_POSITION_MS) {
+                    repository.recordWatch(title.id, position.toDouble() / duration, finished, now)
+                }
                 when {
                     !finished && position >= Resume.MIN_POSITION_MS -> {
                         repository.saveWatchState(

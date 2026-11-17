@@ -55,4 +55,50 @@ class StremioJsonTest {
         assertTrue(StremioJson.subtitles("{}", "x").isEmpty())
         assertTrue(StremioJson.subtitles("nu e json", "x").isEmpty())
     }
+
+    @Test
+    fun readsCatalogs() {
+        val manifest =
+            StremioJson.manifest(
+                """{"id":"com.linvo.cinemeta","name":"Cinemeta","resources":["catalog","meta"],
+                "types":["movie","series"],"catalogs":[
+                {"type":"movie","id":"top","name":"Popular","extra":[{"name":"search"},{"name":"skip"}]},
+                {"type":"movie","id":"search","name":"Caută","extra":[{"name":"search","isRequired":true}]},
+                {"type":"series","id":"imdbRating","extraSupported":["skip","genre"]},
+                {"type":"channel","id":"ch","name":"Canale"},
+                {"id":"broken"}]}""",
+            )!!
+        assertEquals(4, manifest.catalogs.size)
+        val top = manifest.catalogs[0]
+        assertEquals("Popular", top.name)
+        assertTrue(top.browsable)
+        assertTrue(top.skip)
+        assertFalse(manifest.catalogs[1].browsable)
+        assertEquals("imdbRating", manifest.catalogs[2].name)
+        assertTrue(manifest.catalogs[2].skip)
+        assertFalse(manifest.catalogs[3].browsable)
+    }
+
+    @Test
+    fun readsCatalogMetas() {
+        val metas =
+            StremioJson.metas(
+                """{"metas":[
+                {"id":"tt0133093","type":"movie","name":"The Matrix","releaseInfo":"1999"},
+                {"id":"tmdb:1399","type":"series","name":"Game of Thrones","releaseInfo":"2011-2019"},
+                {"id":"mdblist:5","type":"movie","name":"X","imdb_id":"tt0000005","moviedb_id":77,"year":2020},
+                {"id":"tt1","type":"movie"},
+                {"type":"movie","name":"Fără ID"}]}""",
+            )
+        assertEquals(3, metas.size)
+        assertEquals("tt0133093", metas[0].imdbId)
+        assertEquals(1999, metas[0].year)
+        assertNull(metas[0].tmdbId)
+        assertEquals(1399L, metas[1].tmdbId)
+        assertEquals(2011, metas[1].year)
+        assertEquals("tt0000005", metas[2].imdbId)
+        assertEquals(77L, metas[2].tmdbId)
+        assertEquals(2020, metas[2].year)
+        assertTrue(StremioJson.metas("nu e json").isEmpty())
+    }
 }

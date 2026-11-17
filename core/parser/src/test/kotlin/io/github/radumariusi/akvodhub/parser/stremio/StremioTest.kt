@@ -78,4 +78,27 @@ class StremioTest {
         assertNull(SubtitleChoice.autoPick(emptyList(), subs, emptyList()))
         assertNull(SubtitleChoice.autoPick(emptyList(), listOf(sub("9", "fre")), prefs))
     }
+
+    @Test
+    fun buildsCatalogUrls() {
+        val base = "https://v3-cinemeta.strem.io"
+        assertEquals("$base/catalog/movie/top.json", StremioIds.catalogUrl(base, "movie", "top"))
+        assertEquals("$base/catalog/series/top/skip=100.json", StremioIds.catalogUrl(base, "series", "top", 100))
+        assertEquals("$base/catalog/movie/my%20list.json", StremioIds.catalogUrl(base, "movie", "my list"))
+    }
+
+    @Test
+    fun readsCatalogIdsAndYears() {
+        assertEquals(603L, StremioIds.tmdbId("tmdb:603"))
+        assertNull(StremioIds.tmdbId("tt0133093"))
+        assertNull(StremioIds.tmdbId("tmdb:x"))
+        assertEquals("tt0903747", StremioIds.imdbId("tt0903747:1:2"))
+        assertNull(StremioIds.imdbId("kitsu:1"))
+        assertEquals(1999, StremioIds.year("1999"))
+        assertEquals(2008, StremioIds.year("2008-2013"))
+        assertEquals(2019, StremioIds.year("2019–"))
+        assertEquals(2019, StremioIds.year("2019-05-01T00:00:00.000Z"))
+        assertNull(StremioIds.year("12345"))
+        assertNull(StremioIds.year(null))
+    }
 }
