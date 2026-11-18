@@ -460,7 +460,7 @@ class HubRepository(
         dao.sources(titleId).filter { it.kind == VodKind.SERIES && it.streamId != null }
 
     suspend fun episodeAvailabilityChecked(titleId: Long): Boolean =
-        episodeParents(titleId).all { importer.episodeSnapshotCurrent(it) }
+        !dao.hasUnassignedSeason(titleId) && episodeParents(titleId).all { importer.episodeSnapshotCurrent(it) }
 
     suspend fun seriesSeasonNumbers(title: TitleEntity): List<Int> {
         if (title.isLocal) return emptyList()

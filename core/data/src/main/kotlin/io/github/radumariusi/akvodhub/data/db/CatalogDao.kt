@@ -176,6 +176,12 @@ interface CatalogDao {
     )
     suspend fun episodes(titleId: Long): List<RawEntryEntity>
 
+    @Query(
+        "SELECT EXISTS(SELECT 1 FROM raw_entry " +
+            "WHERE titleId = :titleId AND visible = 1 AND kind = 'EPISODE' AND season IS NULL)",
+    )
+    suspend fun hasUnassignedSeason(titleId: Long): Boolean
+
     @Query("SELECT matchState AS state, COUNT(*) AS count FROM raw_entry WHERE matchState <> 3 GROUP BY matchState")
     fun observeStateCounts(): Flow<List<StateCount>>
 

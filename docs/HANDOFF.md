@@ -478,7 +478,8 @@ sau episodului declarațiile din playlist și pistele interne deja observate de 
 `source-tracks:` este limitat la 256 de intrări. Nu se deschid fluxuri din panoul informativ.
 
 Serialele combină numerele sezoanelor TMDB cu episoadele vizibile din playlist. Absența se afișează
-numai după verificarea variantelor Xtream pentru importul curent. Limbile declarate se preiau
+numai după verificarea variantelor Xtream pentru importul curent și dacă episoadele vizibile au
+sezon identificabil. Limbile declarate se preiau
 din episod sau, dacă lipsesc, din serialul părinte. MULTI și datele insuficiente nu sunt
 dovezi că lipsesc limbile originală, engleză sau română. Rezultatul verificării Xtream se leagă
 de `seenRun` în cache-ul existent, cu maximum 512 intrări. După import, workerul existent
