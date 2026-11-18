@@ -168,7 +168,7 @@ private fun DetailsContent(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item("header") {
-            Header(details, state.credits, state.logoPath) {
+            Header(details, state.credits, state.logoPaths) {
                 val first =
                     nextEpisode ?: episodes
                         ?.seasons
@@ -375,12 +375,12 @@ private fun DiscoverCards(
 private fun Header(
     details: TitleDetails,
     credits: Credits?,
-    logoPath: String?,
+    logoPaths: List<String>,
     actions: @Composable () -> Unit,
 ) {
     val title = details.title
     Column(Modifier.widthIn(max = 680.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        TitleHeading(title.name, logoPath)
+        TitleHeading(title.name, logoPaths)
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),

@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-18 — Sigle pentru filme și seriale
+
+- Hero și fișă acceptă sigle TMDB PNG și SVG. Dacă o imagine nu se încarcă, se încearcă următoarea siglă în engleză sau neutră.
+- Rezultatele goale vechi se reverifică la acces. Cererea se anulează când utilizatorul părăsește titlul afișat.
+
 ## 2026-11-18 — Acasă și redare TV
 
 - Fundal pe tot ecranul pe Acasă, „Continuă vizionarea” pe lat și postere portret fără titlu repetat.

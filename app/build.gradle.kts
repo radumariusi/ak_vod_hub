@@ -147,6 +147,7 @@ dependencies {
     implementation(libs.androidx.tv.material)
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+    implementation(libs.coil.svg)
     implementation(libs.qrcodegen)
 
     implementation(libs.hilt.android)

@@ -71,7 +71,7 @@ fun BrowseScreen(
     restoreKey: String?,
     onRestored: () -> Unit,
     showHero: Boolean = false,
-    loadLogo: suspend (Long) -> String? = { null },
+    loadLogo: suspend (Long) -> List<String> = { emptyList() },
 ) {
     LaunchedEffect(browser) { browser.start() }
     val state by browser.state.collectAsState()

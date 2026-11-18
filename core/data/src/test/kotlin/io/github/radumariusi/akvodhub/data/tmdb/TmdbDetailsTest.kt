@@ -2,6 +2,7 @@ package io.github.radumariusi.akvodhub.data.tmdb
 
 import io.github.radumariusi.akvodhub.parser.match.MediaType
 import kotlinx.coroutines.runBlocking
+import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Response
@@ -98,5 +99,34 @@ class TmdbDetailsTest {
             client.details("example", MediaType.MOVIE, 1)
             client.details("example", MediaType.TV, 1)
             assertEquals(listOf("external_ids,release_dates", "external_ids,content_ratings"), appended)
+        }
+
+    @Test
+    fun movieAndTvLogoRequestsIncludeEnglishAndUnlabelledImages() =
+        runBlocking {
+            val requests = mutableListOf<HttpUrl>()
+            val http =
+                OkHttpClient
+                    .Builder()
+                    .addInterceptor { chain ->
+                        requests += chain.request().url
+                        Response
+                            .Builder()
+                            .request(chain.request())
+                            .protocol(Protocol.HTTP_1_1)
+                            .code(200)
+                            .message("OK")
+                            .body(
+                                """{"logos":[{"file_path":"/title.svg","iso_639_1":"en"},{"file_path":"/neutral.png"}]}"""
+                                    .toResponseBody(),
+                            ).build()
+                    }.build()
+            val client = TmdbClient(http)
+            val expected = listOf(TmdbLogo("/title.svg", "en"), TmdbLogo("/neutral.png"))
+            assertEquals(expected, client.images("example", MediaType.MOVIE, 1).logos)
+            assertEquals(expected, client.images("example", MediaType.TV, 2).logos)
+            assertEquals(listOf("/3/movie/1/images", "/3/tv/2/images"), requests.map { it.encodedPath })
+            assertTrue(requests.all { it.queryParameter("language") == "en-US" })
+            assertTrue(requests.all { it.queryParameter("include_image_language") == "en,null" })
         }
 }
