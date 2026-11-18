@@ -23,7 +23,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         TitleSourceOption::class,
         EpisodeProgressEntity::class,
     ],
-    version = 17,
+    version = 18,
     exportSchema = false,
 )
 abstract class AkVodDatabase : RoomDatabase() {
@@ -54,11 +54,20 @@ abstract class AkVodDatabase : RoomDatabase() {
                     MIGRATION_14_15,
                     MIGRATION_15_16,
                     MIGRATION_16_17,
+                    MIGRATION_17_18,
                 ).addCallback(
                     object : RoomDatabase.Callback() {
                         override fun onOpen(db: SupportSQLiteDatabase) = createSearchTable(db)
                     },
                 ).build()
+
+        val MIGRATION_17_18 =
+            object : Migration(17, 18) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE raw_entry ADD COLUMN providerQuality TEXT")
+                    db.execSQL("ALTER TABLE raw_entry ADD COLUMN confirmedQuality TEXT")
+                }
+            }
 
         val MIGRATION_16_17 =
             object : Migration(16, 17) {

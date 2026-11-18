@@ -49,7 +49,6 @@ fun ContentSection(viewModel: PlaybackSettingsViewModel) {
 @Composable
 private fun ContentText(label: String, current: String, key: String, viewModel: PlaybackSettingsViewModel) {
     var draft by remember(current) { mutableStateOf(current) }
-    Text("$label: " + current.ifEmpty { "Niciuna" })
     TvTextField(value = draft, onValueChange = { draft = it }, label = label)
     OutlinedButton(onClick = { viewModel.setContent(key, draft) }, enabled = draft != current) { Text("Salvează") }
 }

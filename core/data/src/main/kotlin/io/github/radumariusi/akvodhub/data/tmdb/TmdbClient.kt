@@ -138,14 +138,6 @@ class TmdbClient(
         return json.decodeFromString<TmdbFindResult>(body)
     }
 
-    suspend fun videos(key: String, type: MediaType, tmdbId: Long): TmdbVideos {
-        val path = if (type == MediaType.TV) "tv/$tmdbId/videos" else "movie/$tmdbId/videos"
-        val body =
-            get(key, url(path).addQueryParameter("language", METADATA_LANGUAGE).build(), strict = true)
-                ?: return TmdbVideos()
-        return json.decodeFromString<TmdbVideos>(body)
-    }
-
     suspend fun episodeOverview(key: String, tmdbId: Long, season: Int, episode: Int): String? {
         val path = url("tv/$tmdbId/season/$season/episode/$episode").addQueryParameter("language", METADATA_LANGUAGE)
         val body = get(key, path.build(), strict = true) ?: return null
@@ -154,7 +146,8 @@ class TmdbClient(
 
     suspend fun images(key: String, type: MediaType, tmdbId: Long): TmdbImages {
         val path = if (type == MediaType.TV) "tv/$tmdbId/images" else "movie/$tmdbId/images"
-        val body = get(key, url(path).build(), strict = true) ?: return TmdbImages()
+        val images = url(path).addQueryParameter("include_image_language", "en,null").build()
+        val body = get(key, images, strict = true) ?: return TmdbImages()
         return json.decodeFromString<TmdbImages>(body)
     }
 

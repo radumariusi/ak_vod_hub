@@ -3,7 +3,10 @@
 package io.github.radumariusi.akvodhub.ui.hub
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -67,6 +70,8 @@ fun BrowseScreen(
     onOpen: (TitleCard, String) -> Unit,
     restoreKey: String?,
     onRestored: () -> Unit,
+    showHero: Boolean = false,
+    loadLogo: suspend (Long) -> String? = { null },
 ) {
     LaunchedEffect(browser) { browser.start() }
     val state by browser.state.collectAsState()
@@ -81,6 +86,7 @@ fun BrowseScreen(
         }
     }
     val grid = rememberLazyGridState()
+    val preview = remember(filter) { mutableStateOf<TitleCard?>(null) }
 
     // Filtru nou → grila revine la început (dar nu la întoarcerea din detalii, cu același filtru).
     var shownFilter by rememberSaveable { mutableStateOf(filter.hashCode()) }
@@ -107,82 +113,79 @@ fun BrowseScreen(
         }
     }
 
-    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text(title, style = MaterialTheme.typography.headlineMedium)
-            Text(
-                when {
-                    state.loading && state.items.isEmpty() -> "Se caută…"
-                    state.items.isEmpty() -> ""
-                    state.endReached -> "${state.items.size} titluri"
-                    else -> "${state.items.size}+ titluri"
-                },
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        if (search) {
-            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                TvTextField(
-                    value = filter.text,
-                    onValueChange = { browser.setFilter(filter.copy(text = it)) },
-                    label = "Caută în playlist-uri",
-                    placeholder = "Titlu, și în altă limbă (ex. „Der Pate”)",
-                    imeAction = ImeAction.Search,
-                )
-                VoiceSearchButton { browser.setFilter(filter.copy(text = it)) }
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val heroHeight = (maxHeight - PosterHeight - 102.dp).coerceIn(104.dp, 196.dp).coerceAtMost(maxHeight * 0.4f)
+        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            val fallback = state.items.firstOrNull()
+            if (showHero && fallback != null) {
+                CatalogHero(fallback, { preview.value }, loadLogo, heroHeight)
             }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedButton(
-                onClick = { showFilters = true },
-                modifier = Modifier.focusRequester(filtersFocus),
-            ) { Text("Filtre și sortare") }
-            Text(filter.summary(), maxLines = 2, style = MaterialTheme.typography.bodySmall)
-        }
-        if (filter.type == MediaType.TV &&
-            (filter.quality != null || filter.language != null || filter.originalAudioOnly)
-        ) {
-            Text(
-                "Potrivire pe o sursă declarată. Episoadele pot avea alte variante.",
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
-
-        when {
-            state.items.isNotEmpty() -> {
-                LazyVerticalGrid(
-                    state = grid,
-                    columns = GridCells.Adaptive(PosterWidth + 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(start = 6.dp, end = 6.dp, top = 10.dp, bottom = 32.dp),
-                    modifier = Modifier.fillMaxSize(),
-                ) {
-                    itemsIndexed(state.items, key = { _, card -> card.id }) { _, card ->
-                        val key = "browse:$screenKey:${card.id}"
-                        PosterCard(
-                            card = card,
-                            onClick = { onOpen(card, key) },
-                            onFocused = {},
-                            requestFocus = key == restoreKey,
-                            onFocusRequested = onRestored,
-                        )
-                    }
+            if (search) Text(title, style = MaterialTheme.typography.headlineMedium)
+            if (search) {
+                Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    TvTextField(
+                        value = filter.text,
+                        modifier = Modifier.weight(1f),
+                        onValueChange = { browser.setFilter(filter.copy(text = it)) },
+                        label = "Caută în playlist-uri",
+                        placeholder = "Titlu, și în altă limbă (ex. „Der Pate”)",
+                        imeAction = ImeAction.Search,
+                    )
+                    VoiceSearchButton { browser.setFilter(filter.copy(text = it)) }
                 }
             }
-
-            state.loading -> {
-                Unit
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (!search) Text(title, style = MaterialTheme.typography.titleLarge)
+                OutlinedButton(
+                    onClick = { showFilters = true },
+                    modifier = Modifier.focusRequester(filtersFocus),
+                ) { Text("Filtre și sortare") }
+                Text(filter.summary(), maxLines = 2, style = MaterialTheme.typography.bodySmall)
             }
-
-            search && filter.text.isBlank() && !filter.hasFilters -> {
-                Message(
-                    "Scrie un titlu sau alege un filtru. Caută după titlul TMDB, titlul original sau numele din playlist.",
+            if (filter.type == MediaType.TV &&
+                (filter.quality != null || filter.language != null || filter.originalAudioOnly)
+            ) {
+                Text(
+                    "Potrivire pe o sursă declarată. Episoadele pot avea alte variante.",
+                    style = MaterialTheme.typography.bodySmall,
                 )
             }
 
-            else -> {
-                Message("Nu am găsit nimic cu aceste filtre.")
+            when {
+                state.items.isNotEmpty() -> {
+                    LazyVerticalGrid(
+                        state = grid,
+                        columns = GridCells.Adaptive(PosterWidth + 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(start = 6.dp, end = 6.dp, top = 10.dp, bottom = 32.dp),
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        itemsIndexed(state.items, key = { _, card -> card.id }) { _, card ->
+                            val key = "browse:$screenKey:${card.id}"
+                            PosterCard(
+                                card = card,
+                                onClick = { onOpen(card, key) },
+                                onFocused = { if (showHero) preview.value = card },
+                                requestFocus = key == restoreKey,
+                                onFocusRequested = onRestored,
+                            )
+                        }
+                    }
+                }
+
+                state.loading -> {
+                    Unit
+                }
+
+                search && filter.text.isBlank() && !filter.hasFilters -> {
+                    Message(
+                        "Scrie un titlu sau alege un filtru. Caută după titlul TMDB, titlul original sau numele din playlist.",
+                    )
+                }
+
+                else -> {
+                    Message("Nu am găsit nimic cu aceste filtre.")
+                }
             }
         }
     }
@@ -207,6 +210,7 @@ private fun CatalogFilter.summary(): String =
         "Audio original".takeIf { originalAudioOnly },
     ).joinToString(" · ")
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun FilterPanel(
     filter: CatalogFilter,
@@ -235,7 +239,10 @@ private fun FilterPanel(
                 modifier = Modifier.heightIn(max = 310.dp).weight(1f, fill = false),
             )
             if (!search && !naming) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
                     OutlinedButton(onClick = { naming = true }) { Text("Salvează combinația") }
                     if (presets.isNotEmpty()) {
                         OutlinedButton(onClick = {
@@ -266,7 +273,10 @@ private fun FilterPanel(
                     },
                 ) { Text("Salvează") }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
                 Button(modifier = Modifier.focusRequester(applyFocus), onClick = {
                     browser.setFilter(draft)
                     dismiss()

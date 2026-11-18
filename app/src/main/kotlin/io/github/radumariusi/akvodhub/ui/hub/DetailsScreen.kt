@@ -2,7 +2,6 @@
 
 package io.github.radumariusi.akvodhub.ui.hub
 
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,7 +12,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -22,21 +21,17 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
@@ -69,8 +64,6 @@ import io.github.radumariusi.akvodhub.ui.touch.Button
 import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
 import io.github.radumariusi.akvodhub.ui.touch.Surface
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 
 /**
  * Pagina unui film sau serial: fundal, poster, descriere, notă, genuri, distribuție, apoi sursele grupate
@@ -88,7 +81,6 @@ fun DetailsScreen(
     LaunchedEffect(titleId) { viewModel.open(titleId) }
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     var activeEpisode by remember(titleId) { mutableStateOf<MergedEpisode?>(null) }
     var episodeMessage by remember(activeEpisode) { mutableStateOf("Se încarcă…") }
     LaunchedEffect(activeEpisode) {
@@ -109,42 +101,6 @@ fun DetailsScreen(
         )
     }
 
-    var loadingTrailer by remember(titleId) { mutableStateOf(false) }
-    val trailerJob = remember(titleId) { mutableStateOf<Job?>(null) }
-    DisposableEffect(titleId) { onDispose { trailerJob.value?.cancel() } }
-    val trailer: () -> Unit = {
-        if (!loadingTrailer) {
-            loadingTrailer = true
-            trailerJob.value =
-                scope.launch {
-                    try {
-                        val id = viewModel.trailer(titleId)
-                        if (id != null) {
-                            openTrailer(context, id)
-                        } else {
-                            Toast
-                                .makeText(
-                                    context,
-                                    "Nu există un trailer YouTube pentru acest titlu.",
-                                    Toast.LENGTH_LONG,
-                                ).show()
-                        }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (_: Exception) {
-                        Toast
-                            .makeText(
-                                context,
-                                "Trailerul nu a putut fi încărcat. Încearcă din nou.",
-                                Toast.LENGTH_LONG,
-                            ).show()
-                    } finally {
-                        loadingTrailer = false
-                    }
-                }
-        }
-    }
-
     fun play(request: PlayRequest) {
         context.startActivity(PlayerActivity.intent(context, request))
     }
@@ -158,8 +114,6 @@ fun DetailsScreen(
                     details = details,
                     onPlay = ::play,
                     onWatchlist = viewModel::toggleWatchlist,
-                    onTrailer = trailer,
-                    loadingTrailer = loadingTrailer,
                     onWatched = viewModel::toggleWatched,
                     onSelectSeason = viewModel::selectSeason,
                     onEpisodeInfo = { activeEpisode = it },
@@ -192,8 +146,6 @@ private fun DetailsContent(
     details: TitleDetails,
     onPlay: (PlayRequest) -> Unit,
     onWatchlist: () -> Unit,
-    onTrailer: () -> Unit,
-    loadingTrailer: Boolean,
     onWatched: () -> Unit,
     onSelectSeason: (Int) -> Unit,
     onEpisodeInfo: (MergedEpisode) -> Unit,
@@ -202,30 +154,10 @@ private fun DetailsContent(
     sourceReason: String?,
 ) {
     val title = details.title
-    val background = MaterialTheme.colorScheme.background
     val playFocus = remember { FocusRequester() }
     LaunchedEffect(title.id) { runCatching { playFocus.requestFocus() } }
 
-    Images.hero(title.backdropPath)?.let {
-        AsyncImage(
-            model = it,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            alpha = 0.65f,
-            modifier = Modifier.fillMaxSize(),
-        )
-    }
-    Box(
-        Modifier.fillMaxSize().background(
-            Brush.horizontalGradient(
-                0f to background,
-                0.55f to background.copy(alpha = 0.75f),
-                1f to Color.Transparent,
-            ),
-        ),
-    )
-
-    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.1f to Color.Transparent, 1f to background)))
+    TitleBackdrop(title.backdropPath, Modifier.fillMaxSize(), opacity = 0.65f)
 
     val episodes = state.episodes
     val season = episodes?.seasons?.firstOrNull { it.number == state.selectedSeason }
@@ -244,12 +176,6 @@ private fun DetailsContent(
                         ?.episodes
                         ?.firstOrNull()
                 PlayActions(state, title.id, first, playFocus, onPlay)
-            }
-        }
-
-        item("trailer") {
-            OutlinedButton(onClick = onTrailer, enabled = !loadingTrailer && !title.isLocal) {
-                Text(if (loadingTrailer) "Se caută trailerul…" else "Trailer")
             }
         }
 
@@ -277,6 +203,12 @@ private fun DetailsContent(
                 sourceReason?.let {
                     Text(it, style = MaterialTheme.typography.bodySmall)
                 }
+                if (details.groups.any { it.quality == null }) {
+                    Text(
+                        "Calitatea surselor nedeclarate se completează după detectarea rezoluției la redare.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
             }
             items(details.groups, key = { "q:${it.quality}" }) { group ->
                 QualityRow(group, details.sources) { onPlay(PlayRequest(title.id, entryId = it)) }
@@ -300,11 +232,22 @@ private fun DetailsContent(
                         }
                     }
                 }
-            } else if (!state.loadingEpisodes) {
-                item("no-episodes") { Message("Nu am găsit episoade pentru acest serial.") }
+            } else {
+                item("no-episodes") {
+                    val message =
+                        if (state.loadingEpisodes) {
+                            "Se încarcă episoadele…"
+                        } else {
+                            "Nu am găsit episoade pentru acest serial."
+                        }
+                    Message(message)
+                }
             }
             season?.let { s ->
-                items(s.episodes, key = { "e:${s.number}:${it.number}:${it.sources.first().id}" }) { episode ->
+                items(
+                    s.episodes,
+                    key = { "e:${s.number}:${it.number ?: "source-${it.sources.first().id}"}" },
+                ) { episode ->
                     val progress = episode.number?.let { state.episodeProgress[episode.season to it] }
                     val showInfo: (() -> Unit)? =
                         if (!title.isLocal && episode.number != null) {
@@ -556,7 +499,7 @@ private fun EpisodeRow(
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.width(56.dp),
                 )
-                Column(Modifier.height(44.dp), verticalArrangement = Arrangement.Center) {
+                Column(Modifier.heightIn(min = 44.dp), verticalArrangement = Arrangement.Center) {
                     Text(
                         episode.title ?: episode.number?.let { "Episodul $it" } ?: "Episod",
                         style = MaterialTheme.typography.titleSmall,

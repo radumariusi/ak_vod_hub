@@ -1,12 +1,27 @@
 package io.github.radumariusi.akvodhub.data.playlist.xtream
 
 import io.github.radumariusi.akvodhub.parser.playlist.JsonObjectStreamException
+import io.github.radumariusi.akvodhub.parser.title.VideoQuality
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class XtreamJsonTest {
+    @Test
+    fun readsDeclaredResolutionWithoutASeparateRequest() {
+        val root =
+            """
+            [
+              {"stream_id":"21","name":"A","resolution":"1920x800"},
+              {"stream_id":"22","name":"B","video":{"width":3840,"height":"2160"}},
+              {"stream_id":"23","name":"C","resolution":{"unknown":1}}
+            ]
+            """.trimIndent()
+        val movies = XtreamJson.objects(root.byteInputStream()).mapNotNull(XtreamJson::movie).toList()
+        assertEquals(listOf(VideoQuality.FHD, VideoQuality.UHD, null), movies.map { it.quality })
+    }
+
     @Test
     fun readsMoviesWithInconsistentTypes() {
         val json =

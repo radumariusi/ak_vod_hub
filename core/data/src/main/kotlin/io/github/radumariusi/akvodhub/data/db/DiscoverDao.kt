@@ -139,12 +139,6 @@ interface DiscoverDao {
     suspend fun trimLogos()
 
     @Query(
-        "DELETE FROM discover_cache WHERE cacheKey LIKE 'trailer:%' AND cacheKey NOT IN " +
-            "(SELECT cacheKey FROM discover_cache WHERE cacheKey LIKE 'trailer:%' ORDER BY fetchedAt DESC, cacheKey LIMIT 128)",
-    )
-    suspend fun trimTrailers()
-
-    @Query(
         "DELETE FROM discover_cache WHERE cacheKey LIKE 'episode:en:%' AND cacheKey NOT IN " +
             "(SELECT cacheKey FROM discover_cache WHERE cacheKey LIKE 'episode:en:%' ORDER BY fetchedAt DESC, cacheKey LIMIT 64)",
     )

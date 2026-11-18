@@ -97,6 +97,7 @@ fun AppRoot(
     val showDialog by updateViewModel.showDialog.collectAsState()
     val totals by playlistsViewModel.totals.collectAsState()
     val languages by hub.browse.languages.collectAsState()
+    val playbackPrefs by hub.playback.prefs.collectAsState()
     val states = rememberSaveableStateHolder()
 
     val open: (TitleCard, String) -> Unit = { card, key ->
@@ -224,6 +225,8 @@ fun AppRoot(
                                     open,
                                     restoreKey,
                                     onRestored,
+                                    showHero = playbackPrefs.homeHero,
+                                    loadLogo = hub.home::logo,
                                 )
                             }
 
@@ -237,6 +240,8 @@ fun AppRoot(
                                     open,
                                     restoreKey,
                                     onRestored,
+                                    showHero = playbackPrefs.homeHero,
+                                    loadLogo = hub.home::logo,
                                 )
                             }
 

@@ -13,12 +13,15 @@ import io.github.radumariusi.akvodhub.data.playlist.xtream.XtreamClient
 import io.github.radumariusi.akvodhub.data.playlist.xtream.XtreamException
 import io.github.radumariusi.akvodhub.data.security.SecretCipher
 import io.github.radumariusi.akvodhub.parser.VodKind
+import io.github.radumariusi.akvodhub.parser.catalog.ContentVisibility
 import io.github.radumariusi.akvodhub.parser.playlist.M3uParser
 import io.github.radumariusi.akvodhub.parser.playlist.VodClassifier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -61,6 +64,9 @@ class PlaylistImporter(
 ) {
     private val dao = db.playlistDao()
     private val mutex = Mutex()
+    private val episodeLocks = List(64) { Mutex() }
+    private val episodeRequests = Semaphore(3)
+    private val contentPrefs = context.getSharedPreferences("playback", Context.MODE_PRIVATE)
 
     suspend fun import(
         sourceId: Long,
@@ -136,19 +142,19 @@ class PlaylistImporter(
         sourceId: Long,
         seriesId: Long,
     ): List<RawEntryEntity> =
-        mutex.withLock {
+        episodeLocks[((sourceId * 31 + seriesId).hashCode() and Int.MAX_VALUE) % episodeLocks.size].withLock {
             val source = dao.source(sourceId) ?: return@withLock emptyList()
             if (source.type != PlaylistType.XTREAM) return@withLock dao.episodes(sourceId, seriesId)
             val account = account(source)
-            val episodes = xtream.episodes(account, seriesId)
+            val episodes = episodeRequests.withPermit { xtream.episodes(account, seriesId) }
             db.withTransaction {
-                val seriesAdded = dao.seriesFirstSeen(sourceId, seriesId) ?: return@withTransaction emptyList()
+                val series = dao.xtreamSeries(sourceId, seriesId) ?: return@withTransaction emptyList()
                 val now = clock()
                 val firstSeen =
                     if (dao.hasEpisodes(sourceId, seriesId)) {
                         now
                     } else {
-                        seriesAdded
+                        series.firstSeenAt
                     }
                 val writer = BatchWriter(sourceId, run = now)
                 episodes.forEach { e ->
@@ -167,6 +173,7 @@ class PlaylistImporter(
                             episode = e.episode,
                             containerExt = e.containerExtension,
                             providerAddedAt = e.added,
+                            providerQuality = e.quality,
                             firstSeenAt = firstSeen,
                             seenRun = now,
                             matchState = MatchState.INHERITED,
@@ -175,9 +182,24 @@ class PlaylistImporter(
                 }
                 writer.flush()
                 dao.inheritSeriesTitle(sourceId, seriesId)
+                applyEpisodeVisibility(sourceId, seriesId, series.visible)
                 dao.episodes(sourceId, seriesId)
             }
         }
+
+    private fun applyEpisodeVisibility(sourceId: Long, seriesId: Long, visible: Boolean) {
+        val sql = db.openHelper.writableDatabase
+        val scope = "sourceId = ? AND seriesId = ? AND kind = 'EPISODE'"
+        sql.execSQL(
+            "UPDATE raw_entry SET visible = ? WHERE $scope",
+            arrayOf(if (visible) 1 else 0, sourceId, seriesId),
+        )
+        if (visible) {
+            val languages = contentPrefs.getString("hidden_languages", "").orEmpty()
+            val hidden = ContentVisibility.hiddenSources(languages, "")
+            sql.execSQL("${hidden.sql} AND $scope", (hidden.args + listOf(sourceId, seriesId)).toTypedArray())
+        }
+    }
 
     private suspend fun importM3u(
         source: PlaylistSourceEntity,
@@ -294,6 +316,7 @@ class PlaylistImporter(
                         containerExt = m.containerExtension,
                         tmdbId = m.tmdbId,
                         providerAddedAt = m.added,
+                        providerQuality = m.quality,
                         firstSeenAt = now,
                         seenRun = now,
                     ),
@@ -320,6 +343,7 @@ class PlaylistImporter(
                         streamId = s.seriesId,
                         tmdbId = s.tmdbId,
                         providerAddedAt = s.lastModified,
+                        providerQuality = s.quality,
                         firstSeenAt = now,
                         seenRun = now,
                     ),
@@ -401,8 +425,15 @@ class PlaylistImporter(
                             val parsed = entry.parsed()
                             val sameTitle =
                                 parsed.title == old.title && parsed.year == old.year && parsed.tmdbId == old.tmdbId
+                            val sameStream =
+                                sameTitle && old.url == parsed.url && old.streamId == parsed.streamId &&
+                                    old.containerExt == parsed.containerExt && old.season == parsed.season &&
+                                    old.episode == parsed.episode
+                            val confirmed = old.confirmedQuality.takeIf { sameStream }
                             updates +=
                                 parsed.copy(
+                                    quality = confirmed ?: parsed.quality,
+                                    confirmedQuality = confirmed,
                                     id = old.id,
                                     firstSeenAt = old.firstSeenAt,
                                     visible = old.visible,

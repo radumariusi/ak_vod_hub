@@ -8,14 +8,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -77,6 +74,7 @@ import io.github.radumariusi.akvodhub.ui.hub.ChoiceDialog
 import io.github.radumariusi.akvodhub.ui.theme.ThemedPanel
 import io.github.radumariusi.akvodhub.ui.touch.Button
 import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
+import io.github.radumariusi.akvodhub.ui.touch.OutlinedIconButton
 import kotlinx.coroutines.delay
 
 /**
@@ -95,6 +93,7 @@ fun PlayerScreen(
     var lastInput by remember { mutableIntStateOf(0) }
     var choice by remember { mutableStateOf<Choice?>(null) }
     var technical by remember { mutableStateOf(false) }
+    var subtitlesOpen by remember { mutableStateOf(false) }
     var jumping by remember { mutableStateOf(false) }
     var adjusting by remember { mutableStateOf(false) }
     var advanced by remember { mutableStateOf(false) }
@@ -112,7 +111,7 @@ fun PlayerScreen(
     var activeCommand by remember { mutableStateOf<FocusRequester?>(null) }
     var restoreMore by remember { mutableStateOf(false) }
     var menuWasOpen by remember { mutableStateOf(false) }
-    val menuOpen = choice != null || adjusting || jumping || technical
+    val menuOpen = choice != null || adjusting || jumping || technical || subtitlesOpen
     LaunchedEffect(menuOpen) {
         if (!menuOpen && menuWasOpen && controls) {
             runCatching { activeCommand?.requestFocus() }
@@ -358,6 +357,7 @@ fun PlayerScreen(
                 viewModel = viewModel,
                 onInput = { lastInput++ },
                 onChoice = { choice = it },
+                onSubtitles = { subtitlesOpen = true },
                 onAdjust = { adjusting = true },
                 onJump = { jumping = true },
                 onTechnical = { technical = true },
@@ -383,6 +383,7 @@ fun PlayerScreen(
         }
     }
 
+    if (subtitlesOpen) SubtitleTracksDialog(state, viewModel, onDismiss = { subtitlesOpen = false })
     if (technical) TechnicalInfoDialog(viewModel, onClose = { technical = false })
     if (jumping) JumpToMinuteDialog(viewModel, onClose = { jumping = false })
     choice?.let { ChoiceDialog(it, onDismiss = { choice = null }) }
@@ -402,6 +403,7 @@ private fun Controls(
     viewModel: PlayerViewModel,
     onInput: () -> Unit,
     onChoice: (Choice) -> Unit,
+    onSubtitles: () -> Unit,
     onAdjust: () -> Unit,
     onJump: () -> Unit,
     onTechnical: () -> Unit,
@@ -427,7 +429,7 @@ private fun Controls(
                             onInput()
                         }
                     }
-                }.padding(start = 48.dp, end = 48.dp, top = 64.dp, bottom = 32.dp),
+                }.padding(horizontal = 32.dp, vertical = 18.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Text(
@@ -439,11 +441,12 @@ private fun Controls(
         )
         state.subtitle?.let { Text(it, style = MaterialTheme.typography.titleMedium, color = Color.White) }
         state.sourceLabel?.let {
+            val detected = state.detectedResolution?.let { " · Rezoluție detectată $it" }.orEmpty()
             Text(
-                it,
+                it + detected,
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.7f),
-                maxLines = 1,
+                color = Color.White.copy(alpha = 0.8f),
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }
@@ -451,10 +454,10 @@ private fun Controls(
             viewModel.seekBy(it)
             onInput()
         }
-        Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 10.dp, vertical = 6.dp),
+        FlowRow(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             if (!advanced) {
                 PlayerCommand(
@@ -486,7 +489,8 @@ private fun Controls(
                         "Subtitrări ($subtitleCount)"
                     },
                     onCommandFocus,
-                ) { onChoice(subtitleChoice(state, viewModel)) }
+                    onClick = onSubtitles,
+                )
                 if (state.sources.size > 1) {
                     PlayerCommand(R.drawable.ic_player_source, "Sursă (${state.sources.size})", onCommandFocus) {
                         onChoice(sourceChoice(state, viewModel))
@@ -651,13 +655,12 @@ private fun PlayerCommand(
     var focused by remember { mutableStateOf(false) }
     val requester = remember { FocusRequester() }
     LaunchedEffect(focused, label) { if (focused) onFocus(label, requester) }
-    OutlinedButton(
+    OutlinedIconButton(
         onClick = {
             onFocus(label, requester)
             onClick()
         },
         modifier = modifier.focusRequester(requester).size(48.dp).onFocusChanged { focused = it.isFocused },
-        contentPadding = PaddingValues(0.dp),
     ) {
         Icon(painterResource(icon), contentDescription = label, modifier = Modifier.size(22.dp))
     }
@@ -819,52 +822,6 @@ private fun NextPanel(
         ) {
             Button(onClick = viewModel::playNext, modifier = Modifier.focusRequester(focus)) { Text("Redă acum") }
             OutlinedButton(onClick = viewModel::cancelCountdown) { Text("Anulează") }
-        }
-    }
-}
-
-/** Meniul „Subtitrări”: oprite, pistele din sursă, apoi cele din addon-uri (limbile preferate primele). */
-private fun subtitleChoice(
-    state: PlayerUiState,
-    viewModel: PlayerViewModel,
-): Choice {
-    val embedded = state.subtitles
-    val addon = state.addonSubtitles
-    val embeddedStart = 2
-    val addonStart = embeddedStart + embedded.size
-    val options = listOf("Oprite", "Automat") + embedded.map { it.label } + addon.map { it.label }
-    val headings =
-        buildMap {
-            if (embedded.isNotEmpty()) put(embeddedStart, "Interne")
-            if (addon.isNotEmpty()) put(addonStart, "Externe")
-        }
-    val selected =
-        when {
-            state.externalSubtitle != null -> {
-                addon
-                    .indexOfFirst { it.subtitle.url == state.externalSubtitle }
-                    .takeIf { it >= 0 }
-                    ?.let { addonStart + it }
-            }
-
-            embedded.any { it.selected } -> {
-                embeddedStart + embedded.indexOfFirst { it.selected }
-            }
-
-            state.subtitlesOff -> {
-                0
-            }
-
-            else -> {
-                1
-            }
-        }
-    return Choice("Subtitrări", options, selected, headings, footer = state.addonStatus) { i ->
-        when {
-            i == 0 -> viewModel.disableSubtitles()
-            i == 1 -> viewModel.automaticSubtitles()
-            i < addonStart -> viewModel.selectTrack(embedded[i - embeddedStart])
-            else -> viewModel.selectAddonSubtitle(addon[i - addonStart])
         }
     }
 }

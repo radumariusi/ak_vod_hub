@@ -1,5 +1,7 @@
 package io.github.radumariusi.akvodhub.data.playlist.xtream
 
+import io.github.radumariusi.akvodhub.parser.title.VideoQuality
+
 /** Datele de conectare la un cont Xtream. [server] e normalizat (`http://host:port`, fără `/` la final). */
 data class XtreamAccount(
     val server: String,
@@ -26,6 +28,7 @@ data class XtreamMovie(
     val containerExtension: String?,
     val tmdbId: Long?,
     val added: Long?,
+    val quality: VideoQuality? = null,
 )
 
 data class XtreamSeries(
@@ -35,6 +38,7 @@ data class XtreamSeries(
     val cover: String?,
     val tmdbId: Long?,
     val lastModified: Long?,
+    val quality: VideoQuality? = null,
 )
 
 data class XtreamEpisode(
@@ -44,6 +48,7 @@ data class XtreamEpisode(
     val episode: Int?,
     val containerExtension: String?,
     val added: Long?,
+    val quality: VideoQuality? = null,
 )
 
 class XtreamException(

@@ -46,12 +46,11 @@ fun TvTextField(
 ) {
     var editing by remember { mutableStateOf(false) }
     var editorFocused by remember { mutableStateOf(false) }
-    var fieldFocused by remember { mutableStateOf(false) }
     val requester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     val shape = MaterialTheme.shapes.small
     val colors = MaterialTheme.colorScheme
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(modifier.widthIn(max = 560.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(label, style = MaterialTheme.typography.labelLarge, color = colors.onSurfaceVariant)
         if (!editing) {
             val shown =
@@ -62,15 +61,12 @@ fun TvTextField(
                 }
             Surface(
                 onClick = { editing = true },
-                modifier =
-                    modifier
-                        .widthIn(max = 640.dp)
-                        .fillMaxWidth()
-                        .onFocusChanged { fieldFocused = it.isFocused }
-                        .border(2.dp, if (fieldFocused) colors.primary else colors.surfaceVariant, shape),
+                modifier = Modifier.fillMaxWidth(),
+                shape = shape,
             ) {
                 Text(
                     shown,
+                    color = if (value.isEmpty()) colors.onSurfaceVariant else colors.onSurface,
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                     maxLines = 1,
@@ -96,8 +92,7 @@ fun TvTextField(
                         autoCorrectEnabled = false,
                     ),
                 modifier =
-                    modifier
-                        .widthIn(max = 640.dp)
+                    Modifier
                         .fillMaxWidth()
                         .focusRequester(requester)
                         .onFocusChanged {
@@ -107,7 +102,7 @@ fun TvTextField(
                             }
                             editorFocused = it.isFocused
                         }.background(colors.surfaceVariant, shape)
-                        .border(2.dp, if (editorFocused) colors.primary else colors.surfaceVariant, shape)
+                        .border(2.dp, if (editorFocused) colors.secondary else colors.surfaceVariant, shape)
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                 decorationBox = { inner ->
                     Box {

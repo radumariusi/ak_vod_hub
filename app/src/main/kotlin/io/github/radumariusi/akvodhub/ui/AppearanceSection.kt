@@ -38,9 +38,9 @@ fun AppearanceSection(viewModel: PlaybackSettingsViewModel, home: HomeViewModel)
     var configureRows by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         OutlinedButton(onClick = { viewModel.setHomeHero(!prefs.homeHero) }) {
-            Text("Hero pe Acasă: " + if (prefs.homeHero) "da" else "nu")
+            Text("Hero în catalog · " + if (prefs.homeHero) "da" else "nu")
         }
-        Text("Aspectul și rândurile de pe Acasă se aplică imediat.")
+        Text("Prezintă titlul cu focus pe Acasă, Filme și Seriale.")
         OutlinedButton(onClick = { configureRows = true }) { Text("Rânduri pe Acasă") }
         Text("Aspect", style = MaterialTheme.typography.titleLarge)
         Text("Posterele mici lasă loc pentru mai multe titluri pe ecran.", style = MaterialTheme.typography.bodyMedium)
@@ -98,7 +98,10 @@ private fun HomeRowsDialog(
             LazyColumn(Modifier.heightIn(max = 400.dp).weight(1f, fill = false)) {
                 itemsIndexed(order, key = { _, key -> key }) { index, key ->
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { hidden = if (key in hidden) hidden - key else hidden + key }) {
+                        OutlinedButton(
+                            onClick = { hidden = if (key in hidden) hidden - key else hidden + key },
+                            modifier = Modifier.weight(1f),
+                        ) {
                             Text("${labels[key]} · " + if (key in hidden) "ascuns" else "vizibil", maxLines = 2)
                         }
                         OutlinedButton(onClick = { move(index, index - 1) }, enabled = index > 0) { Text("Sus") }

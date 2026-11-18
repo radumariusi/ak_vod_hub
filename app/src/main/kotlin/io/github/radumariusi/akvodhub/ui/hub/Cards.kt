@@ -12,12 +12,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,7 +28,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -47,7 +43,6 @@ import io.github.radumariusi.akvodhub.parser.catalog.PosterSize
 import io.github.radumariusi.akvodhub.parser.match.SourceGrouping
 import io.github.radumariusi.akvodhub.parser.title.VideoQuality
 import io.github.radumariusi.akvodhub.ui.touch.Card
-import kotlinx.coroutines.launch
 
 val LocalPosterBadges = staticCompositionLocalOf { PosterBadges.defaults }
 
@@ -121,6 +116,7 @@ fun PosterCard(
     requestFocus: Boolean = false,
     onFocusRequested: () -> Unit = {},
     supportingText: String? = null,
+    reserveSupportingText: Boolean = false,
 ) {
     val badges = LocalPosterBadges.current
     val requester = remember { FocusRequester() }
@@ -130,12 +126,9 @@ fun PosterCard(
             onFocusRequested()
         }
     }
-    val visibility = remember { BringIntoViewRequester() }
-    val scope = rememberCoroutineScope()
     Box(
         modifier
             .width(PosterWidth + 16.dp)
-            .bringIntoViewRequester(visibility)
             .padding(horizontal = 8.dp, vertical = 10.dp),
     ) {
         Card(
@@ -144,13 +137,7 @@ fun PosterCard(
                 Modifier
                     .width(PosterWidth)
                     .focusRequester(requester)
-                    .onFocusChanged {
-                        if (it.isFocused) {
-                            onFocused()
-                            scope.launch { visibility.bringIntoView() }
-                        }
-                    },
-            scale = CardDefaults.scale(focusedScale = 1.05f),
+                    .onFocusChanged { if (it.isFocused) onFocused() },
         ) {
             Box(Modifier.size(PosterWidth, PosterHeight).background(MaterialTheme.colorScheme.surfaceVariant)) {
                 val poster = Images.poster(card.posterPath, LocalPosterSize.current)
@@ -225,12 +212,14 @@ fun PosterCard(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 5.dp),
             )
-            supportingText?.let {
+            if (supportingText != null || reserveSupportingText) {
                 Text(
-                    it,
+                    supportingText.orEmpty(),
                     style = MaterialTheme.typography.labelSmall,
                     textAlign = TextAlign.Center,
+                    minLines = 2,
                     maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 3.dp, vertical = 3.dp),
                 )
             }

@@ -57,4 +57,19 @@ class EpisodeMergeTest {
         assertNull(EpisodeMerge.episodeTitle("Fără marcaj"))
         assertEquals("Final", EpisodeMerge.episodeTitle("Serial Episodul 12: Final"))
     }
+
+    @Test
+    fun genericProviderNamesUseTheLocalizedFallback() {
+        val season =
+            EpisodeMerge
+                .merge(
+                    listOf(
+                        entry(1, 1, 1, "Series S01E01 Episodio 1"),
+                        entry(2, 1, 2, "Episodio 2").copy(episodeNameOnly = true),
+                        entry(3, 1, 3, "The Reunion").copy(episodeNameOnly = true),
+                        entry(4, 1, 4, "Series S01E04 Episodio 4: A New Day"),
+                    ),
+                ).single()
+        assertEquals(listOf(null, null, "The Reunion", "A New Day"), season.episodes.map { it.title })
+    }
 }
