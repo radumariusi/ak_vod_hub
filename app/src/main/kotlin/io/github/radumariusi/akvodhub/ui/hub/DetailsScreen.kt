@@ -1,13 +1,12 @@
-@file:OptIn(ExperimentalTvMaterial3Api::class, ExperimentalLayoutApi::class)
+@file:OptIn(ExperimentalTvMaterial3Api::class)
 
 package io.github.radumariusi.akvodhub.ui.hub
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,12 +18,16 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,13 +44,11 @@ import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
-import io.github.radumariusi.akvodhub.data.catalog.Credits
 import io.github.radumariusi.akvodhub.data.catalog.Person
 import io.github.radumariusi.akvodhub.data.catalog.SourceDetails
 import io.github.radumariusi.akvodhub.data.catalog.TitleDetails
 import io.github.radumariusi.akvodhub.data.db.TitleCard
 import io.github.radumariusi.akvodhub.data.db.isLocal
-import io.github.radumariusi.akvodhub.data.tmdb.TmdbEpisode
 import io.github.radumariusi.akvodhub.hub.DetailsState
 import io.github.radumariusi.akvodhub.hub.DetailsViewModel
 import io.github.radumariusi.akvodhub.parser.catalog.MergedEpisode
@@ -61,6 +62,7 @@ import io.github.radumariusi.akvodhub.player.PlayerActivity
 import io.github.radumariusi.akvodhub.ui.touch.Button
 import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
 import io.github.radumariusi.akvodhub.ui.touch.Surface
+import kotlinx.coroutines.launch
 
 /**
  * Pagina unui film sau serial: fundal, poster, descriere, notă, genuri, distribuție, apoi sursele grupate
@@ -78,6 +80,13 @@ fun DetailsScreen(
     LaunchedEffect(titleId) { viewModel.open(titleId) }
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
+    val saved = rememberSaveableStateHolder()
+    var showingEpisodes by rememberSaveable(titleId) { mutableStateOf(false) }
+    var restoreEpisodeAction by rememberSaveable(titleId) { mutableStateOf(false) }
+    BackHandler(enabled = showingEpisodes) {
+        showingEpisodes = false
+        restoreEpisodeAction = true
+    }
 
     fun play(request: PlayRequest) {
         context.startActivity(PlayerActivity.intent(context, request))
@@ -86,25 +95,45 @@ fun DetailsScreen(
     val details = state.details?.takeIf { state.titleId == titleId }
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         when {
-            details != null -> {
-                DetailsContent(
-                    state = state,
-                    details = details,
-                    onPlay = ::play,
-                    onWatchlist = viewModel::toggleWatchlist,
-                    onWatched = viewModel::toggleWatched,
-                    onSelectSeason = viewModel::selectSeason,
-                    loadEpisodeMetadata = viewModel::episodeMetadata,
-                    onActor = onActor,
-                    sourceReason =
-                        state.recommended?.let {
-                            viewModel.sourceReason(
-                                it,
-                                details.title.originalLanguage,
-                            )
+            details != null && showingEpisodes -> {
+                saved.SaveableStateProvider("episodes:$titleId") {
+                    SeriesEpisodeScreen(
+                        state = state,
+                        title = details.title,
+                        onSelectSeason = viewModel::selectSeason,
+                        loadMetadata = viewModel::episodeMetadata,
+                        loadSeason = viewModel::seasonMetadata,
+                        onPlay = { episode, resume -> play(episodeRequest(titleId, episode, resume)) },
+                        onBack = {
+                            showingEpisodes = false
+                            restoreEpisodeAction = true
                         },
-                    onOpen = onOpen,
-                )
+                    )
+                }
+            }
+
+            details != null -> {
+                saved.SaveableStateProvider("detail:$titleId") {
+                    DetailsContent(
+                        state = state,
+                        details = details,
+                        onPlay = ::play,
+                        onWatchlist = viewModel::toggleWatchlist,
+                        onWatched = viewModel::toggleWatched,
+                        onShowEpisodes = { showingEpisodes = true },
+                        restoreEpisodeAction = restoreEpisodeAction,
+                        onEpisodeActionRestored = { restoreEpisodeAction = false },
+                        onActor = onActor,
+                        sourceReason =
+                            state.recommended?.let {
+                                viewModel.sourceReason(
+                                    it,
+                                    details.title.originalLanguage,
+                                )
+                            },
+                        onOpen = onOpen,
+                    )
+                }
             }
 
             state.loading -> {
@@ -125,52 +154,91 @@ private fun DetailsContent(
     onPlay: (PlayRequest) -> Unit,
     onWatchlist: () -> Unit,
     onWatched: () -> Unit,
-    onSelectSeason: (Int) -> Unit,
-    loadEpisodeMetadata: suspend (MergedEpisode) -> TmdbEpisode?,
+    onShowEpisodes: () -> Unit,
+    restoreEpisodeAction: Boolean,
+    onEpisodeActionRestored: () -> Unit,
     onActor: (Person) -> Unit,
     onOpen: (TitleCard) -> Unit,
     sourceReason: String?,
 ) {
     val title = details.title
     val playFocus = remember { FocusRequester() }
-    LaunchedEffect(title.id) { runCatching { playFocus.requestFocus() } }
+    val episodesFocus = remember { FocusRequester() }
+    val list = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val hasSources = title.mediaType == MediaType.MOVIE && details.groups.isNotEmpty()
+    val infoIndex = if (hasSources) 2 + details.groups.size else 1
+    LaunchedEffect(title.id) {
+        if (restoreEpisodeAction) {
+            list.scrollToItem(0)
+            runCatching { episodesFocus.requestFocus() }
+            onEpisodeActionRestored()
+        } else {
+            runCatching { playFocus.requestFocus() }
+        }
+    }
 
-    TitleBackdrop(title.backdropPath, Modifier.fillMaxSize(), opacity = 0.65f)
+    TitleBackdrop(title.backdropPath, Modifier.fillMaxSize(), opacity = 0.94f)
 
-    val episodes = state.episodes
-    val season = episodes?.seasons?.firstOrNull { it.number == state.selectedSeason }
-    val nextEpisode = state.nextEpisode
     LazyColumn(
+        state = list,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 48.dp, vertical = 32.dp),
+        contentPadding = PaddingValues(horizontal = 40.dp, vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item("header") {
-            Header(details, state.credits, state.logoPaths) {
+            Header(details, state.logoPaths) {
                 val first =
-                    nextEpisode ?: episodes
+                    state.nextEpisode ?: state.episodes
                         ?.seasons
                         ?.firstOrNull()
                         ?.episodes
                         ?.firstOrNull()
                 PlayActions(state, title.id, first, playFocus, onPlay)
-            }
-        }
-
-        item("personal-library") {
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
-            ) {
-                item {
-                    OutlinedButton(onClick = onWatchlist, enabled = !state.changingLibrary) {
-                        Text(if (state.inWatchlist) "Scoate din Lista mea" else "Adaugă în Lista mea")
+                if (title.mediaType == MediaType.TV) {
+                    OutlinedButton(
+                        onClick = onShowEpisodes,
+                        modifier = Modifier.fillMaxWidth().focusRequester(episodesFocus),
+                    ) {
+                        Text("Sezoane și episoade", modifier = Modifier.fillMaxWidth())
+                    }
+                } else if (hasSources) {
+                    OutlinedButton(
+                        onClick = { scope.launch { list.animateScrollToItem(1) } },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Alege sursa", modifier = Modifier.fillMaxWidth())
                     }
                 }
-                item {
-                    OutlinedButton(onClick = onWatched, enabled = !state.changingLibrary) {
-                        Text(if (state.watched) "Marchează nevăzut" else "Marchează văzut")
+                if (state.recommended != null || first != null) {
+                    val request =
+                        if (first != null) {
+                            episodeRequest(title.id, first, resume = true)
+                        } else {
+                            PlayRequest(title.id, resume = true)
+                        }
+                    OutlinedButton(
+                        onClick = { onPlay(request.copy(openTrackMenu = true)) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Audio și subtitrări", modifier = Modifier.fillMaxWidth())
                     }
+                }
+                OutlinedButton(
+                    onClick = onWatchlist,
+                    enabled = !state.changingLibrary,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        if (state.inWatchlist) "Scoate din Lista mea" else "Adaugă în Lista mea",
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                OutlinedButton(
+                    onClick = { scope.launch { list.animateScrollToItem(infoIndex) } },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Distribuție și informații", modifier = Modifier.fillMaxWidth())
                 }
             }
         }
@@ -193,38 +261,15 @@ private fun DetailsContent(
             }
         }
 
-        if (episodes != null) {
-            if (episodes.seasons.isNotEmpty()) {
-                item("seasons") {
-                    EpisodeSeasonPicker(episodes.seasons, state.selectedSeason, onSelectSeason)
+        item("title-info") {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Informații", style = MaterialTheme.typography.titleLarge)
+                title.overview?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                state.credits?.directors?.takeIf { it.isNotEmpty() }?.let {
+                    Text("Regia: ${it.joinToString(", ")}", style = MaterialTheme.typography.bodySmall)
                 }
-            } else {
-                item("no-episodes") {
-                    val message =
-                        if (state.loadingEpisodes) {
-                            "Se încarcă episoadele…"
-                        } else {
-                            "Nu am găsit episoade pentru acest serial."
-                        }
-                    Message(message)
-                }
-            }
-            season?.let { s ->
-                items(
-                    s.episodes,
-                    key = { "e:${title.id}:${s.number}:${it.number ?: "source-${it.sources.first().id}"}" },
-                ) { episode ->
-                    val progress = episode.number?.let { state.episodeProgress[episode.season to it] }
-                    EpisodeRow(
-                        episode,
-                        next = nextEpisode == episode,
-                        progress = progress,
-                        seriesBackdrop = title.backdropPath,
-                        loadMetadata = loadEpisodeMetadata.takeIf { !title.isLocal && episode.number != null },
-                        onClick = {
-                            onPlay(episodeRequest(title.id, episode, resume = progress?.finished == false))
-                        },
-                    )
+                OutlinedButton(onClick = onWatched, enabled = !state.changingLibrary) {
+                    Text(if (state.watched) "Marchează nevăzut" else "Marchează văzut")
                 }
             }
         }
@@ -326,7 +371,9 @@ private fun DiscoverCards(
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
                 contentPadding = PaddingValues(horizontal = 6.dp, vertical = 10.dp),
             ) {
-                items(cards, key = { it.id }) { card -> PosterCard(card, onClick = { onOpen(card) }, onFocused = {}) }
+                items(cards, key = { it.id }) { card ->
+                    PosterCard(card, onClick = { onOpen(card) }, onFocused = {}, showTitle = false)
+                }
             }
         }
     }
@@ -335,17 +382,12 @@ private fun DiscoverCards(
 @Composable
 private fun Header(
     details: TitleDetails,
-    credits: Credits?,
     logoPaths: List<String>,
     actions: @Composable () -> Unit,
 ) {
     val title = details.title
-    Column(Modifier.widthIn(max = 680.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        TitleHeading(title.name, logoPaths)
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) { actions() }
+    Column(Modifier.widthIn(max = 620.dp).fillMaxWidth(0.82f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        TitleHeading(title.name, logoPaths, height = 82.dp)
         val meta =
             listOfNotNull(
                 if (title.mediaType == MediaType.MOVIE) "Film" else "Serial",
@@ -373,15 +415,9 @@ private fun Header(
             )
         }
         title.overview?.let {
-            Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 6, overflow = TextOverflow.Ellipsis)
+            Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 4, overflow = TextOverflow.Ellipsis)
         }
-        credits?.directors?.takeIf { it.isNotEmpty() }?.let {
-            Text(
-                "Regia: ${it.joinToString(", ")}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        Column(Modifier.widthIn(max = 300.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) { actions() }
         if (title.isLocal) {
             Text(
                 "Titlu negăsit (încă) pe TMDB: informațiile vin din playlist.",
@@ -453,7 +489,7 @@ private fun PlayActions(
         val best = state.recommended
         when {
             best == null -> {
-                OutlinedButton(onClick = {}, modifier = Modifier.focusRequester(playFocus)) {
+                OutlinedButton(onClick = {}, modifier = Modifier.fillMaxWidth().focusRequester(playFocus)) {
                     Text("Nicio sursă de redare")
                 }
             }
@@ -461,15 +497,17 @@ private fun PlayActions(
             watch != null && Resume.shouldResume(watch.positionMs, watch.durationMs) -> {
                 Button(
                     onClick = { onPlay(PlayRequest(titleId, resume = true)) },
-                    modifier = Modifier.focusRequester(playFocus),
+                    modifier = Modifier.fillMaxWidth().focusRequester(playFocus),
                 ) { Text("Continuă de la ${Resume.format(watch.positionMs)}") }
-                OutlinedButton(onClick = { onPlay(PlayRequest(titleId)) }) { Text("De la început") }
+                OutlinedButton(onClick = { onPlay(PlayRequest(titleId)) }, modifier = Modifier.fillMaxWidth()) {
+                    Text("De la început", modifier = Modifier.fillMaxWidth())
+                }
             }
 
             else -> {
                 Button(onClick = {
                     onPlay(PlayRequest(titleId))
-                }, modifier = Modifier.focusRequester(playFocus)) {
+                }, modifier = Modifier.fillMaxWidth().focusRequester(playFocus)) {
                     Text("Redă")
                 }
             }
@@ -484,7 +522,7 @@ private fun PlayActions(
             val resume = Resume.shouldResume(watch.positionMs, watch.durationMs)
             Button(
                 onClick = { onPlay(episodeRequest(titleId, current, resume)) },
-                modifier = Modifier.focusRequester(playFocus),
+                modifier = Modifier.fillMaxWidth().focusRequester(playFocus),
             ) {
                 Text(
                     if (resume) {
@@ -494,9 +532,12 @@ private fun PlayActions(
                     },
                 )
             }
-            if (firstEpisode != null && firstEpisode != current) {
-                OutlinedButton(onClick = { onPlay(episodeRequest(titleId, firstEpisode)) }) {
-                    Text("De la ${episodeCode(firstEpisode)}")
+            if (resume) {
+                OutlinedButton(
+                    onClick = { onPlay(episodeRequest(titleId, current)) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("De la începutul episodului", modifier = Modifier.fillMaxWidth())
                 }
             }
         }
@@ -504,12 +545,12 @@ private fun PlayActions(
         firstEpisode != null -> {
             Button(
                 onClick = { onPlay(episodeRequest(titleId, firstEpisode)) },
-                modifier = Modifier.focusRequester(playFocus),
+                modifier = Modifier.fillMaxWidth().focusRequester(playFocus),
             ) { Text("Redă ${episodeCode(firstEpisode)}") }
         }
 
         else -> {
-            OutlinedButton(onClick = {}, modifier = Modifier.focusRequester(playFocus)) {
+            OutlinedButton(onClick = {}, modifier = Modifier.fillMaxWidth().focusRequester(playFocus)) {
                 Text(if (state.loadingEpisodes) "Se încarcă episoadele…" else "Nicio sursă de redare")
             }
         }

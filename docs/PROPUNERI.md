@@ -182,6 +182,12 @@ Vezi detalii despre schema Room și limitele cunoscute în [HANDOFF.md](HANDOFF.
 - Setări → Redare afișează ordinea automată 4K EN, RO sau MULTI și regulile de surse configurate.
 - Focusul revine la fila activă sau la categoria deschisă din Setări la ieșirea direcțională din conținut.
 
+## Interfață TV panoramică după v0.1.45
+
+- Hero comun cu Redă și Detalii, postere portret și navigare din telecomandă.
+- Fișă cu acțiuni verticale și ecran dedicat pentru sezoane și episoade, cu metadate la deschidere.
+- Temă comună pentru hub, setări și player. Identitatea și funcțiile rămân cele ale AK VOD Hub.
+
 ## Ce ar îngreuna aplicația (de evitat sau doar opțional)
 
 1. **Trailere redate în aplicație / pe fundal** (YouTube, WebView): megabytes în plus și RAM. → Deschidem aplicația YouTube.

@@ -453,3 +453,18 @@ celorlalte surse cu aceleași etichete, apoi încearcă restul. Limba originală
 Sus din conținut intră în fila activă a meniului principal, inclusiv când aceasta trebuie derulată în cadru.
 Stânga la ieșirea din panoul de opțiuni readuce focusul pe categoria deschisă. Navigarea internă în liste
 și mutarea cursorului în editor rămân în grija componentelor.
+
+
+### Interfață TV panoramică după v0.1.45
+
+Meniul afișează marca AK VOD și indicatorul filei active. Hero-ul din Acasă, Filme și Seriale afișează
+sigla, metadatele și acțiunile Redă/Detalii. Redă folosește progresul salvat; pentru un serial fără episoade
+locale cere doar episoadele acelui serial prin traseul Xtream existent. Preîncărcarea siglelor rămâne limitată
+la vecinii direcționali. Posterele „Continuă vizionarea” rămân 16:9, restul portret.
+
+Fișa are acțiuni verticale pentru redare, reluare, listă, surse sau sezoane și informații. „Audio și
+subtitrări” deschide playerul în pauză și folosește pistele reale. Pagina de episoade are lista sezoanelor
+și numărul episoadelor disponibile în stânga, episoadele în dreapta și selector compact pe lățimi mici.
+Numai deschiderea paginii cere sezonul selectat de la TMDB. Cache-ul păstrează maximum opt sezoane și
+64 de intrări în fiecare rezultat, cu completare individuală la focus dacă e necesar. Doar episoadele
+playlistului sunt afișate. Fără schema Room nouă sau dependențe.

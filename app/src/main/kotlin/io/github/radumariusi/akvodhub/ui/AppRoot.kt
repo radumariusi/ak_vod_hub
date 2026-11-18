@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -26,6 +27,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
@@ -34,6 +36,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.Text
 import io.github.radumariusi.akvodhub.R
 import io.github.radumariusi.akvodhub.catalog.TmdbViewModel
 import io.github.radumariusi.akvodhub.data.db.TitleCard
@@ -101,7 +104,7 @@ fun AppRoot(
         )
     }
     var exitPrompt by rememberSaveable { mutableStateOf(false) }
-    var homeBackdrop by remember { mutableStateOf<String?>(null) }
+    var hubBackdrop by remember(current) { mutableStateOf<String?>(null) }
     var openTitle by rememberSaveable { mutableStateOf<Long?>(null) }
     var actors by rememberSaveable { mutableStateOf(arrayListOf<ActorFrame>()) }
 
@@ -214,8 +217,8 @@ fun AppRoot(
         }
         states.SaveableStateProvider("main") {
             Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                if (current == Destination.HOME && playbackPrefs.homeHero) {
-                    TitleBackdrop(homeBackdrop, Modifier.matchParentSize(), opacity = 0.65f)
+                if (playbackPrefs.homeHero) {
+                    TitleBackdrop(hubBackdrop, Modifier.matchParentSize(), opacity = 0.32f)
                 }
                 Column(Modifier.fillMaxSize()) {
                     MainTabs(current) { current = it }
@@ -228,7 +231,7 @@ fun AppRoot(
                                         totals = totals,
                                         viewModel = hub.home,
                                         onOpenSettings = { current = Destination.SETTINGS },
-                                        onBackdropChanged = { homeBackdrop = it },
+                                        onBackdropChanged = { hubBackdrop = it },
                                         onOpen = open,
                                         restoreKey = restoreKey,
                                         onRestored = onRestored,
@@ -247,6 +250,7 @@ fun AppRoot(
                                         onRestored,
                                         showHero = playbackPrefs.homeHero,
                                         loadLogo = hub.home::logo,
+                                        onBackdropChanged = { hubBackdrop = it },
                                     )
                                 }
 
@@ -262,6 +266,7 @@ fun AppRoot(
                                         onRestored,
                                         showHero = playbackPrefs.homeHero,
                                         loadLogo = hub.home::logo,
+                                        onBackdropChanged = { hubBackdrop = it },
                                     )
                                 }
 
@@ -318,9 +323,12 @@ private fun MainTabs(current: Destination, onSelect: (Destination) -> Unit) {
     LazyRow(
         state = list,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
         contentPadding = PaddingValues(horizontal = 32.dp, vertical = 12.dp),
         modifier =
             Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.9f))
                 .focusProperties {
                     onEnter = {
                         if (requestedFocusDirection == FocusDirection.Up) {
@@ -328,7 +336,7 @@ private fun MainTabs(current: Destination, onSelect: (Destination) -> Unit) {
                             if (!runCatching { active.requestFocus() }.getOrDefault(false)) {
                                 cancelFocusChange()
                                 scope.launch {
-                                    list.scrollToItem(current.ordinal)
+                                    list.scrollToItem(current.ordinal + 1)
                                     withFrameNanos { }
                                     runCatching { active.requestFocus() }
                                 }
@@ -337,6 +345,14 @@ private fun MainTabs(current: Destination, onSelect: (Destination) -> Unit) {
                     }
                 }.focusGroup(),
     ) {
+        item("brand") {
+            Text(
+                "AK VOD",
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(end = 12.dp),
+            )
+        }
         items(Destination.entries, key = { it.name }) { destination ->
             SelectionTab(
                 label = destination.label,

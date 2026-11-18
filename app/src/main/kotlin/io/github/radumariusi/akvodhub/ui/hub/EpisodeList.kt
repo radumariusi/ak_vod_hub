@@ -1,26 +1,39 @@
 package io.github.radumariusi.akvodhub.ui.hub
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
@@ -29,7 +42,10 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import io.github.radumariusi.akvodhub.data.db.EpisodeProgressEntity
+import io.github.radumariusi.akvodhub.data.db.TitleEntity
+import io.github.radumariusi.akvodhub.data.db.isLocal
 import io.github.radumariusi.akvodhub.data.tmdb.TmdbEpisode
+import io.github.radumariusi.akvodhub.hub.DetailsState
 import io.github.radumariusi.akvodhub.parser.catalog.EpisodeMerge
 import io.github.radumariusi.akvodhub.parser.catalog.MergedEpisode
 import io.github.radumariusi.akvodhub.parser.catalog.MergedSeason
@@ -71,16 +87,22 @@ internal fun EpisodeRow(
     progress: EpisodeProgressEntity?,
     seriesBackdrop: String?,
     loadMetadata: (suspend (MergedEpisode) -> TmdbEpisode?)?,
+    metadataFromSeason: TmdbEpisode? = null,
+    seasonLoading: Boolean = false,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
-    var metadata by remember { mutableStateOf<TmdbEpisode?>(null) }
-    LaunchedEffect(focused) {
-        if (focused && metadata == null && loadMetadata != null) {
+    var individualMetadata by remember { mutableStateOf<TmdbEpisode?>(null) }
+    LaunchedEffect(focused, seasonLoading, metadataFromSeason) {
+        if (focused && !seasonLoading && metadataFromSeason == null && individualMetadata == null &&
+            loadMetadata != null
+        ) {
             delay(220)
-            metadata = loadMetadata(episode)
+            individualMetadata = loadMetadata(episode)
         }
     }
+    val metadata = metadataFromSeason ?: individualMetadata
     val name = EpisodeMerge.namedEpisode(metadata?.name) ?: episode.title
     val label =
         when {
@@ -99,7 +121,7 @@ internal fun EpisodeRow(
         }
     Surface(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.hasFocus },
+        modifier = modifier.fillMaxWidth().onFocusChanged { focused = it.hasFocus },
     ) {
         Row(
             Modifier.fillMaxWidth().padding(10.dp),
@@ -197,6 +219,189 @@ internal fun EpisodeRow(
                         style = MaterialTheme.typography.labelSmall,
                         color = colors.onSurfaceVariant,
                         maxLines = 1,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Ecranul dedicat sezoanelor. Lista rămâne limitată la episoadele disponibile din playlist. */
+@Composable
+internal fun SeriesEpisodeScreen(
+    state: DetailsState,
+    title: TitleEntity,
+    onSelectSeason: (Int) -> Unit,
+    loadMetadata: suspend (MergedEpisode) -> TmdbEpisode?,
+    loadSeason: suspend (Int) -> Map<Int, TmdbEpisode>,
+    onPlay: (MergedEpisode, Boolean) -> Unit,
+    onBack: () -> Unit,
+) {
+    val seasons = state.episodes?.seasons.orEmpty()
+    val selected = seasons.firstOrNull { it.number == state.selectedSeason } ?: seasons.firstOrNull()
+    val listFocus = remember { FocusRequester() }
+    val seasonFocus = remember { FocusRequester() }
+
+    BoxWithConstraints(Modifier.fillMaxSize().padding(horizontal = 36.dp, vertical = 20.dp)) {
+        if (seasons.isEmpty() || selected == null) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(onClick = onBack) { Text("Înapoi la fișă") }
+                Message(
+                    if (state.loadingEpisodes ||
+                        state.episodes == null
+                    ) {
+                        "Se încarcă episoadele…"
+                    } else {
+                        "Nu sunt episoade disponibile."
+                    },
+                )
+            }
+            return@BoxWithConstraints
+        }
+        if (maxWidth < 570.dp) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onBack) { Text("Înapoi la fișă") }
+                EpisodeSeasonPicker(seasons, selected.number, onSelectSeason)
+                SeasonEpisodes(
+                    title,
+                    selected,
+                    state,
+                    listFocus,
+                    loadMetadata,
+                    loadSeason,
+                    onPlay,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                Column(
+                    Modifier
+                        .weight(0.28f)
+                        .fillMaxHeight()
+                        .clip(MaterialTheme.shapes.large)
+                        .background(MaterialTheme.colorScheme.surface)
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    TitleHeading(title.name, state.logoPaths, height = 54.dp)
+                    Text(
+                        listOfNotNull(
+                            title.year?.toString(),
+                            "${seasons.size} sezoane disponibile",
+                        ).joinToString(" · "),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    OutlinedButton(onClick = onBack) { Text("Înapoi la fișă") }
+                    LazyColumn(
+                        state = rememberLazyListState(seasons.indexOf(selected).coerceAtLeast(0)),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        items(seasons, key = { it.number }) { season ->
+                            val active = season.number == selected.number
+                            val colors = MaterialTheme.colorScheme
+                            val seasonColor = if (active) colors.secondary else colors.onSurface
+                            Surface(
+                                onClick = {
+                                    if (active) listFocus.requestFocus() else onSelectSeason(season.number)
+                                },
+                                modifier =
+                                    Modifier.fillMaxWidth().then(
+                                        if (active) Modifier.focusRequester(seasonFocus) else Modifier,
+                                    ),
+                            ) {
+                                Row(
+                                    Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        seasonLabel(season.number),
+                                        modifier = Modifier.weight(1f),
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = seasonColor,
+                                    )
+                                    Text(season.episodes.size.toString(), style = MaterialTheme.typography.labelMedium)
+                                }
+                            }
+                        }
+                    }
+                }
+                SeasonEpisodes(
+                    title,
+                    selected,
+                    state,
+                    listFocus,
+                    loadMetadata,
+                    loadSeason,
+                    onPlay,
+                    modifier =
+                        Modifier
+                            .weight(0.72f)
+                            .focusProperties {
+                                onExit = {
+                                    if (requestedFocusDirection == FocusDirection.Left) seasonFocus.requestFocus()
+                                }
+                            }.focusGroup(),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SeasonEpisodes(
+    title: TitleEntity,
+    season: MergedSeason,
+    state: DetailsState,
+    listFocus: FocusRequester,
+    loadMetadata: suspend (MergedEpisode) -> TmdbEpisode?,
+    loadSeason: suspend (Int) -> Map<Int, TmdbEpisode>,
+    onPlay: (MergedEpisode, Boolean) -> Unit,
+    modifier: Modifier,
+) {
+    key(season.number) {
+        val next = state.nextEpisode
+        val initial = remember { (next?.let(season.episodes::indexOf) ?: -1).coerceAtLeast(0) }
+        val entry = season.episodes.getOrElse(initial) { season.episodes.first() }
+        val scroll = rememberLazyListState(initial)
+        var metadata by remember { mutableStateOf<Map<Int, TmdbEpisode>>(emptyMap()) }
+        var loading by remember { mutableStateOf(!title.isLocal) }
+        LaunchedEffect(Unit) {
+            if (!title.isLocal) metadata = loadSeason(season.number)
+            loading = false
+        }
+        LaunchedEffect(Unit) {
+            if (scroll.layoutInfo.visibleItemsInfo.none { it.index == initial }) scroll.scrollToItem(initial)
+            withFrameNanos { }
+            runCatching { listFocus.requestFocus() }
+        }
+        Column(modifier.fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                listOfNotNull(seasonLabel(season.number), title.certification).joinToString(" · "),
+                style = MaterialTheme.typography.headlineSmall,
+            )
+            LazyColumn(
+                state = scroll,
+                contentPadding = PaddingValues(bottom = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                items(season.episodes, key = {
+                    it.number?.let { number -> "e:$number" }
+                        ?: "source:${it.sources.first().id}"
+                }) { episode ->
+                    val progress = episode.number?.let { state.episodeProgress[episode.season to it] }
+                    EpisodeRow(
+                        episode = episode,
+                        next = next == episode,
+                        progress = progress,
+                        seriesBackdrop = title.backdropPath,
+                        loadMetadata = loadMetadata.takeIf { !title.isLocal && episode.number != null },
+                        metadataFromSeason = episode.number?.let(metadata::get),
+                        seasonLoading = loading,
+                        modifier = if (episode == entry) Modifier.focusRequester(listFocus) else Modifier,
+                        onClick = { onPlay(episode, progress?.finished == false) },
                     )
                 }
             }

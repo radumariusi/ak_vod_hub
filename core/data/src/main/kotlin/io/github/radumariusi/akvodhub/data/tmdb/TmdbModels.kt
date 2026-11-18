@@ -192,7 +192,11 @@ data class TmdbEpisode(
     val overview: String? = null,
     val runtime: Int? = null,
     @SerialName("still_path") val stillPath: String? = null,
+    @SerialName("episode_number") val number: Int? = null,
 )
+
+@Serializable
+data class TmdbSeason(val episodes: List<TmdbEpisode> = emptyList())
 
 @Serializable
 data class TmdbImages(val logos: List<TmdbLogo> = emptyList())

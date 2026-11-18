@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -19,11 +20,11 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
+import io.github.radumariusi.akvodhub.ui.touch.Surface
 
 @Composable
 internal fun SelectionTab(label: String, active: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    OutlinedButton(
+    Surface(
         onClick = onClick,
         modifier =
             modifier.semantics {
@@ -31,7 +32,10 @@ internal fun SelectionTab(label: String, active: Boolean, modifier: Modifier = M
                 role = Role.Tab
             },
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            Modifier.padding(horizontal = 15.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
             Text(label, textDecoration = TextDecoration.None)
             val indicator = if (active) MaterialTheme.colorScheme.primary else Color.Transparent
             Box(Modifier.width(32.dp).height(3.dp).background(indicator))

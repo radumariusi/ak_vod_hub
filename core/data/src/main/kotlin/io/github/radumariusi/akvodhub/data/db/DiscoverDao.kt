@@ -144,6 +144,12 @@ interface DiscoverDao {
     )
     suspend fun trimEpisodes()
 
+    @Query(
+        "DELETE FROM discover_cache WHERE cacheKey LIKE 'season:en:%' AND cacheKey NOT IN " +
+            "(SELECT cacheKey FROM discover_cache WHERE cacheKey LIKE 'season:en:%' ORDER BY fetchedAt DESC, cacheKey LIMIT 8)",
+    )
+    suspend fun trimSeasons()
+
     @Query("SELECT * FROM imdb_map WHERE imdbId IN (:ids)")
     suspend fun imdbMap(ids: List<String>): List<ImdbMapEntity>
 

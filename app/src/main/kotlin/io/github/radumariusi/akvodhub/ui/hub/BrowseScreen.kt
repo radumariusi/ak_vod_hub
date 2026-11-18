@@ -31,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -51,6 +52,8 @@ import io.github.radumariusi.akvodhub.parser.match.MediaType
 import io.github.radumariusi.akvodhub.parser.match.SourceGrouping
 import io.github.radumariusi.akvodhub.parser.title.ParsedTitle
 import io.github.radumariusi.akvodhub.parser.title.VideoQuality
+import io.github.radumariusi.akvodhub.player.PlayRequest
+import io.github.radumariusi.akvodhub.player.PlayerActivity
 import io.github.radumariusi.akvodhub.ui.TvTextField
 import io.github.radumariusi.akvodhub.ui.theme.ThemedPanel
 import io.github.radumariusi.akvodhub.ui.touch.Button
@@ -74,9 +77,14 @@ fun BrowseScreen(
     onRestored: () -> Unit,
     showHero: Boolean = false,
     loadLogo: suspend (Long) -> List<String> = { emptyList() },
+    onBackdropChanged: ((String?) -> Unit)? = null,
 ) {
+    val context = LocalContext.current
     LaunchedEffect(browser) { browser.start() }
     val state by browser.state.collectAsState()
+    LaunchedEffect(showHero, state.items.isEmpty()) {
+        if (!showHero || state.items.isEmpty()) onBackdropChanged?.invoke(null)
+    }
     val filter = state.filter
     var showFilters by remember { mutableStateOf(false) }
     var restoreFiltersFocus by remember { mutableStateOf(false) }
@@ -122,7 +130,7 @@ fun BrowseScreen(
                 val available = (maxWidth.roundToPx() - 2 * 6.dp.roundToPx()).coerceAtLeast(0)
                 with(gridCells) { calculateCrossAxisCellSizes(available, 0).size }
             }
-        val heroHeight = (maxHeight - PosterHeight - 102.dp).coerceIn(104.dp, 196.dp).coerceAtMost(maxHeight * 0.4f)
+        val heroHeight = catalogHeroHeight(maxHeight)
         Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             val fallback = state.items.firstOrNull()
             if (showHero && fallback != null) {
@@ -131,10 +139,15 @@ fun BrowseScreen(
                     { preview.value },
                     loadLogo,
                     heroHeight,
+                    onBackdropChanged,
                     neighborTitleIds = {
                         val index = preview.value?.let { card -> state.items.indexOfFirst { it.id == card.id } } ?: 0
                         HeroNeighbors.grid(index, columns, state.items.size).map { state.items[it].id }
                     },
+                    onPlay = { card ->
+                        context.startActivity(PlayerActivity.intent(context, PlayRequest(card.id, resume = true)))
+                    },
+                    onDetails = { card -> onOpen(card, "browse:$screenKey:${card.id}") },
                 )
             }
             if (search) Text(title, style = MaterialTheme.typography.headlineMedium)

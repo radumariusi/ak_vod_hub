@@ -468,6 +468,37 @@ class HubRepository(
         }
     }
 
+    /** Cerut numai din ecranul dedicat episoadelor, pentru sezonul deschis. */
+    suspend fun seasonMetadata(title: TitleEntity, season: Int): Map<Int, TmdbEpisode> {
+        if (title.isLocal || season < 0) return emptyMap()
+        val cache = db.discoverDao()
+        val cacheKey = "season:en:${title.tmdbId}:$season"
+        val now = System.currentTimeMillis()
+        val old = cache.cached(cacheKey)
+        val cached = old?.data?.let { runCatching { Json.decodeFromString<Map<Int, TmdbEpisode>>(it) }.getOrNull() }
+        if (old != null && cached != null && LocalizedOverview.isCached(old.fetchedAt, now)) return cached
+        val key = settings.apiKey() ?: return cached.orEmpty()
+        return try {
+            val episodes =
+                withTimeoutOrNull(4_000L) { tmdb.season(key, title.tmdbId, season) } ?: return cached.orEmpty()
+            val metadata =
+                episodes
+                    .asSequence()
+                    .mapNotNull { item -> item.number?.let { it to item } }
+                    .take(64)
+                    .toMap()
+            db.withTransaction {
+                cache.putCache(DiscoverCacheEntity(cacheKey, Json.encodeToString(metadata), now))
+                cache.trimSeasons()
+            }
+            metadata
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            cached.orEmpty()
+        }
+    }
+
     /** Distribuția de la TMDB (o cerere, ținută în memorie). null dacă nu avem cheie sau titlul e local. */
     suspend fun credits(title: TitleEntity): Credits? {
         if (title.isLocal) return null

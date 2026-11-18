@@ -149,6 +149,12 @@ class TmdbClient(
         return json.decodeFromString<TmdbEpisode>(body)
     }
 
+    suspend fun season(key: String, tmdbId: Long, season: Int): List<TmdbEpisode> {
+        val path = url("tv/$tmdbId/season/$season").addQueryParameter("language", METADATA_LANGUAGE)
+        val body = get(key, path.build(), strict = true, cancellable = true) ?: return emptyList()
+        return json.decodeFromString<TmdbSeason>(body).episodes
+    }
+
     suspend fun images(key: String, type: MediaType, tmdbId: Long): TmdbImages {
         val path = if (type == MediaType.TV) "tv/$tmdbId/images" else "movie/$tmdbId/images"
         val images =

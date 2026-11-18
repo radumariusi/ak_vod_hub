@@ -196,6 +196,11 @@ class DetailsViewModel
             return repository.episodeMetadata(title, episode.season, number)
         }
 
+        suspend fun seasonMetadata(season: Int): Map<Int, TmdbEpisode> {
+            val title = state.value.details?.title ?: return emptyMap()
+            return repository.seasonMetadata(title, season)
+        }
+
         fun toggleWatchlist() = changeLibrary { id -> repository.setInWatchlist(id, !mutableState.value.inWatchlist) }
 
         fun toggleWatched() = changeLibrary { id -> repository.markWatched(id, !mutableState.value.watched) }
