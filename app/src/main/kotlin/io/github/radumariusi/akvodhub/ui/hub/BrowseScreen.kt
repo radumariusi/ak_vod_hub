@@ -185,6 +185,7 @@ fun BrowseScreen(
                                 onFocused = { if (showHero) preview.value = card },
                                 requestFocus = key == restoreKey,
                                 onFocusRequested = onRestored,
+                                showTitle = search,
                             )
                         }
                     }

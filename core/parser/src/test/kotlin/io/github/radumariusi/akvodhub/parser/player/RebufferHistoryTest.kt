@@ -12,15 +12,28 @@ class RebufferHistoryTest {
         history.buffering(0)
         assertFalse(history.ready(300))
         history.buffering(3_000)
-        assertFalse(history.ready(5_000))
+        assertFalse(history.ready(3_800))
         history.buffering(7_000)
-        assertFalse(history.ready(9_000))
+        assertFalse(history.ready(7_700))
         history.buffering(12_000)
-        assertTrue(history.ready(14_000))
+        assertTrue(history.ready(12_600))
+        assertEquals(3, history.totalCount)
+        assertEquals(2_100L, history.totalDurationMs)
         history.buffering(15_000)
         assertFalse(history.ready(17_000))
         history.buffering(90_000)
         assertFalse(history.ready(92_000))
+    }
+
+    @Test
+    fun twoCostlyStallsTriggerRecoveryButOldStallsDoNot() {
+        val history = RebufferHistory()
+        history.buffering(0)
+        assertFalse(history.ready(2_100))
+        history.buffering(40_000)
+        assertFalse(history.ready(42_100))
+        history.buffering(45_000)
+        assertTrue(history.ready(46_900))
     }
 
     @Test

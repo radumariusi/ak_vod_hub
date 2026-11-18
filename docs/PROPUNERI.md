@@ -175,6 +175,13 @@ Vezi detalii despre schema Room și limitele cunoscute în [HANDOFF.md](HANDOFF.
 - Sigla decodată se citește direct din memoria Coil pe Acasă, Filme și Seriale. Titlul curent are prioritate față de cei până la patru vecini.
 - Episoadele au rânduri cu miniatură, titlu și stare, selector de sezon și redare cu OK. Titlul, descrierea, durata și imaginea TMDB se cer la focus stabil.
 
+## Sigle și stabilitate după v0.1.44
+
+- Cereri limitate în timp pentru lista și imaginea siglei. Vecinii încep devreme și păstrează cererea când primesc focus. Filme și Seriale folosesc posterele de pe Acasă.
+- Recuperarea Media3 se aplică la 4K și rezoluții mai mici, cu reducerea bitrate-ului sau trecerea la o rezervă disponibilă.
+- Setări → Redare afișează ordinea automată 4K EN, RO sau MULTI și regulile de surse configurate.
+- Focusul revine la fila activă sau la categoria deschisă din Setări la ieșirea direcțională din conținut.
+
 ## Ce ar îngreuna aplicația (de evitat sau doar opțional)
 
 1. **Trailere redate în aplicație / pe fundal** (YouTube, WebView): megabytes în plus și RAM. → Deschidem aplicația YouTube.

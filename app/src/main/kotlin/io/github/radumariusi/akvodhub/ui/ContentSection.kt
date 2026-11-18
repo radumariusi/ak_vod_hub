@@ -24,7 +24,7 @@ fun ContentSection(viewModel: PlaybackSettingsViewModel) {
         OutlinedButton(onClick = { viewModel.setPreferOriginalLanguage(!prefs.preferOriginalLanguage) }) {
             Text("Preferă limba originală: " + if (prefs.preferOriginalLanguage) "da" else "nu")
         }
-        Text("Original înaintea profilului, apoi MULTI. Sursa aleasă manual are prioritate.")
+        Text("În modul automat, prioritizează sursele care declară limba originală. Se aplică la următoarea redare.")
         OutlinedButton(onClick = { viewModel.setHideAdultMovies(!prefs.hideAdultMovies) }) {
             Text("Filme din categorii pentru adulți · " + if (prefs.hideAdultMovies) "Ascunse" else "Afișate")
         }

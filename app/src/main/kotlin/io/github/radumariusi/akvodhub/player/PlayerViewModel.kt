@@ -31,6 +31,7 @@ import io.github.radumariusi.akvodhub.parser.match.SourceInfo
 import io.github.radumariusi.akvodhub.parser.player.BufferPreset
 import io.github.radumariusi.akvodhub.parser.player.EpisodeOrder
 import io.github.radumariusi.akvodhub.parser.player.FallbackQueue
+import io.github.radumariusi.akvodhub.parser.player.PlaybackRecovery
 import io.github.radumariusi.akvodhub.parser.player.RebufferHistory
 import io.github.radumariusi.akvodhub.parser.player.Resume
 import io.github.radumariusi.akvodhub.parser.player.SeekNavigation
@@ -40,7 +41,6 @@ import io.github.radumariusi.akvodhub.parser.stremio.AddonSubtitle
 import io.github.radumariusi.akvodhub.parser.stremio.SubtitleChoice
 import io.github.radumariusi.akvodhub.parser.stremio.SubtitleLanguages
 import io.github.radumariusi.akvodhub.parser.subtitle.SubtitleDocument
-import io.github.radumariusi.akvodhub.parser.title.VideoQuality
 import io.github.radumariusi.akvodhub.parser.title.VideoResolution
 import io.github.radumariusi.akvodhub.ui.hub.sourceLabel
 import io.github.radumariusi.akvodhub.ui.hub.sourceShortLabel
@@ -178,7 +178,8 @@ class PlayerViewModel
         private var startPosition = 0L
         private var generation = 0
         private var watchdog: Job? = null
-        private val rebufferHistory = RebufferHistory()
+        private var rebufferHistory = RebufferHistory()
+        private var adaptiveSteps = 0
         private var countdownJob: Job? = null
         private var sleepJob: Job? = null
         private var sleepTimer = SleepTimer()
@@ -199,26 +200,23 @@ class PlayerViewModel
         private val listener =
             object : Player.Listener {
                 override fun onPlaybackStateChanged(playbackState: Int) {
+                    if (player.currentMediaItem?.mediaId != queue?.current?.toString()) return
                     when (playbackState) {
                         Player.STATE_READY -> {
                             watchdog?.cancel()
+                            mutableState.update { it.copy(loading = false) }
                             if (!started) {
                                 started = true
-                                retriedSame = false
-                            } else if (player.playWhenReady && rebufferHistory.ready(SystemClock.elapsedRealtime()) &&
-                                queue?.hasMore == true
-                            ) {
-                                sourceFailed("buffer repetat", preferLowerQuality = true)
-                                return
+                            } else if (player.playWhenReady && rebufferHistory.ready(SystemClock.elapsedRealtime())) {
+                                recoverUnstableSource("întreruperi repetate")
                             }
-                            mutableState.update { it.copy(loading = false) }
                         }
 
                         Player.STATE_BUFFERING -> {
                             mutableState.update { it.copy(loading = true) }
                             if (started && player.playWhenReady) {
                                 rebufferHistory.buffering(SystemClock.elapsedRealtime())
-                                startWatchdog(STALL_TIMEOUT_MS, "s-a blocat (nu mai vin date)")
+                                startStallWatchdog()
                             }
                         }
 
@@ -235,8 +233,12 @@ class PlayerViewModel
                         watchdog?.cancel()
                         rebufferHistory.reset()
                     } else if (player.playbackState == Player.STATE_BUFFERING) {
-                        val timeout = if (started) STALL_TIMEOUT_MS else START_TIMEOUT_MS
-                        startWatchdog(timeout, "bufferul nu se umple")
+                        if (started) {
+                            rebufferHistory.buffering(SystemClock.elapsedRealtime())
+                            startStallWatchdog()
+                        } else {
+                            startWatchdog(START_TIMEOUT_MS, "bufferul nu se umple")
+                        }
                     }
                 }
 
@@ -253,12 +255,13 @@ class PlayerViewModel
                 }
 
                 override fun onPlayerError(error: PlaybackException) {
+                    if (player.currentMediaItem?.mediaId != queue?.current?.toString()) return
                     if (started && !retriedSame && PlaybackErrors.isNetwork(error)) {
                         // Mergea: întâi o reîncercare a aceleiași surse (o întrerupere scurtă a rețelei).
                         retriedSame = true
                         showNotice("Conexiunea s-a întrerupt, reiau sursa…")
                         player.prepare()
-                        startWatchdog(START_TIMEOUT_MS, "nu mai răspunde")
+                        startStallWatchdog()
                         return
                     }
                     sourceFailed(PlaybackErrors.describe(error))
@@ -273,6 +276,7 @@ class PlayerViewModel
                 }
 
                 override fun onTracksChanged(tracks: Tracks) {
+                    if (player.currentMediaItem?.mediaId != queue?.current?.toString()) return
                     if (tracks.containsType(C.TRACK_TYPE_VIDEO) && !tracks.isTypeSupported(C.TRACK_TYPE_VIDEO)) {
                         val codec = TrackOptions.videoCodec(tracks)?.let { "$it " }.orEmpty()
                         sourceFailed("video ${codec}nesuportat de acest TV")
@@ -369,8 +373,7 @@ class PlayerViewModel
                             0L
                         }
                     }
-                val chosen = request.entryId ?: watch?.entryId?.takeIf { request.resume && resumeAt > 0 }
-                playEpisode(episode, chosen, resumeAt)
+                playEpisode(episode, request.entryId, resumeAt)
             } else {
                 this.details = details.sources
                 val all = details.groups.flatMap { g -> g.languages.flatMap { it.sources } }
@@ -379,8 +382,7 @@ class PlayerViewModel
                     return
                 }
                 val resumeAt = if (request.resume) watch?.positionMs ?: 0L else 0L
-                val chosen = request.entryId ?: watch?.entryId?.takeIf { request.resume }
-                play(all, chosen, resumeAt)
+                play(all, request.entryId, resumeAt)
             }
         }
 
@@ -417,10 +419,16 @@ class PlayerViewModel
             generation++
             val gen = generation
             started = false
-            rebufferHistory.reset()
+            rebufferHistory = RebufferHistory()
+            adaptiveSteps = 0
             retriedSame = false
             embeddedTextLanguages = null
-            player.trackSelectionParameters = PlayerFactory.apply(player.trackSelectionParameters, trackPreferences())
+            val resetVideoLimit =
+                player.trackSelectionParameters
+                    .buildUpon()
+                    .setMaxVideoBitrate(Int.MAX_VALUE)
+                    .build()
+            player.trackSelectionParameters = PlayerFactory.apply(resetVideoLimit, trackPreferences())
             startPosition = positionMs
             player.playWhenReady = autoplay
             mutableState.update {
@@ -454,43 +462,81 @@ class PlayerViewModel
             }
         }
 
-        private fun startWatchdog(
-            timeoutMs: Long,
-            reason: String,
-        ) {
+        private fun startWatchdog(timeoutMs: Long, reason: String, onTimeout: () -> Unit = { sourceFailed(reason) }) {
             watchdog?.cancel()
             val gen = generation
             watchdog =
                 viewModelScope.launch {
                     delay(timeoutMs)
-                    if (gen == generation && player.playWhenReady) sourceFailed(reason)
+                    if (gen == generation && player.playWhenReady) onTimeout()
                 }
         }
 
+        private fun startStallWatchdog() {
+            startWatchdog(STALL_TIMEOUT_MS, "bufferul nu se umple") {
+                if (player.playbackState != Player.STATE_BUFFERING) return@startWatchdog
+                val reason = "bufferul nu se umple"
+                if (!recoverUnstableSource(reason) && !reconnectStalledSource()) sourceFailed(reason)
+            }
+        }
+
+        private fun recoverUnstableSource(reason: String): Boolean {
+            val current = player.videoFormat
+            val bitrates =
+                player.currentTracks.groups
+                    .filter { it.type == C.TRACK_TYPE_VIDEO && it.isSelected && it.isAdaptiveSupported }
+                    .flatMap { group ->
+                        (0 until group.length).filter(group::isTrackSupported).map { group.getTrackFormat(it).bitrate }
+                    }
+            val params = player.trackSelectionParameters
+            val lower = PlaybackRecovery.lowerBitrate(current?.bitrate ?: 0, params.maxVideoBitrate, bitrates)
+            if (lower != null) {
+                player.trackSelectionParameters = params.buildUpon().setMaxVideoBitrate(lower).build()
+                adaptiveSteps++
+                showNotice("Redarea se întrerupe. Reduc bitrate-ul și păstrez aceeași sursă.")
+                if (player.playbackState == Player.STATE_BUFFERING) startStallWatchdog()
+                return true
+            }
+            if (queue?.hasMore != true) return false
+            sourceFailed(reason, preferLighter = true)
+            return true
+        }
+
+        /** O singură reconectare dacă ultima sursă s-a blocat după ce a redat deja. */
+        private fun reconnectStalledSource(): Boolean {
+            if (retriedSame) return false
+            val item = player.currentMediaItem ?: return false
+            val position = player.currentPosition.coerceAtLeast(0)
+            retriedSame = true
+            rebufferHistory.reset()
+            showNotice("Bufferul nu se umple. Reconectez sursa de la aceeași poziție.")
+            player.stop()
+            player.setMediaItem(item, position)
+            player.prepare()
+            startStallWatchdog()
+            return true
+        }
+
         /** Sursa curentă nu merge: trecem la următoarea, de la aceeași poziție. */
-        private fun sourceFailed(reason: String, preferLowerQuality: Boolean = false) {
+        private fun sourceFailed(reason: String, preferLighter: Boolean = false) {
             val q = queue ?: return
             val failed = q.current ?: return
             watchdog?.cancel()
             val position = if (started) player.currentPosition.coerceAtLeast(0) else startPosition
             val autoplay = player.playWhenReady
             val preferred =
-                if (preferLowerQuality && (
-                        sources[failed]?.quality == VideoQuality.UHD ||
-                            VideoResolution.quality(player.videoSize.width, player.videoSize.height) == VideoQuality.UHD
-                    )
-                ) {
-                    val languages = sources[failed]?.languages.orEmpty()
-                    q.candidates
-                        .asSequence()
-                        .filter { it != failed && q.reasonFor(it) == null }
-                        .mapNotNull(sources::get)
-                        .filter { it.quality in listOf(VideoQuality.FHD, VideoQuality.HD, VideoQuality.SD) }
-                        .sortedWith(
-                            compareByDescending<SourceInfo> { source -> source.languages.any { it in languages } }
-                                .thenByDescending { it.quality },
-                        ).firstOrNull()
-                        ?.id
+                if (preferLighter) {
+                    val currentQuality =
+                        VideoResolution.quality(player.videoSize.width, player.videoSize.height)
+                            ?: sources[failed]?.quality
+                    val available =
+                        q.candidates
+                            .filter {
+                                it != failed && q.reasonFor(
+                                    it,
+                                ) == null
+                            }.mapNotNull(sources::get)
+                    PlaybackRecovery.lighterSource(currentQuality, sources[failed]?.languages.orEmpty(), available)
                 } else {
                     null
                 }
@@ -502,7 +548,9 @@ class PlayerViewModel
                     it.copy(
                         loading = false,
                         error =
-                            if (q.size == 1) {
+                            if (started) {
+                                "Redarea s-a oprit. Nu mai sunt surse de rezervă."
+                            } else if (q.size == 1) {
                                 "Sursa nu a pornit."
                             } else {
                                 "Niciuna din cele ${q.size} surse nu a pornit."
@@ -513,9 +561,7 @@ class PlayerViewModel
                 }
                 return
             }
-            showNotice(
-                "Sursa ${short(failed)} a eșuat ($reason). Trec la ${short(next)}.",
-            )
+            showNotice("Sursa ${short(failed)}: $reason. Continui pe ${short(next)}.")
             playCurrent(position, autoplay)
         }
 
@@ -904,6 +950,10 @@ class PlayerViewModel
                 "Bitrate audio: ${bitrate(audio?.averageBitrate)}",
                 "Cadre pierdute: ${counters?.droppedBufferCount ?: 0} (sursa curentă)",
                 "Buffer disponibil: ${player.totalBufferedDuration.coerceAtLeast(0) / 1000} s",
+                "Întreruperi de buffer: ${rebufferHistory.totalCount} · ${Resume.format(
+                    rebufferHistory.totalDurationMs,
+                )} total",
+                "Reduceri de bitrate pe sursa curentă: $adaptiveSteps",
                 "Passthrough solicitat la deschidere: ${if (passthroughRequested) "da, dacă ieșirea permite" else "nu"}",
                 "Compresie PCM: ${if (nightModeEnabled) "mod noapte" else "dezactivată"}",
             ).joinToString("\n")
@@ -1113,7 +1163,7 @@ class PlayerViewModel
 
         companion object {
             const val START_TIMEOUT_MS = 25_000L
-            const val STALL_TIMEOUT_MS = 45_000L
+            const val STALL_TIMEOUT_MS = 16_000L
             const val SAVE_EVERY_MS = 15_000L
             const val NOTICE_MS = 7_000L
             const val NEXT_COUNTDOWN_S = 10

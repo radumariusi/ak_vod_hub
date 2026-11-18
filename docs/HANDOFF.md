@@ -428,3 +428,28 @@ La 220 ms de focus stabil se cer numele, descrierea, miniatura și durata TMDB p
 Rândul rămâne utilizabil cu datele din playlist și, dacă există, imaginea serialului. Cache-ul existent
 `discover_cache` păstrează până la 64 de rezultate pentru episoade, cu prefixul nou `episode:en:v2:`
 și rezervă pentru descrierile vechi offline. Fără migrare Room sau dependențe noi.
+
+
+### Sigle și stabilitate după v0.1.44
+
+Căutarea siglelor folosește un buget de 2,5 s pentru lista TMDB, fără blocaj global între titluri. Hero
+încearcă variantele cu 1,6 s per imagine și cel mult 6 s în total, cu PNG w300. Fișa păstrează PNG w500,
+cu cel mult 2 s per imagine. SVG folosește originalul. Lipsa confirmată se salvează în cache, iar timeout-ul
+permite reîncercarea la revenire. După 180 ms de focus, se încearcă pe rând până la patru vecini, în paralel
+cu titlul curent. Când un vecin deja în curs primește focus, cererea continuă. Cererile celorlalte titluri
+se anulează, iar intrarea în fundal anulează toate cererile hero. Filme și Seriale folosesc posterele portret
+de pe Acasă, cu notele jos și titlul în hero, în accesibilitate și ca rezervă dacă imaginea lipsește.
+
+Media3 păstrează țintele de memorie ale celor trei profiluri. Normal și Mare au o rezervă inițială mai
+mare în timp. Trei întreruperi de cel puțin 400 ms sau două care însumează 4 s în 35 s declanșează
+recuperarea. La o blocare de 16 s playerul poate reduce bitrate-ul pe fluxul adaptiv ori trece la o
+rezervă mai ușoară, preferând audio declarat în comun. Dacă ultima sursă este blocată, o reconectează
+o singură dată de la poziția curentă. Panoul tehnic afișează numărul întreruperilor și reducerile de bitrate.
+
+În lipsa regulilor personalizate, alegerea automată (inclusiv la reluare) pune 4K EN, RO sau MULTI înaintea
+celorlalte surse cu aceleași etichete, apoi încearcă restul. Limba originală, dacă e activată, și alegerea manuală
+își păstrează prioritatea. Reluarea păstrează poziția. Fără migrare Room sau dependențe noi.
+
+Sus din conținut intră în fila activă a meniului principal, inclusiv când aceasta trebuie derulată în cadru.
+Stânga la ieșirea din panoul de opțiuni readuce focusul pe categoria deschisă. Navigarea internă în liste
+și mutarea cursorului în editor rămân în grija componentelor.

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -27,14 +28,22 @@ import coil3.compose.AsyncImage
 import coil3.compose.asPainter
 import coil3.request.ImageRequest
 import coil3.svg.SvgDecoder
+import kotlinx.coroutines.delay
 import coil3.Image as CoilImage
 
 /** Textul rămâne vizibil până când logo-ul chiar s-a încărcat, inclusiv offline. */
 @Composable
 fun TitleHeading(name: String, logoPaths: List<String>, height: Dp = 76.dp) {
     var candidate by remember(name, logoPaths) { mutableIntStateOf(0) }
-    val path = logoPaths.getOrNull(candidate)
+    val index = candidate
+    val path = logoPaths.getOrNull(index)
     var loaded by remember(name, path) { mutableStateOf(false) }
+    LaunchedEffect(name, path, loaded) {
+        if (path != null && !loaded) {
+            delay(2_000)
+            if (candidate == index) candidate = index + 1
+        }
+    }
     Box(Modifier.widthIn(max = 360.dp).height(height), contentAlignment = Alignment.CenterStart) {
         if (!loaded) {
             TitleHeadingText(name)
@@ -49,7 +58,7 @@ fun TitleHeading(name: String, logoPaths: List<String>, height: Dp = 76.dp) {
                     contentScale = ContentScale.Fit,
                     alignment = Alignment.CenterStart,
                     onSuccess = { loaded = true },
-                    onError = { candidate++ },
+                    onError = { if (candidate == index) candidate = index + 1 },
                     modifier = Modifier.fillMaxSize(),
                 )
             }
@@ -89,10 +98,10 @@ private fun TitleHeadingText(name: String) {
     )
 }
 
-internal fun logoRequest(context: Context, path: String): ImageRequest.Builder =
+internal fun logoRequest(context: Context, path: String, rasterSize: String = "w500"): ImageRequest.Builder =
     ImageRequest
         .Builder(context)
-        .data(Images.logo(path))
+        .data(Images.logo(path, rasterSize))
         .apply {
             if (path.endsWith(".svg", ignoreCase = true)) {
                 decoderFactory(SvgDecoder.Factory(density = SvgDecoder.NO_DENSITY))

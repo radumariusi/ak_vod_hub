@@ -44,9 +44,12 @@ data class SourceProfile(
         fallbackLanguages: List<String> = emptyList(),
         originalLanguage: String? = null,
     ): List<SourceInfo> {
-        val base = SourceGrouping.ordered(sources, (languages + fallbackLanguages).distinct())
+        val base =
+            SourceGrouping.ordered(
+                sources,
+                (languages + fallbackLanguages + DEFAULT_LANGUAGES.takeIf { rules.isEmpty() }.orEmpty()).distinct(),
+            )
         val original = OriginalLanguage.code(originalLanguage)
-        if (rules.isEmpty() && original == null) return base
         return base
             .withIndex()
             .sortedWith(
@@ -60,6 +63,13 @@ data class SourceProfile(
 
     /** 2 × indexul primei reguli respectate (+1 dacă doar „MULTI” ar putea-o respecta); la final, restul. */
     private fun rank(source: SourceInfo): Int {
+        if (rules.isEmpty()) {
+            return when {
+                !hasDefaultLanguage(source) -> 2
+                source.quality == VideoQuality.UHD -> 0
+                else -> 1
+            }
+        }
         rules.forEachIndexed { i, rule ->
             if (rule.matches(source)) return 2 * i
             if (rule.matchesMulti(source)) return 2 * i + 1
@@ -76,6 +86,10 @@ data class SourceProfile(
 
     companion object {
         private const val ANY = "*"
+        private val DEFAULT_LANGUAGES = listOf("en", "ro", ParsedTitle.MULTI)
+
+        fun hasDefaultLanguage(source: SourceInfo): Boolean = source.languages.any { it in DEFAULT_LANGUAGES }
+
         const val MAX_RULES = 4
 
         fun decode(value: String?): SourceProfile {

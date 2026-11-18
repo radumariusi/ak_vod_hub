@@ -19,9 +19,16 @@ class PlayerLogicTest {
     private val all = listOf(fhdEn, hdMulti, uhdDe, fhdRo, uhdEn)
 
     @Test
-    fun `fara profil ordinea e cea obisnuita`() {
+    fun `implicit sursele EN RO si MULTI vin primele`() {
         val order = SourceProfile().order(all, listOf("en")).map { it.id }
-        assertEquals(listOf(1L, 2L, 4L, 3L, 5L), order)
+        assertEquals(listOf(1L, 4L, 3L, 5L, 2L), order)
+    }
+
+    @Test
+    fun `4K RO si MULTI au prioritate fata de 1080p EN`() {
+        val uhdRo = SourceInfo(7, VideoQuality.UHD, languages = listOf("ro"))
+        val uhdMulti = SourceInfo(8, VideoQuality.UHD, languages = listOf("mul"))
+        assertEquals(listOf(7L, 8L, 4L, 2L), SourceProfile().order(listOf(uhdDe, fhdEn, uhdMulti, uhdRo)).map { it.id })
     }
 
     @Test

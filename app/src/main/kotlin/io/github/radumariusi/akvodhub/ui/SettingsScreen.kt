@@ -22,6 +22,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -75,7 +76,7 @@ fun SettingsScreen(
         listOf("Conținut", "Aspect", "Redare", "Audio", "Subtitrări", "Surse și playlist-uri", "Servicii", "Sistem")
     var selected by rememberSaveable { mutableStateOf(0) }
     var inOptions by remember { mutableStateOf(false) }
-    val categoryFocus = remember { List(8) { FocusRequester() } }
+    val categoryFocus = remember { List(categories.size) { FocusRequester() } }
     val optionsFocus = remember { FocusRequester() }
     val saved = rememberSaveableStateHolder()
     LaunchedEffect(adding, phoneSetup) {
@@ -141,8 +142,13 @@ fun SettingsScreen(
                     .fillMaxHeight()
                     .focusRequester(optionsFocus)
                     .onFocusChanged { inOptions = it.hasFocus }
-                    .focusProperties { left = categoryFocus[selected] }
-                    .focusGroup()
+                    .focusProperties {
+                        onExit = {
+                            if (requestedFocusDirection == FocusDirection.Left) {
+                                categoryFocus[selected].requestFocus()
+                            }
+                        }
+                    }.focusGroup()
                     .verticalScroll(rememberScrollState())
                     .padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),

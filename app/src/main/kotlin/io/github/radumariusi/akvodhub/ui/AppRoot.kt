@@ -5,6 +5,7 @@ package io.github.radumariusi.akvodhub.ui
 import androidx.activity.compose.BackHandler
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,16 +14,23 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
@@ -49,6 +57,7 @@ import io.github.radumariusi.akvodhub.ui.hub.WatchlistScreen
 import io.github.radumariusi.akvodhub.update.UpdateViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 
 enum class Destination(
     val label: String,
@@ -209,18 +218,7 @@ fun AppRoot(
                     TitleBackdrop(homeBackdrop, Modifier.matchParentSize(), opacity = 0.65f)
                 }
                 Column(Modifier.fillMaxSize()) {
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        contentPadding = PaddingValues(horizontal = 32.dp, vertical = 12.dp),
-                    ) {
-                        items(Destination.entries, key = { it.name }) { destination ->
-                            SelectionTab(
-                                label = destination.label,
-                                active = current == destination,
-                                onClick = { current = destination },
-                            )
-                        }
-                    }
+                    MainTabs(current) { current = it }
                     Box(Modifier.weight(1f).padding(start = 32.dp, top = 8.dp, end = 32.dp, bottom = 8.dp)) {
                         // Fiecare ecran își păstrează derularea când treci prin meniu sau prin detalii.
                         states.SaveableStateProvider(current.name) {
@@ -309,6 +307,44 @@ fun AppRoot(
             onInstall = updateViewModel::downloadAndInstall,
             onDismiss = updateViewModel::dismissDialog,
         )
+    }
+}
+
+@Composable
+private fun MainTabs(current: Destination, onSelect: (Destination) -> Unit) {
+    val tabs = remember { Destination.entries.associateWith { FocusRequester() } }
+    val list = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    LazyRow(
+        state = list,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingValues(horizontal = 32.dp, vertical = 12.dp),
+        modifier =
+            Modifier
+                .focusProperties {
+                    onEnter = {
+                        if (requestedFocusDirection == FocusDirection.Up) {
+                            val active = tabs.getValue(current)
+                            if (!runCatching { active.requestFocus() }.getOrDefault(false)) {
+                                cancelFocusChange()
+                                scope.launch {
+                                    list.scrollToItem(current.ordinal)
+                                    withFrameNanos { }
+                                    runCatching { active.requestFocus() }
+                                }
+                            }
+                        }
+                    }
+                }.focusGroup(),
+    ) {
+        items(Destination.entries, key = { it.name }) { destination ->
+            SelectionTab(
+                label = destination.label,
+                active = current == destination,
+                modifier = Modifier.focusRequester(tabs.getValue(destination)),
+                onClick = { onSelect(destination) },
+            )
+        }
     }
 }
 

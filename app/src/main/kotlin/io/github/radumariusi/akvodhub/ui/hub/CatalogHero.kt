@@ -11,9 +11,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -26,6 +28,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.Image
@@ -35,8 +39,12 @@ import coil3.memory.MemoryCache
 import coil3.request.SuccessResult
 import coil3.size.Scale
 import io.github.radumariusi.akvodhub.data.db.TitleCard
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.roundToInt
 
 @Composable
@@ -90,26 +98,54 @@ internal fun CatalogHero(
 
     fun cached(id: Long): Image? = imageLoader.memoryCache?.get(MemoryCache.Key(logoKey(id)))?.image
 
-    suspend fun load(id: Long): Image? {
-        cached(id)?.let { return it }
-        val density = context.resources.displayMetrics.density
-        for (path in logo(id)) {
-            val request =
-                logoRequest(context, path)
-                    .memoryCacheKey(logoKey(id))
-                    .size((360 * density).roundToInt(), (76 * density).roundToInt())
-                    .scale(Scale.FIT)
-                    .build()
-            val result = imageLoader.execute(request)
-            if (result is SuccessResult) return result.image
+    suspend fun load(id: Long): Image? =
+        cached(id) ?: withTimeoutOrNull(6_000L) {
+            val density = context.resources.displayMetrics.density
+            for (path in logo(id)) {
+                val request =
+                    logoRequest(context, path, rasterSize = "w300")
+                        .memoryCacheKey(logoKey(id))
+                        .size((360 * density).roundToInt(), (76 * density).roundToInt())
+                        .scale(Scale.FIT)
+                        .build()
+                val result = withTimeoutOrNull(1_600L) { imageLoader.execute(request) }
+                if (result is SuccessResult) return@withTimeoutOrNull result.image
+            }
+            null
         }
-        return null
+
+    val scope = rememberCoroutineScope()
+    val requests = remember { mutableMapOf<Long, Deferred<Image?>>() }
+
+    fun keepRequest(id: Long?) {
+        val iterator = requests.iterator()
+        while (iterator.hasNext()) {
+            val (titleId, request) = iterator.next()
+            if (titleId != id) {
+                request.cancel()
+                iterator.remove()
+            }
+        }
     }
 
+    suspend fun awaitLogo(id: Long): Image? {
+        cached(id)?.let { return it }
+        val request = requests.getOrPut(id) { scope.async(start = CoroutineStart.LAZY) { load(id) } }
+        try {
+            return request.await()
+        } finally {
+            if (request.isCompleted && requests[id] === request) requests.remove(id)
+        }
+    }
+
+    val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateFlow
+        .collectAsState()
+    val foreground = lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
     val cachedLogo = cached(target.id)
     var presentation by remember { mutableStateOf(HeroPresentation(target, cachedLogo)) }
-    var settled by remember(target.id) { mutableStateOf(cachedLogo != null) }
-    LaunchedEffect(target.id) {
+    LaunchedEffect(target.id, foreground) {
+        keepRequest(target.id.takeIf { foreground })
+        if (!foreground) return@LaunchedEffect
         val readyLogo = cached(target.id)
         if (readyLogo != null) {
             presentation = HeroPresentation(latestTarget, readyLogo)
@@ -119,20 +155,19 @@ internal fun CatalogHero(
                     delay(300)
                     presentation = HeroPresentation(latestTarget, null)
                 }
-            val loaded = load(target.id)
+            val loaded = awaitLogo(target.id)
             if (loaded != null) {
                 showText.cancel()
                 presentation = HeroPresentation(latestTarget, loaded)
             }
         }
-        settled = true
     }
     val latestNeighbors by rememberUpdatedState(neighborTitleIds)
-    LaunchedEffect(target.id, settled) {
-        if (settled) {
-            delay(350)
+    LaunchedEffect(target.id, foreground) {
+        if (foreground) {
+            delay(180)
             val neighbors = latestNeighbors().distinct().filterNot { it == target.id }
-            for (neighbor in neighbors) load(neighbor)
+            for (neighbor in neighbors) awaitLogo(neighbor)
         }
     }
     val display = if (cachedLogo != null) HeroPresentation(target, cachedLogo) else presentation
