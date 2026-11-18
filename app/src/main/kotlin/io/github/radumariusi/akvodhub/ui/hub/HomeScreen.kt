@@ -11,14 +11,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -47,6 +50,7 @@ import io.github.radumariusi.akvodhub.player.PlayerActivity
 import io.github.radumariusi.akvodhub.ui.formatCount
 import io.github.radumariusi.akvodhub.ui.touch.Button
 import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
+import kotlin.math.abs
 
 /**
  * Acasă: în sus, fișa titlului cu focus (fundal, descriere); dedesubt, rânduri orizontale
@@ -111,6 +115,8 @@ private fun HomeRows(
     var initialFocusDone by rememberSaveable { mutableStateOf(false) }
     val focusKey = restoreKey ?: if (!initialFocusDone) cardKey(rows[0], rows[0].items[0]) else null
     val focused = remember { mutableStateOf<TitleCard?>(null) }
+    val focusedRowKey = remember { mutableStateOf<String?>(null) }
+    val visibleRows = remember { mutableStateMapOf<String, LazyListState>() }
     var choice by remember { mutableStateOf<Choice?>(null) }
     var returnToCard by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
@@ -160,6 +166,9 @@ private fun HomeRows(
                     viewModel::logo,
                     heroHeight,
                     onBackdropChanged,
+                    neighborTitleIds = {
+                        homeLogoNeighbors(rows, focusedRowKey.value, focused.value?.id, visibleRows)
+                    },
                 )
             }
             LazyColumn(
@@ -169,10 +178,15 @@ private fun HomeRows(
                 modifier = Modifier.weight(1f).clipToBounds(),
             ) {
                 items(rows, key = { it.key }) { row ->
+                    val rowState = rememberLazyListState()
+                    DisposableEffect(row.key, rowState) {
+                        visibleRows[row.key] = rowState
+                        onDispose { visibleRows.remove(row.key) }
+                    }
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(row.title, style = MaterialTheme.typography.titleMedium)
                         LazyRow(
-                            state = rememberLazyListState(),
+                            state = rowState,
                             horizontalArrangement = Arrangement.spacedBy(14.dp),
                             contentPadding = PaddingValues(horizontal = 6.dp, vertical = 10.dp),
                             modifier = Modifier.focusRestorer(),
@@ -191,6 +205,7 @@ private fun HomeRows(
                                             }
                                         },
                                         onFocused = {
+                                            focusedRowKey.value = row.key
                                             focused.value = card
                                             viewModel.onItemFocused(row.key, index)
                                         },
@@ -216,6 +231,37 @@ private fun HomeRows(
         }
     }
     choice?.let { ChoiceDialog(it, onDismiss = { choice = null }) }
+}
+
+private fun homeLogoNeighbors(
+    rows: List<HomeRow>,
+    rowKey: String?,
+    titleId: Long?,
+    rowStates: Map<String, LazyListState>,
+): List<Long> {
+    val rowIndex = rows.indexOfFirst { it.key == rowKey }.coerceAtLeast(0)
+    val row = rows[rowIndex]
+    val index = row.items.indexOfFirst { it.id == titleId }
+    if (titleId != null && index < 0) return emptyList()
+    val current = index.coerceAtLeast(0)
+    val currentItem = rowStates[row.key]?.layoutInfo?.visibleItemsInfo?.firstOrNull { it.index == current }
+    val center = currentItem?.let { it.offset + it.size / 2 }
+
+    fun closest(other: HomeRow?): Long? {
+        other ?: return null
+        val item =
+            center?.let { x ->
+                rowStates[other.key]?.layoutInfo?.visibleItemsInfo?.minByOrNull { abs(it.offset + it.size / 2 - x) }
+            }
+        return other.items.getOrNull(item?.index ?: 0)?.id
+    }
+
+    return listOfNotNull(
+        row.items.getOrNull(current + 1)?.id,
+        row.items.getOrNull(current - 1)?.id,
+        closest(rows.getOrNull(rowIndex + 1)),
+        closest(rows.getOrNull(rowIndex - 1)),
+    )
 }
 
 private fun ContinueItem.progressLabel(): String? =

@@ -11,6 +11,7 @@ import io.github.radumariusi.akvodhub.data.db.EpisodeProgressEntity
 import io.github.radumariusi.akvodhub.data.db.WatchStateEntity
 import io.github.radumariusi.akvodhub.data.discover.DiscoverRepository
 import io.github.radumariusi.akvodhub.data.discover.TitleDiscovery
+import io.github.radumariusi.akvodhub.data.tmdb.TmdbEpisode
 import io.github.radumariusi.akvodhub.parser.catalog.MergedEpisode
 import io.github.radumariusi.akvodhub.parser.match.MediaType
 import io.github.radumariusi.akvodhub.parser.match.SourceInfo
@@ -189,10 +190,10 @@ class DetailsViewModel
                 originalLanguage,
             )
 
-        suspend fun episodeOverview(episode: MergedEpisode): String? {
+        suspend fun episodeMetadata(episode: MergedEpisode): TmdbEpisode? {
             val title = state.value.details?.title ?: return null
             val number = episode.number ?: return null
-            return repository.episodeOverview(title, episode.season, number)
+            return repository.episodeMetadata(title, episode.season, number)
         }
 
         fun toggleWatchlist() = changeLibrary { id -> repository.setInWatchlist(id, !mutableState.value.inWatchlist) }

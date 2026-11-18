@@ -78,11 +78,13 @@ object EpisodeMerge {
 
     private fun providerTitle(entry: EpisodeEntry): String? {
         if (!entry.episodeNameOnly) return null
-        val title = entry.name.trim()
-        if (title.isEmpty() || genericLabel.matches(title)) return null
+        val title = namedEpisode(entry.name) ?: return null
         if (episodeTag.containsMatchIn(title) || genericPrefix.containsMatchIn(title)) return null
         return title
     }
+
+    fun namedEpisode(title: String?): String? =
+        title?.trim()?.takeIf { it.isNotEmpty() && !genericLabel.matches(it) }
 
     /** Ce urmează după `S01E02` în numele din playlist; null dacă nu e nimic util. */
     fun episodeTitle(name: String): String? {

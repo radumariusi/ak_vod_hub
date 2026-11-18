@@ -72,4 +72,11 @@ class EpisodeMergeTest {
                 ).single()
         assertEquals(listOf(null, null, "The Reunion", "A New Day"), season.episodes.map { it.title })
     }
+
+    @Test
+    fun genericMetadataEpisodeNamesUseTheUiFallback() {
+        assertNull(EpisodeMerge.namedEpisode("Episode 5"))
+        assertNull(EpisodeMerge.namedEpisode("Episodio 05"))
+        assertEquals("The Beginning", EpisodeMerge.namedEpisode(" The Beginning "))
+    }
 }

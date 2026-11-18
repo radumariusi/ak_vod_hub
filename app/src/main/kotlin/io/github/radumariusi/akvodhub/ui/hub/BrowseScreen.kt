@@ -31,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -42,6 +43,7 @@ import io.github.radumariusi.akvodhub.hub.Browser
 import io.github.radumariusi.akvodhub.parser.catalog.CatalogFilter
 import io.github.radumariusi.akvodhub.parser.catalog.CatalogSort
 import io.github.radumariusi.akvodhub.parser.catalog.Genres
+import io.github.radumariusi.akvodhub.parser.catalog.HeroNeighbors
 import io.github.radumariusi.akvodhub.parser.catalog.LibraryFilter
 import io.github.radumariusi.akvodhub.parser.catalog.ProductionFilter
 import io.github.radumariusi.akvodhub.parser.catalog.YearRange
@@ -114,11 +116,26 @@ fun BrowseScreen(
     }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
+        val gridCells = GridCells.Adaptive(PosterWidth + 16.dp)
+        val columns =
+            with(LocalDensity.current) {
+                val available = (maxWidth.roundToPx() - 2 * 6.dp.roundToPx()).coerceAtLeast(0)
+                with(gridCells) { calculateCrossAxisCellSizes(available, 0).size }
+            }
         val heroHeight = (maxHeight - PosterHeight - 102.dp).coerceIn(104.dp, 196.dp).coerceAtMost(maxHeight * 0.4f)
         Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             val fallback = state.items.firstOrNull()
             if (showHero && fallback != null) {
-                CatalogHero(fallback, { preview.value }, loadLogo, heroHeight)
+                CatalogHero(
+                    fallback,
+                    { preview.value },
+                    loadLogo,
+                    heroHeight,
+                    neighborTitleIds = {
+                        val index = preview.value?.let { card -> state.items.indexOfFirst { it.id == card.id } } ?: 0
+                        HeroNeighbors.grid(index, columns, state.items.size).map { state.items[it].id }
+                    },
+                )
             }
             if (search) Text(title, style = MaterialTheme.typography.headlineMedium)
             if (search) {
@@ -155,7 +172,7 @@ fun BrowseScreen(
                 state.items.isNotEmpty() -> {
                     LazyVerticalGrid(
                         state = grid,
-                        columns = GridCells.Adaptive(PosterWidth + 16.dp),
+                        columns = gridCells,
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         contentPadding = PaddingValues(start = 6.dp, end = 6.dp, top = 10.dp, bottom = 32.dp),
                         modifier = Modifier.weight(1f),

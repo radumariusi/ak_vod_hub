@@ -129,4 +129,30 @@ class TmdbDetailsTest {
             assertTrue(requests.all { it.queryParameter("language") == "en-US" })
             assertTrue(requests.all { it.queryParameter("include_image_language") == "en,null" })
         }
+
+    @Test
+    fun focusedEpisodeRequestsEnglishNameSummaryStillAndDuration() =
+        runBlocking {
+            var episodeUrl: HttpUrl? = null
+            val http =
+                OkHttpClient
+                    .Builder()
+                    .addInterceptor { chain ->
+                        episodeUrl = chain.request().url
+                        Response
+                            .Builder()
+                            .request(chain.request())
+                            .protocol(Protocol.HTTP_1_1)
+                            .code(200)
+                            .message("OK")
+                            .body(
+                                """{"name":"Pilot","overview":"The crew arrives.","still_path":"/pilot.jpg","runtime":48}"""
+                                    .toResponseBody(),
+                            ).build()
+                    }.build()
+            val episode = TmdbClient(http).episode("example", 6, 1, 2)
+            assertEquals(TmdbEpisode("Pilot", "The crew arrives.", 48, "/pilot.jpg"), episode)
+            assertEquals("/3/tv/6/season/1/episode/2", episodeUrl?.encodedPath)
+            assertEquals("en-US", episodeUrl?.queryParameter("language"))
+        }
 }
