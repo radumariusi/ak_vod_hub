@@ -43,11 +43,17 @@ fun ActorScreen(
     LaunchedEffect(personId) { viewModel.open(personId, restoreThrough = opened) }
     LaunchedEffect(grid, personId) {
         snapshotFlow {
-            grid.layoutInfo.visibleItemsInfo
-                .lastOrNull()
-                ?.index ?: -1
+            val visible = grid.layoutInfo.visibleItemsInfo
+            (visible.firstOrNull()?.index ?: -1) to (visible.lastOrNull()?.index ?: -1)
         }.distinctUntilChanged()
-            .collect(viewModel::onVisible)
+            .collect { (first, last) -> viewModel.onVisible(first, last) }
+    }
+    LaunchedEffect(opened, requestFocus, state.items) {
+        if (!requestFocus) return@LaunchedEffect
+        val index = state.items.indexOfFirst { it.id == opened }
+        if (index >= 0 && grid.layoutInfo.visibleItemsInfo.none { it.key == opened }) {
+            grid.scrollToItem(index)
+        }
     }
     Column(Modifier.fillMaxSize().padding(36.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(name, style = MaterialTheme.typography.headlineMedium)

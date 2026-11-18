@@ -6,6 +6,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.radumariusi.akvodhub.data.catalog.ActorRepository
 import io.github.radumariusi.akvodhub.data.catalog.HubRepository
 import io.github.radumariusi.akvodhub.data.db.TitleCard
+import io.github.radumariusi.akvodhub.parser.catalog.KeysetPage
+import io.github.radumariusi.akvodhub.parser.catalog.PageWindow
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,6 +32,7 @@ class ActorViewModel
         private val mutableState = MutableStateFlow(ActorState())
         val state = mutableState.asStateFlow()
         private var job: Job? = null
+        private var window = PageWindow<Long, TitleCard>()
 
         init {
             viewModelScope.launch {
@@ -62,14 +65,13 @@ class ActorViewModel
                 viewModelScope.launch {
                     try {
                         repository.prepare(personId)
-                        var page = repository.page(personId, 0, PAGE)
-                        val items = page.toMutableList()
-                        while (restoreThrough != null && page.size == PAGE && items.last().id < restoreThrough) {
-                            page = repository.page(personId, items.last().id, PAGE)
-                            items += page
-                        }
+                        val fresh = PageWindow<Long, TitleCard>()
+                        do {
+                            fresh.move { fetch(personId, it) }
+                        } while (restoreThrough != null && fresh.hasLater && fresh.items.last().id < restoreThrough)
+                        window = fresh
                         mutableState.value =
-                            ActorState(personId, items, loading = false, endReached = page.size < PAGE)
+                            ActorState(personId, fresh.items, loading = false, endReached = !fresh.hasLater)
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
@@ -85,21 +87,27 @@ class ActorViewModel
                 }
         }
 
-        fun onVisible(index: Int) {
+        private suspend fun fetch(personId: Long, after: Long?): KeysetPage<Long, TitleCard> {
+            val items = repository.page(personId, after ?: 0, PAGE)
+            return KeysetPage(items, items.lastOrNull()?.id?.takeIf { items.size == PAGE })
+        }
+
+        fun onVisible(first: Int, last: Int) {
             val state = mutableState.value
             val id = state.personId ?: return
-            if (state.loading || state.endReached || index < state.items.size - 18) return
+            if (state.loading || first < 0 || state.items.isEmpty()) return
+            val backwards = window.hasEarlier && first < 8
+            if (!backwards && (state.endReached || last < state.items.size - 18)) return
             mutableState.update { it.copy(loading = true) }
             job =
                 viewModelScope.launch {
                     try {
-                        val more = repository.page(id, state.items.lastOrNull()?.id ?: 0, PAGE)
+                        window.move(backwards) { fetch(id, it) }
                         mutableState.update {
                             it.copy(
-                                items = it.items + more,
+                                items = window.items.distinctBy { card -> card.id },
                                 loading = false,
-                                endReached =
-                                    more.size < PAGE,
+                                endReached = !window.hasLater,
                             )
                         }
                     } catch (e: CancellationException) {

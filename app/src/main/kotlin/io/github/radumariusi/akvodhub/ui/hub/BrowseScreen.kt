@@ -92,13 +92,10 @@ fun BrowseScreen(
     }
     LaunchedEffect(grid, browser) {
         snapshotFlow {
-            val lastVisible =
-                grid.layoutInfo.visibleItemsInfo
-                    .lastOrNull()
-                    ?.index ?: -1
-            lastVisible to state.items.size
+            val visible = grid.layoutInfo.visibleItemsInfo
+            (visible.firstOrNull()?.index ?: -1) to (visible.lastOrNull()?.index ?: -1)
         }.distinctUntilChanged()
-            .collect { (index, _) -> browser.onVisible(index) }
+            .collect { (first, last) -> browser.onVisible(first, last) }
     }
     LaunchedEffect(restoreKey, state.items) {
         val id = restoreKey?.takeIf { it.startsWith("browse:$screenKey:") }?.substringAfterLast(':')?.toLongOrNull()

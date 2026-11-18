@@ -10,6 +10,8 @@ import io.github.radumariusi.akvodhub.parser.catalog.BrowseFilters
 import io.github.radumariusi.akvodhub.parser.catalog.CatalogCursor
 import io.github.radumariusi.akvodhub.parser.catalog.CatalogFilter
 import io.github.radumariusi.akvodhub.parser.catalog.FilterPreset
+import io.github.radumariusi.akvodhub.parser.catalog.KeysetPage
+import io.github.radumariusi.akvodhub.parser.catalog.PageWindow
 import io.github.radumariusi.akvodhub.parser.match.MediaType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -27,6 +29,7 @@ data class BrowseState(
     val items: List<TitleCard> = emptyList(),
     val loading: Boolean = true,
     val endReached: Boolean = false,
+    val hasEarlier: Boolean = false,
 )
 
 /**
@@ -71,8 +74,7 @@ class Browser(
     val state: StateFlow<BrowseState> = mutableState.asStateFlow()
     private var job: Job? = null
     private var started = false
-    private var cursor: CatalogCursor? = null
-    private val loadedIds = mutableSetOf<Long>()
+    private var window = PageWindow<CatalogCursor, TitleCard>()
 
     /** Prima încărcare, când ecranul apare. */
     fun start() {
@@ -82,7 +84,17 @@ class Browser(
     }
 
     fun reload() {
-        if (started) load(mutableState.value.filter, debounce = false)
+        if (!started) return
+        val filter = mutableState.value.filter
+        if (mutableState.value.loading || window.items.isEmpty()) {
+            load(filter, debounce = false)
+            return
+        }
+        mutableState.update { it.copy(loading = true) }
+        job = scope.launch {
+            window.refresh { fetch(filter, it) }
+            publishWindow()
+        }
     }
 
     /** Schimbă doar cardul deja încărcat, fără resetarea paginării sau a focusului. */
@@ -119,32 +131,40 @@ class Browser(
             scope.launch {
                 if (debounce) delay(TYPING_DELAY_MS)
                 val empty = needsInput && filter.text.isBlank() && !filter.hasFilters
-                val page = if (empty) null else repository.page(filter, PAGE)
-                val items = page?.items.orEmpty()
-                cursor = page?.next
-                loadedIds.clear()
-                items.mapTo(loadedIds) { it.id }
-                mutableState.value = BrowseState(filter, items, loading = false, endReached = cursor == null)
+                val fresh = PageWindow<CatalogCursor, TitleCard>()
+                if (!empty) fresh.move { fetch(filter, it) }
+                window = fresh
+                mutableState.value = BrowseState(filter, fresh.items, loading = false, endReached = empty || !fresh.hasLater)
             }
     }
 
-    /** Ultimul element vizibil e [index]: dacă suntem aproape de capăt, aducem pagina următoare. */
-    fun onVisible(index: Int) {
+    private suspend fun fetch(filter: CatalogFilter, after: CatalogCursor?): KeysetPage<CatalogCursor, TitleCard> {
+        val page = repository.page(filter, PAGE, after)
+        return KeysetPage(page.items, page.next)
+    }
+
+    fun onVisible(first: Int, last: Int) {
         val s = mutableState.value
-        if (s.loading || s.endReached || index < s.items.size - PREFETCH) return
+        if (s.loading || s.items.isEmpty() || first < 0) return
+        val backwards = s.hasEarlier && first < PREFETCH / 2
+        if (!backwards && (s.endReached || last < s.items.size - PREFETCH)) return
         mutableState.update { it.copy(loading = true) }
         job =
             scope.launch {
-                val page = repository.page(s.filter, PAGE, checkNotNull(cursor))
-                val current = mutableState.value
-                cursor = page.next
-                mutableState.value =
-                    current.copy(
-                        items = current.items + page.items.filter { loadedIds.add(it.id) },
-                        loading = false,
-                        endReached = cursor == null,
-                    )
+                window.move(backwards) { fetch(s.filter, it) }
+                publishWindow()
             }
+    }
+
+    private fun publishWindow() {
+        mutableState.update {
+            it.copy(
+                items = window.items.distinctBy { card -> card.id },
+                loading = false,
+                endReached = !window.hasLater,
+                hasEarlier = window.hasEarlier,
+            )
+        }
     }
 
     companion object {
@@ -179,6 +199,12 @@ class BrowseViewModel
                 }
             }
             viewModelScope.launch { mutableLanguages.value = repository.languages() }
+            viewModelScope.launch {
+                repository.watchVersion.drop(1).collect {
+                    listOf(movies, series, search).filter { it.state.value.filter.library !=
+                        io.github.radumariusi.akvodhub.parser.catalog.LibraryFilter.ALL }.forEach(Browser::reload)
+                }
+            }
             viewModelScope.launch {
                 repository.posterProgress.collect { value ->
                     value?.let { (id, progress) ->
