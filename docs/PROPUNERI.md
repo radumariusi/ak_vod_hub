@@ -194,6 +194,10 @@ Vezi detalii despre schema Room și limitele cunoscute în [HANDOFF.md](HANDOFF.
 - Sezoane oficiale TMDB combinate cu episoadele din playlist și preîncărcare limitată după import.
 - Fundal hero unic, buton Filtre în zona de acțiuni și meniu TV centrat.
 
+## Pornirea ecranului Acasă după v0.1.47
+
+- Primele rânduri folosesc catalogul salvat și sunt publicate progresiv. Pregătirea indexului continuă separat, iar ecranul se actualizează când datele se schimbă.
+
 ## Ce ar îngreuna aplicația (de evitat sau doar opțional)
 
 1. **Trailere redate în aplicație / pe fundal** (YouTube, WebView): megabytes în plus și RAM. → Deschidem aplicația YouTube.

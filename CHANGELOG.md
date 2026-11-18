@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-19 — Pornirea ecranului Acasă
+
+- Acasă afișează rândurile locale pe măsură ce se încarcă. Reindexarea începe după afișarea datelor deja salvate.
+- Notificările din timpul încărcării se grupează și actualizează ecranul după citirea în curs.
+
 ## 2026-11-19 — Retușuri fișă, sezoane și catalog TV
 
 - Sigla rămâne vizibilă la intrarea în fișă. Descrierea apare o singură dată și se poate extinde.

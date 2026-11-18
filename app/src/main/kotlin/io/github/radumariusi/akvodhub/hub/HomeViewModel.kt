@@ -85,6 +85,8 @@ class HomeViewModel
         private var catalogs: List<HomeRow> = emptyList()
         private var loaded = false
         private var reloadJob: Job? = null
+        private var reloadPending = false
+        private var preparationStarted = false
         private var personalJob: Job? = null
         private var catalogJob: Job? = null
 
@@ -96,20 +98,20 @@ class HomeViewModel
             ) + Genres.home.map { Triple("genre:${it.key}", it.label, CatalogFilter(genre = it)) }
 
         init {
-            viewModelScope.launch {
-                repository.prepare()
-                reload()
-            }
             // După fiecare reindexare (import, potrivire TMDB, playlist șters), rândurile se reîncarcă.
             viewModelScope.launch {
                 repository.catalogVersion.drop(1).collect { reload() }
             }
             viewModelScope.launch {
                 repository.watchVersion.drop(1).collect {
-                    refreshContinueWatching()
-                    refreshEpisodeNews()
-                    refreshWatchlist()
-                    loadPersonal(delayMs = PERSONAL_DEBOUNCE_MS)
+                    if (reloadJob?.isActive == true) {
+                        reloadPending = true
+                    } else {
+                        refreshContinueWatching()
+                        refreshEpisodeNews()
+                        refreshWatchlist()
+                        loadPersonal(delayMs = PERSONAL_DEBOUNCE_MS)
+                    }
                 }
             }
             viewModelScope.launch {
@@ -122,6 +124,7 @@ class HomeViewModel
                     .drop(1)
                     .collect { reload() }
             }
+            reload()
         }
 
         suspend fun logo(titleId: Long): List<String> = repository.logo(titleId)
@@ -136,29 +139,56 @@ class HomeViewModel
         }
 
         fun reload() {
-            reloadJob?.cancel()
+            reloadPending = true
+            if (reloadJob?.isActive == true) return
             reloadJob =
                 viewModelScope.launch {
                     personalJob?.cancel()
                     catalogJob?.cancel()
-                    loadingMore.values.forEach(Job::cancel)
-                    loadingMore.clear()
-                    val rows = mutableListOf<HomeRow>()
-                    if (enabled(CONTINUE)) continueRow()?.let { rows += it }
-                    if (enabled(HomeRows.WATCHLIST)) newRow(HomeRows.WATCHLIST, "Lista mea")?.let { rows += it }
-                    if (enabled(NEWS)) newRow(NEWS, "Nou în playlist")?.let { rows += it }
-                    if (enabled(EPISODES)) newRow(EPISODES, "Episoade noi la serialele urmărite")?.let { rows += it }
-                    for ((key, title, filter) in specs) {
-                        if (enabled(key)) newRow(key, title, filter)?.let { rows += it }
-                    }
-                    windows.keys.retainAll(rows.map { it.key }.toSet())
-                    base = rows
-                    loaded = true
-                    publish()
-                    // Disponibilitatea s-a putut schimba: refacem și rândurile de descoperire.
+                    do {
+                        reloadPending = false
+                        loadBaseRows()
+                        if (!preparationStarted) {
+                            preparationStarted = true
+                            // Catalogul salvat este deja vizibil. Reindexarea funcționează și offline.
+                            viewModelScope.launch { repository.prepare() }
+                        }
+                    } while (reloadPending)
                     loadPersonal()
                     loadCatalogs()
                 }
+        }
+
+        private suspend fun loadBaseRows() {
+            loadingMore.values.forEach(Job::cancel)
+            loadingMore.clear()
+            val publishProgressively = base.isEmpty()
+            val rows = mutableListOf<HomeRow>()
+
+            fun add(row: HomeRow?) {
+                row ?: return
+                rows += row
+                if (publishProgressively) {
+                    base = rows.toList()
+                    publish()
+                }
+            }
+
+            if (enabled(CONTINUE)) add(continueRow())
+            if (enabled(HomeRows.WATCHLIST)) add(newRow(HomeRows.WATCHLIST, "Lista mea"))
+            // Primele pagini folosesc același traseu ca filele Filme și Seriale.
+            for ((key, title, filter) in specs.take(2)) {
+                if (enabled(key)) add(newRow(key, title, filter))
+            }
+            if (enabled(NEWS)) add(newRow(NEWS, "Nou în playlist"))
+            if (enabled(EPISODES)) add(newRow(EPISODES, "Episoade noi la serialele urmărite"))
+            for ((key, title, filter) in specs.drop(2)) {
+                if (enabled(key)) add(newRow(key, title, filter))
+            }
+            windows.keys.retainAll(rows.map { it.key }.toSet())
+            base = rows
+            loaded = true
+            publish()
         }
 
         private suspend fun continueRow(): HomeRow? {
