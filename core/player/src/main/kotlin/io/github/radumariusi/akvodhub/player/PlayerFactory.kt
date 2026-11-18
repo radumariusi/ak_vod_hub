@@ -47,7 +47,7 @@ object PlayerFactory {
                 .setUserAgent(USER_AGENT)
                 .setAllowCrossProtocolRedirects(true)
                 .setConnectTimeoutMs(15_000)
-                .setReadTimeoutMs(30_000)
+                .setReadTimeoutMs(15_000)
         val dataSource = DefaultDataSource.Factory(context, http)
         val renderers =
             object : DefaultRenderersFactory(context) {
