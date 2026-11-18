@@ -15,6 +15,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -38,6 +39,9 @@ import coil3.memory.MemoryCache
 import coil3.request.SuccessResult
 import coil3.size.Scale
 import io.github.radumariusi.akvodhub.data.db.TitleCard
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -110,38 +114,60 @@ internal fun CatalogHero(
             null
         }
 
+    val scope = rememberCoroutineScope()
+    val requests = remember { mutableMapOf<Long, Deferred<Image?>>() }
+
+    fun keepRequest(id: Long?) {
+        val iterator = requests.iterator()
+        while (iterator.hasNext()) {
+            val (titleId, request) = iterator.next()
+            if (titleId != id) {
+                request.cancel()
+                iterator.remove()
+            }
+        }
+    }
+
+    suspend fun awaitLogo(id: Long): Image? {
+        cached(id)?.let { return it }
+        val request = requests.getOrPut(id) { scope.async(start = CoroutineStart.LAZY) { load(id) } }
+        try {
+            return request.await()
+        } finally {
+            if (request.isCompleted && requests[id] === request) requests.remove(id)
+        }
+    }
+
     val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateFlow
         .collectAsState()
     val foreground = lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
     val cachedLogo = cached(target.id)
     var presentation by remember { mutableStateOf(HeroPresentation(target, cachedLogo)) }
-    var settled by remember(target.id) { mutableStateOf(cachedLogo != null) }
     LaunchedEffect(target.id, foreground) {
+        keepRequest(target.id.takeIf { foreground })
         if (!foreground) return@LaunchedEffect
         val readyLogo = cached(target.id)
         if (readyLogo != null) {
             presentation = HeroPresentation(latestTarget, readyLogo)
         } else {
-            settled = false
             val showText =
                 launch {
                     delay(300)
                     presentation = HeroPresentation(latestTarget, null)
                 }
-            val loaded = load(target.id)
+            val loaded = awaitLogo(target.id)
             if (loaded != null) {
                 showText.cancel()
                 presentation = HeroPresentation(latestTarget, loaded)
             }
         }
-        settled = true
     }
     val latestNeighbors by rememberUpdatedState(neighborTitleIds)
-    LaunchedEffect(target.id, settled, foreground) {
-        if (settled && foreground) {
-            delay(350)
+    LaunchedEffect(target.id, foreground) {
+        if (foreground) {
+            delay(180)
             val neighbors = latestNeighbors().distinct().filterNot { it == target.id }
-            for (neighbor in neighbors) load(neighbor)
+            for (neighbor in neighbors) awaitLogo(neighbor)
         }
     }
     val display = if (cachedLogo != null) HeroPresentation(target, cachedLogo) else presentation
