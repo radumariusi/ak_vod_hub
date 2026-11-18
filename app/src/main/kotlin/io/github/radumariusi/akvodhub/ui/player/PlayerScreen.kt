@@ -105,7 +105,6 @@ fun PlayerScreen(
     var duration by remember { mutableLongStateOf(0L) }
     val rootFocus = remember { FocusRequester() }
     val playFocus = remember { FocusRequester() }
-    var openingKey by remember { mutableStateOf<Key?>(null) }
     var controlsHeight by remember { mutableIntStateOf(0) }
     val moreFocus = remember { FocusRequester() }
     var activeCommand by remember { mutableStateOf<FocusRequester?>(null) }
@@ -235,10 +234,7 @@ fun PlayerScreen(
                 if (controls || overlay) return@onKeyEvent false
                 if (e.key.isPlayerOk()) {
                     if (PlayerKeyPress.activate(e.type == KeyEventType.KeyDown, e.nativeKeyEvent.repeatCount)) {
-                        openingKey = e.key
-                    } else if (e.type == KeyEventType.KeyUp && openingKey == e.key) {
-                        openingKey = null
-                        if (!e.nativeKeyEvent.isCanceled) controls = true
+                        viewModel.togglePlay()
                     }
                     return@onKeyEvent true
                 }

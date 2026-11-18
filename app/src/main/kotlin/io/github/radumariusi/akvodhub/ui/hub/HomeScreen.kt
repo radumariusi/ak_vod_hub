@@ -57,12 +57,16 @@ fun HomeScreen(
     totals: LibraryTotals?,
     viewModel: HomeViewModel,
     onOpenSettings: () -> Unit,
+    onBackdropChanged: (String?) -> Unit,
     onOpen: (TitleCard, String) -> Unit,
     restoreKey: String?,
     onRestored: () -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
     val prefs by viewModel.prefs.collectAsState()
+    LaunchedEffect(prefs.homeHero, state.rows.isEmpty()) {
+        if (!prefs.homeHero || state.rows.isEmpty()) onBackdropChanged(null)
+    }
     when {
         totals != null && totals.playlists == 0 -> {
             EmptyLibrary(onOpenSettings)
@@ -89,7 +93,7 @@ fun HomeScreen(
         }
 
         else -> {
-            HomeRows(state.rows, viewModel, onOpen, restoreKey, onRestored)
+            HomeRows(state.rows, viewModel, onOpen, restoreKey, onRestored, onBackdropChanged)
         }
     }
 }
@@ -101,6 +105,7 @@ private fun HomeRows(
     onOpen: (TitleCard, String) -> Unit,
     restoreKey: String?,
     onRestored: () -> Unit,
+    onBackdropChanged: (String?) -> Unit,
 ) {
     // Focusul inițial (o singură dată) pe primul titlu; apoi, la întoarcere, pe cardul deschis.
     var initialFocusDone by rememberSaveable { mutableStateOf(false) }
@@ -145,11 +150,17 @@ private fun HomeRows(
     }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val heroHeight = (maxHeight - PosterHeight - 96.dp).coerceIn(108.dp, 204.dp).coerceAtMost(maxHeight * 0.43f)
+        val heroHeight = (maxHeight * 0.46f).coerceAtMost(228.dp)
         Column(Modifier.fillMaxSize()) {
             val prefs by viewModel.prefs.collectAsState()
             if (prefs.homeHero) {
-                CatalogHero(rows.first().items.first(), { focused.value }, viewModel::logo, heroHeight)
+                CatalogHero(
+                    rows.first().items.first(),
+                    { focused.value },
+                    viewModel::logo,
+                    heroHeight,
+                    onBackdropChanged,
+                )
             }
             LazyColumn(
                 state = rememberLazyListState(),
@@ -190,7 +201,8 @@ private fun HomeRows(
                                             onRestored()
                                         },
                                         supportingText = info?.progressLabel(),
-                                        reserveSupportingText = row.key == HomeViewModel.CONTINUE,
+                                        landscape = row.key == HomeViewModel.CONTINUE,
+                                        showTitle = false,
                                     )
                                     if (info != null && prefs.continueDirect) {
                                         OutlinedButton(onClick = { actions(card, key, info) }) { Text("Acțiuni") }

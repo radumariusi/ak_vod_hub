@@ -31,6 +31,7 @@ import io.github.radumariusi.akvodhub.parser.match.SourceInfo
 import io.github.radumariusi.akvodhub.parser.player.BufferPreset
 import io.github.radumariusi.akvodhub.parser.player.EpisodeOrder
 import io.github.radumariusi.akvodhub.parser.player.FallbackQueue
+import io.github.radumariusi.akvodhub.parser.player.RebufferHistory
 import io.github.radumariusi.akvodhub.parser.player.Resume
 import io.github.radumariusi.akvodhub.parser.player.SeekNavigation
 import io.github.radumariusi.akvodhub.parser.player.SeriesPlayback
@@ -39,6 +40,7 @@ import io.github.radumariusi.akvodhub.parser.stremio.AddonSubtitle
 import io.github.radumariusi.akvodhub.parser.stremio.SubtitleChoice
 import io.github.radumariusi.akvodhub.parser.stremio.SubtitleLanguages
 import io.github.radumariusi.akvodhub.parser.subtitle.SubtitleDocument
+import io.github.radumariusi.akvodhub.parser.title.VideoQuality
 import io.github.radumariusi.akvodhub.parser.title.VideoResolution
 import io.github.radumariusi.akvodhub.ui.hub.sourceLabel
 import io.github.radumariusi.akvodhub.ui.hub.sourceShortLabel
@@ -176,6 +178,7 @@ class PlayerViewModel
         private var startPosition = 0L
         private var generation = 0
         private var watchdog: Job? = null
+        private val rebufferHistory = RebufferHistory()
         private var countdownJob: Job? = null
         private var sleepJob: Job? = null
         private var sleepTimer = SleepTimer()
@@ -202,13 +205,21 @@ class PlayerViewModel
                             if (!started) {
                                 started = true
                                 retriedSame = false
+                            } else if (player.playWhenReady && rebufferHistory.ready(SystemClock.elapsedRealtime()) &&
+                                queue?.hasMore == true
+                            ) {
+                                sourceFailed("buffer repetat", preferLowerQuality = true)
+                                return
                             }
                             mutableState.update { it.copy(loading = false) }
                         }
 
                         Player.STATE_BUFFERING -> {
                             mutableState.update { it.copy(loading = true) }
-                            if (started) startWatchdog(STALL_TIMEOUT_MS, "s-a blocat (nu mai vin date)")
+                            if (started && player.playWhenReady) {
+                                rebufferHistory.buffering(SystemClock.elapsedRealtime())
+                                startWatchdog(STALL_TIMEOUT_MS, "s-a blocat (nu mai vin date)")
+                            }
                         }
 
                         Player.STATE_ENDED -> {
@@ -216,6 +227,28 @@ class PlayerViewModel
                         }
 
                         else -> {}
+                    }
+                }
+
+                override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                    if (!playWhenReady) {
+                        watchdog?.cancel()
+                        rebufferHistory.reset()
+                    } else if (player.playbackState == Player.STATE_BUFFERING) {
+                        val timeout = if (started) STALL_TIMEOUT_MS else START_TIMEOUT_MS
+                        startWatchdog(timeout, "bufferul nu se umple")
+                    }
+                }
+
+                override fun onPositionDiscontinuity(
+                    oldPosition: Player.PositionInfo,
+                    newPosition: Player.PositionInfo,
+                    reason: Int,
+                ) {
+                    if (reason == Player.DISCONTINUITY_REASON_SEEK ||
+                        reason == Player.DISCONTINUITY_REASON_SEEK_ADJUSTMENT
+                    ) {
+                        rebufferHistory.reset(ignoreBefore = SystemClock.elapsedRealtime() + 5_000L)
                     }
                 }
 
@@ -378,16 +411,18 @@ class PlayerViewModel
             playCurrent(positionMs)
         }
 
-        private fun playCurrent(positionMs: Long) {
+        private fun playCurrent(positionMs: Long, autoplay: Boolean = true) {
             val q = queue ?: return
             val id = q.current ?: return
             generation++
             val gen = generation
             started = false
+            rebufferHistory.reset()
             retriedSame = false
             embeddedTextLanguages = null
             player.trackSelectionParameters = PlayerFactory.apply(player.trackSelectionParameters, trackPreferences())
             startPosition = positionMs
+            player.playWhenReady = autoplay
             mutableState.update {
                 it.copy(
                     loading = true,
@@ -413,8 +448,9 @@ class PlayerViewModel
                     positionMs,
                 )
                 player.prepare()
-                player.playWhenReady = true
-                startWatchdog(START_TIMEOUT_MS, "nu pornește în ${START_TIMEOUT_MS / 1000} s")
+                if (player.playWhenReady) {
+                    startWatchdog(START_TIMEOUT_MS, "nu pornește în ${START_TIMEOUT_MS / 1000} s")
+                }
             }
         }
 
@@ -427,17 +463,38 @@ class PlayerViewModel
             watchdog =
                 viewModelScope.launch {
                     delay(timeoutMs)
-                    if (gen == generation) sourceFailed(reason)
+                    if (gen == generation && player.playWhenReady) sourceFailed(reason)
                 }
         }
 
         /** Sursa curentă nu merge: trecem la următoarea, de la aceeași poziție. */
-        private fun sourceFailed(reason: String) {
+        private fun sourceFailed(reason: String, preferLowerQuality: Boolean = false) {
             val q = queue ?: return
             val failed = q.current ?: return
             watchdog?.cancel()
             val position = if (started) player.currentPosition.coerceAtLeast(0) else startPosition
-            val next = q.fail(reason)
+            val autoplay = player.playWhenReady
+            val preferred =
+                if (preferLowerQuality && (
+                        sources[failed]?.quality == VideoQuality.UHD ||
+                            VideoResolution.quality(player.videoSize.width, player.videoSize.height) == VideoQuality.UHD
+                    )
+                ) {
+                    val languages = sources[failed]?.languages.orEmpty()
+                    q.candidates
+                        .asSequence()
+                        .filter { it != failed && q.reasonFor(it) == null }
+                        .mapNotNull(sources::get)
+                        .filter { it.quality in listOf(VideoQuality.FHD, VideoQuality.HD, VideoQuality.SD) }
+                        .sortedWith(
+                            compareByDescending<SourceInfo> { source -> source.languages.any { it in languages } }
+                                .thenByDescending { it.quality },
+                        ).firstOrNull()
+                        ?.id
+                } else {
+                    null
+                }
+            val next = q.fail(reason, preferred)
             generation++
             player.stop()
             if (next == null) {
@@ -459,7 +516,7 @@ class PlayerViewModel
             showNotice(
                 "Sursa ${short(failed)} a eșuat ($reason). Trec la ${short(next)}.",
             )
-            playCurrent(position)
+            playCurrent(position, autoplay)
         }
 
         /** Utilizatorul alege altă sursă din meniu: continuăm de la aceeași poziție. */
@@ -467,9 +524,10 @@ class PlayerViewModel
             val q = queue ?: return
             if (entryId == q.current && mutableState.value.error == null) return
             val position = if (started) player.currentPosition.coerceAtLeast(0) else startPosition
+            val autoplay = player.playWhenReady || mutableState.value.error != null
             if (!q.switchTo(entryId)) return
             mutableState.update { it.copy(error = null, failures = emptyList()) }
-            playCurrent(position)
+            playCurrent(position, autoplay)
         }
 
         /** Toate au eșuat: încercăm din nou lista, de la prima sursă. */

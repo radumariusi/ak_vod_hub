@@ -67,6 +67,7 @@ internal fun CatalogHero(
     focused: () -> TitleCard?,
     logo: suspend (Long) -> String?,
     height: Dp,
+    onBackdropChanged: ((String?) -> Unit)? = null,
 ) {
     val target = focused() ?: fallback
     var shown by remember { mutableStateOf(target) }
@@ -76,8 +77,9 @@ internal fun CatalogHero(
     }
     var logoPath by remember(shown.id) { mutableStateOf<String?>(null) }
     LaunchedEffect(shown.id) { logoPath = logo(shown.id) }
+    LaunchedEffect(shown.backdropPath) { onBackdropChanged?.invoke(shown.backdropPath) }
     Box(Modifier.fillMaxWidth().height(height).clipToBounds()) {
-        TitleBackdrop(shown.backdropPath, Modifier.matchParentSize())
+        if (onBackdropChanged == null) TitleBackdrop(shown.backdropPath, Modifier.matchParentSize())
         Column(
             Modifier
                 .align(Alignment.CenterStart)

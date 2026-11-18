@@ -81,6 +81,7 @@ class MainActivity : ComponentActivity() {
                                 watchlistViewModel,
                             ),
                             navRequests,
+                            onExit = ::finish,
                         )
                     }
                 }

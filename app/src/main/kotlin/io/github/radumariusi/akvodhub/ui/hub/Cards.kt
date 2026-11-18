@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -60,6 +61,8 @@ object Images {
     fun logo(path: String?) = url(path, "w500")
 
     fun hero(path: String?) = url(path, "w780")
+
+    fun thumbnail(path: String?) = url(path, "w300")
 
     fun backdrop(path: String?) = url(path, "w1280")
 
@@ -116,9 +119,13 @@ fun PosterCard(
     requestFocus: Boolean = false,
     onFocusRequested: () -> Unit = {},
     supportingText: String? = null,
-    reserveSupportingText: Boolean = false,
+    landscape: Boolean = false,
+    showTitle: Boolean = true,
 ) {
+    val width = if (landscape) PosterWidth * 2.05f else PosterWidth
+    val height = if (landscape) width * (9f / 16) else PosterHeight
     val badges = LocalPosterBadges.current
+    val ratingsAtBottom = !landscape && !showTitle
     val requester = remember { FocusRequester() }
     if (requestFocus) {
         LaunchedEffect(Unit) {
@@ -128,19 +135,21 @@ fun PosterCard(
     }
     Box(
         modifier
-            .width(PosterWidth + 16.dp)
+            .width(width + 16.dp)
             .padding(horizontal = 8.dp, vertical = 10.dp),
     ) {
         Card(
             onClick = onClick,
             modifier =
                 Modifier
-                    .width(PosterWidth)
+                    .width(width)
                     .focusRequester(requester)
                     .onFocusChanged { if (it.isFocused) onFocused() },
         ) {
-            Box(Modifier.size(PosterWidth, PosterHeight).background(MaterialTheme.colorScheme.surfaceVariant)) {
-                val poster = Images.poster(card.posterPath, LocalPosterSize.current)
+            Box(Modifier.size(width, height).background(MaterialTheme.colorScheme.surfaceVariant)) {
+                val poster =
+                    (if (landscape) Images.thumbnail(card.backdropPath) else null)
+                        ?: Images.poster(card.posterPath, LocalPosterSize.current)
                 if (poster == null) {
                     Text(
                         card.name,
@@ -163,8 +172,12 @@ fun PosterCard(
                     modifier = Modifier.align(Alignment.TopStart).padding(4.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
-                    if (PosterBadge.TMDB in badges) PosterBadgeText(card.tmdbBadge ?: "★ —")
-                    if (PosterBadge.IMDB in badges) PosterBadgeText(card.imdbBadge ?: "IMDb —")
+                    if (ratingsAtBottom) {
+                        if (PosterBadge.DUB in badges) card.dubLabel?.let { PosterBadgeText(it) }
+                    } else {
+                        if (PosterBadge.TMDB in badges) PosterBadgeText(card.tmdbBadge ?: "★ —")
+                        if (PosterBadge.IMDB in badges) PosterBadgeText(card.imdbBadge ?: "IMDb —")
+                    }
                 }
                 Column(
                     modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
@@ -177,7 +190,23 @@ fun PosterCard(
                     }
                     if (PosterBadge.NEW in badges && card.isNew) PosterBadgeText("Nou")
                 }
-                if (PosterBadge.DUB in badges) {
+                if (landscape && supportingText != null) {
+                    PosterBadgeText(supportingText, Modifier.align(Alignment.BottomStart).padding(8.dp))
+                }
+                if (ratingsAtBottom && (PosterBadge.TMDB in badges || PosterBadge.IMDB in badges)) {
+                    Row(
+                        Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .background(Color(0xD9111319))
+                            .padding(start = 2.dp, end = 2.dp, bottom = 5.dp, top = 2.dp),
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        if (PosterBadge.TMDB in badges) PosterBadgeText(card.tmdbBadge ?: "★ —")
+                        if (PosterBadge.IMDB in badges) PosterBadgeText(card.imdbBadge ?: "IMDb —")
+                    }
+                }
+                if (showTitle && PosterBadge.DUB in badges) {
                     card.dubLabel?.let { label ->
                         PosterBadgeText(
                             label,
@@ -203,24 +232,15 @@ fun PosterCard(
                     }
                 }
             }
-            Text(
-                card.name,
-                style = MaterialTheme.typography.bodySmall,
-                textAlign = TextAlign.Center,
-                minLines = 2,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 5.dp),
-            )
-            if (supportingText != null || reserveSupportingText) {
+            if (showTitle) {
                 Text(
-                    supportingText.orEmpty(),
-                    style = MaterialTheme.typography.labelSmall,
+                    card.name,
+                    style = MaterialTheme.typography.bodySmall,
                     textAlign = TextAlign.Center,
                     minLines = 2,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 3.dp, vertical = 3.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 5.dp),
                 )
             }
         }

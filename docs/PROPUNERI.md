@@ -157,6 +157,14 @@ Vezi detalii despre schema Room și limitele cunoscute în [HANDOFF.md](HANDOFF.
 - Episoade Xtream publicate progresiv, etichete generice în română și eliminarea comenzii Trailer care deschidea YouTube.
 - Rezoluții declarate din răspunsul Xtream și confirmate la redare, cu actualizarea rezumatelor existente.
 
+## Acasă și redare după v0.1.41
+
+- Fundalul fișei este folosit pe întreaga suprafață Acasă. Rândul „Continuă vizionarea” are carduri 16:9,
+  iar celelalte rânduri au postere 2:3, cu numele în hero și în descrierea accesibilă.
+- Înapoi din Acasă cere confirmarea ieșirii. OK comută imediat redarea și pauza când comenzile sunt ascunse.
+- Playerul are un buffer Normal mai mare și detectează întreruperile repetate, cu preferință pentru o variantă de
+  calitate mai mică atunci când sursa curentă este 4K și redarea rămâne instabilă.
+
 ## Ce ar îngreuna aplicația (de evitat sau doar opțional)
 
 1. **Trailere redate în aplicație / pe fundal** (YouTube, WebView): megabytes în plus și RAM. → Deschidem aplicația YouTube.
