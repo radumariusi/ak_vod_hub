@@ -280,9 +280,7 @@ internal fun SeriesEpisodeScreen(
                     },
                 )
             }
-            return@BoxWithConstraints
-        }
-        if (maxWidth < 570.dp) {
+        } else if (maxWidth < 570.dp) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onBack) { Text("Înapoi la fișă") }
                 EpisodeSeasonPicker(seasons, selected.number, ::seasonDescription, onSelectSeason)
@@ -396,21 +394,21 @@ private fun SeasonEpisodes(
     availability: String?,
     modifier: Modifier,
 ) {
-    key(season.number) {
-        if (season.episodes.isEmpty()) {
-            LaunchedEffect(Unit) {
-                withFrameNanos { }
-                runCatching { listFocus.requestFocus() }
-            }
-            Column(modifier.fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(seasonLabel(season.number), style = MaterialTheme.typography.headlineSmall)
-                Text(
-                    availability ?: "Nu sunt episoade disponibile.",
-                    modifier = Modifier.focusRequester(listFocus).focusable(),
-                )
-            }
-            return@key
+    if (season.episodes.isEmpty()) {
+        LaunchedEffect(season.number) {
+            withFrameNanos { }
+            runCatching { listFocus.requestFocus() }
         }
+        Column(modifier.fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(seasonLabel(season.number), style = MaterialTheme.typography.headlineSmall)
+            Text(
+                availability ?: "Nu sunt episoade disponibile.",
+                modifier = Modifier.focusRequester(listFocus).focusable(),
+            )
+        }
+        return
+    }
+    key(season.number) {
         val next = state.nextEpisode
         val initial = remember { (next?.let(season.episodes::indexOf) ?: -1).coerceAtLeast(0) }
         val entry = season.episodes.getOrElse(initial) { season.episodes.first() }
