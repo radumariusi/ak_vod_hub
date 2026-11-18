@@ -3,6 +3,8 @@
 package io.github.radumariusi.akvodhub.ui.hub
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,6 +47,7 @@ import io.github.radumariusi.akvodhub.parser.catalog.PosterSize
 import io.github.radumariusi.akvodhub.parser.match.SourceGrouping
 import io.github.radumariusi.akvodhub.parser.title.VideoQuality
 import io.github.radumariusi.akvodhub.ui.touch.Card
+import kotlinx.coroutines.launch
 
 val LocalPosterBadges = staticCompositionLocalOf { PosterBadges.defaults }
 
@@ -125,21 +129,29 @@ fun PosterCard(
             onFocusRequested()
         }
     }
-    // La 144 × 216 dp, scala 1,08 extinde posterul cu aproximativ 6 × 9 dp pe fiecare latură.
-    Column(
-        modifier.width(PosterWidth + 16.dp).padding(horizontal = 8.dp, vertical = 10.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+    val visibility = remember { BringIntoViewRequester() }
+    val scope = rememberCoroutineScope()
+    Box(
+        modifier
+            .width(PosterWidth + 16.dp)
+            .bringIntoViewRequester(visibility)
+            .padding(horizontal = 8.dp, vertical = 10.dp),
     ) {
         Card(
             onClick = onClick,
             modifier =
                 Modifier
-                    .size(PosterWidth, PosterHeight)
+                    .width(PosterWidth)
                     .focusRequester(requester)
-                    .onFocusChanged { if (it.isFocused) onFocused() },
-            scale = CardDefaults.scale(focusedScale = 1.08f),
+                    .onFocusChanged {
+                        if (it.isFocused) {
+                            onFocused()
+                            scope.launch { visibility.bringIntoView() }
+                        }
+                    },
+            scale = CardDefaults.scale(focusedScale = 1.05f),
         ) {
-            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant)) {
+            Box(Modifier.size(PosterWidth, PosterHeight).background(MaterialTheme.colorScheme.surfaceVariant)) {
                 val poster = Images.poster(card.posterPath, LocalPosterSize.current)
                 if (poster == null) {
                     Text(
@@ -203,16 +215,16 @@ fun PosterCard(
                     }
                 }
             }
+            Text(
+                card.name,
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center,
+                minLines = 2,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 5.dp),
+            )
         }
-        Text(
-            card.name,
-            style = MaterialTheme.typography.bodySmall,
-            textAlign = TextAlign.Center,
-            minLines = 2,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-        )
     }
 }
 

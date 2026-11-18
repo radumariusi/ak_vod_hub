@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -279,30 +278,24 @@ private fun DetailsContent(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Distribuție", style = MaterialTheme.typography.titleMedium)
                     LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(20.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                         contentPadding = PaddingValues(12.dp),
                     ) {
                         items(cast) { person ->
-                            Surface(onClick = {
-                                if (person.id >
-                                    0
-                                ) {
-                                    onActor(person)
-                                }
-                            }, modifier = Modifier.width(132.dp)) {
+                            Surface(onClick = { if (person.id > 0) onActor(person) }, modifier = Modifier.width(120.dp)) {
                                 Column(
-                                    Modifier.fillMaxWidth().padding(10.dp),
+                                    Modifier.fillMaxWidth().padding(6.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalArrangement = Arrangement.spacedBy(2.dp),
                                 ) {
                                     AsyncImage(
                                         model = Images.profile(person.profilePath),
                                         contentDescription = person.name,
-                                        contentScale = ContentScale.Crop,
+                                        contentScale = ContentScale.Fit,
                                         modifier =
                                             Modifier
-                                                .size(80.dp)
-                                                .clip(CircleShape)
+                                                .size(96.dp, 144.dp)
+                                                .clip(MaterialTheme.shapes.small)
                                                 .background(MaterialTheme.colorScheme.surfaceVariant),
                                     )
                                     Text(
@@ -310,7 +303,6 @@ private fun DetailsContent(
                                         style = MaterialTheme.typography.labelLarge,
                                         textAlign = TextAlign.Center,
                                         modifier = Modifier.fillMaxWidth(),
-                                        minLines = 2,
                                         maxLines = 2,
                                         overflow = TextOverflow.Ellipsis,
                                     )
@@ -320,7 +312,6 @@ private fun DetailsContent(
                                         color = LocalContentColor.current.copy(alpha = 0.9f),
                                         textAlign = TextAlign.Center,
                                         modifier = Modifier.fillMaxWidth(),
-                                        minLines = 2,
                                         maxLines = 2,
                                         overflow = TextOverflow.Ellipsis,
                                     )
