@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-11-18 — Sigle mai rapide și recuperarea redării
+
+- Siglele au bugete de încărcare scurte, iar preîncărcarea se oprește când Acasă și grilele intră în fundal.
+- Playerul reduce bitrate-ul fluxului adaptiv sau încearcă o sursă de rezoluție mai mică la întreruperi repetate, inclusiv la 1080p.
+- Alegerea automată afișează clar prioritatea 4K EN, RO sau MULTI și separă regulile personalizate.
+
 ## 2026-11-18 — Sigle la navigare și lista episoadelor
 
 - Siglele deja decodate apar direct la revenire. Hero începe încărcarea pe focus și pregătește vecinii direcționali după ce termină.

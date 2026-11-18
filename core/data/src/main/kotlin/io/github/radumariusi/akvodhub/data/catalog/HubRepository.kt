@@ -144,8 +144,15 @@ class HubRepository(
         }
         val rule = profile.rules.firstOrNull { it.matches(source) || it.matchesMulti(source) }
         return when {
+            rule == null && profile.rules.isEmpty() && source.quality == VideoQuality.UHD &&
+                SourceProfile.hasDefaultLanguage(
+                    source,
+                ) -> "Prima alegere automată: 4K cu audio declarat EN, RO sau MULTI."
+
             rule == null -> "Recomandată după calitate și limbile preferate."
+
             rule.matches(source) -> "Recomandată după regula ${rule.label()} din profil."
+
             else -> "Recomandată după profil, cu eticheta MULTI. Limba se verifică la redare."
         }
     }

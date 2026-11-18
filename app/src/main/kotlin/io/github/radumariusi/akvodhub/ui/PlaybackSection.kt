@@ -17,6 +17,7 @@ import io.github.radumariusi.akvodhub.data.player.PlaybackSettings
 import io.github.radumariusi.akvodhub.parser.match.SourceGrouping
 import io.github.radumariusi.akvodhub.parser.player.SourceProfile
 import io.github.radumariusi.akvodhub.parser.player.SourceRule
+import io.github.radumariusi.akvodhub.parser.title.ParsedTitle
 import io.github.radumariusi.akvodhub.parser.title.VideoQuality
 import io.github.radumariusi.akvodhub.player.PlaybackSettingsViewModel
 import io.github.radumariusi.akvodhub.ui.hub.Choice
@@ -35,7 +36,17 @@ fun PlaybackSection(viewModel: PlaybackSettingsViewModel) {
     var choice by remember { mutableStateOf<Choice?>(null) }
     val rules = prefs.profile.rules
     val qualities = listOf<VideoQuality?>(null) + VideoQuality.entries.reversed()
-    val languageOptions = listOf<String?>(null) + languages
+    val languageOptions =
+        (
+            listOf(
+                null,
+                "en",
+                "ro",
+                ParsedTitle.MULTI,
+            ) + languages + rules.map { it.language }
+        ).distinct()
+
+    fun audioLabel(code: String?): String = if (code == ParsedTitle.MULTI) "MULTI" else languageName(code)
 
     fun pickQuality(
         index: Int,
@@ -52,20 +63,47 @@ fun PlaybackSection(viewModel: PlaybackSettingsViewModel) {
         current: SourceRule,
     ) {
         choice =
-            Choice("Limbă audio", languageOptions.map { languageName(it) }, languageOptions.indexOf(current.language)) {
+            Choice("Limbă audio", languageOptions.map(::audioLabel), languageOptions.indexOf(current.language)) {
                 viewModel.setRule(index, current.copy(language = languageOptions[it]))
             }
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("Redare", style = MaterialTheme.typography.titleLarge)
+        Text("Ordinea surselor", style = MaterialTheme.typography.titleMedium)
         Text(
-            "Alegerea automată a sursei: " +
-                prefs.profile.describe().ifEmpty { "cea mai bună calitate, în limba sistemului sau engleză" } +
-                ". Dacă o sursă nu pornește, playerul trece singur la următoarea.",
+            if (rules.isEmpty()) {
+                "Automat · 4K EN, RO sau MULTI, apoi surse EN, RO sau MULTI la alte rezoluții."
+            } else {
+                "Reguli personalizate · ${prefs.profile.describe()}."
+            },
             style = MaterialTheme.typography.bodyMedium,
+        )
+        Text(
+            "Dacă redarea se întrerupe repetat, playerul încearcă o variantă mai ușoară de la aceeași poziție. " +
+                "Sursa aleasă manual pornește prima. MULTI este o etichetă din playlist. Pistele reale apar în player.",
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        if (prefs.preferOriginalLanguage) {
+            Text("„Preferă limba originală” este activă și are prioritate în modul automat.")
+        }
+        rules.forEachIndexed { index, rule ->
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(if (index == 0) "Prima alegere" else "Apoi", style = MaterialTheme.typography.bodyLarge)
+                OutlinedButton(onClick = { pickQuality(index, rule) }) { Text(qualityName(rule.quality)) }
+                OutlinedButton(onClick = { pickLanguage(index, rule) }) { Text(audioLabel(rule.language)) }
+                OutlinedButton(onClick = { viewModel.setRule(index, null) }) { Text("Șterge regula") }
+            }
+        }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (rules.size < SourceProfile.MAX_RULES) {
+                OutlinedButton(onClick = {
+                    viewModel.loadLanguages()
+                    viewModel.setRule(rules.size, SourceRule(VideoQuality.FHD, null))
+                }) { Text(if (rules.isEmpty()) "Adaugă o regulă personalizată" else "Adaugă o regulă de rezervă") }
+            }
+        }
         OutlinedButton(onClick = {
             val options = io.github.radumariusi.akvodhub.parser.player.PlaybackDefaults.speeds
             choice =
@@ -101,23 +139,7 @@ fun PlaybackSection(viewModel: PlaybackSettingsViewModel) {
                     viewModel.setBufferPreset(options[it])
                 }
         }) { Text("Buffer: ${prefs.bufferPreset.label}") }
-        Text("Bufferul se aplică la redeschiderea playerului; mare folosește mai multă memorie.")
-        rules.forEachIndexed { index, rule ->
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(if (index == 0) "Prima:" else "Altfel:", style = MaterialTheme.typography.bodyLarge)
-                OutlinedButton(onClick = { pickQuality(index, rule) }) { Text(qualityName(rule.quality)) }
-                OutlinedButton(onClick = { pickLanguage(index, rule) }) { Text(languageName(rule.language)) }
-                OutlinedButton(onClick = { viewModel.setRule(index, null) }) { Text("Șterge") }
-            }
-        }
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            if (rules.size < SourceProfile.MAX_RULES) {
-                OutlinedButton(onClick = {
-                    viewModel.loadLanguages()
-                    viewModel.setRule(rules.size, SourceRule(VideoQuality.FHD, null))
-                }) { Text(if (rules.isEmpty()) "Adaugă o preferință" else "Adaugă „altfel”") }
-            }
-        }
+        Text("Se aplică la următoarea deschidere a playerului. Mare păstrează o rezervă mai mare în memorie.")
         Text(
             "Decodor audio software (AC3, EAC3, DTS): ${viewModel.ffmpegStatus}",
             style = MaterialTheme.typography.bodySmall,

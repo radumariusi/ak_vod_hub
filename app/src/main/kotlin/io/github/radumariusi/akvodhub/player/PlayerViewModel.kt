@@ -373,8 +373,7 @@ class PlayerViewModel
                             0L
                         }
                     }
-                val chosen = request.entryId ?: watch?.entryId?.takeIf { request.resume && resumeAt > 0 }
-                playEpisode(episode, chosen, resumeAt)
+                playEpisode(episode, request.entryId, resumeAt)
             } else {
                 this.details = details.sources
                 val all = details.groups.flatMap { g -> g.languages.flatMap { it.sources } }
@@ -383,8 +382,7 @@ class PlayerViewModel
                     return
                 }
                 val resumeAt = if (request.resume) watch?.positionMs ?: 0L else 0L
-                val chosen = request.entryId ?: watch?.entryId?.takeIf { request.resume }
-                play(all, chosen, resumeAt)
+                play(all, request.entryId, resumeAt)
             }
         }
 
