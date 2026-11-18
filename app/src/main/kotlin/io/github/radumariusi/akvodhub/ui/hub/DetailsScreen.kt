@@ -4,6 +4,7 @@ package io.github.radumariusi.akvodhub.ui.hub
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -34,11 +36,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
@@ -61,6 +65,7 @@ import io.github.radumariusi.akvodhub.parser.player.EpisodeOrder
 import io.github.radumariusi.akvodhub.parser.player.Resume
 import io.github.radumariusi.akvodhub.player.PlayRequest
 import io.github.radumariusi.akvodhub.player.PlayerActivity
+import io.github.radumariusi.akvodhub.ui.theme.ThemedPanel
 import io.github.radumariusi.akvodhub.ui.touch.Button
 import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
 import io.github.radumariusi.akvodhub.ui.touch.Surface
@@ -673,30 +678,49 @@ private fun SourceTracksDialog(
                 .joinToString(", ")
                 .ifEmpty { "Nedeclarate" }
         val confirmed = cached
-        val sections =
-            buildList {
-                add("Audio declarat: $audio")
-                add("Subtitrări declarate: $subtitles")
-                if (confirmed == null) {
-                    add("Pistele acestei variante se confirmă în timpul redării.")
-                } else {
-                    add("Audio detectat: ${confirmed.audio.joinToString(", ").ifEmpty { "Nicio pistă detectată" }}")
-                    add(
-                        "Subtitrări interne detectate: ${confirmed.subtitles.joinToString(
-                            ", ",
-                        ).ifEmpty { "Nicio pistă detectată" }}",
-                    )
+        val title = sourceTags(source, details[source.id])
+        val back = remember { FocusRequester() }
+        Dialog(onDismissRequest = { selected = null }) {
+            ThemedPanel(Modifier.widthIn(max = 620.dp).fillMaxWidth()) {
+                LaunchedEffect(Unit) { back.requestFocus() }
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                OutlinedButton(onClick = { selected = null }, modifier = Modifier.focusRequester(back)) {
+                    Text("Înapoi la surse")
                 }
-                add("Subtitrările externe se caută în player.")
+                LazyColumn(
+                    modifier = Modifier.heightIn(max = 340.dp).weight(1f, fill = false),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    item { TrackDetailLine("Audio declarat în playlist · $audio") }
+                    item { TrackDetailLine("Subtitrări declarate în playlist · $subtitles") }
+                    if (confirmed == null) {
+                        item { TrackDetailLine("Pistele acestei variante se confirmă în timpul redării.") }
+                    } else {
+                        item { Text("Audio detectat", style = MaterialTheme.typography.titleSmall) }
+                        items(confirmed.audio.ifEmpty { listOf("Nicio pistă detectată") }) { TrackDetailLine(it) }
+                        item { Text("Subtitrări interne detectate", style = MaterialTheme.typography.titleSmall) }
+                        items(confirmed.subtitles.ifEmpty { listOf("Nicio pistă detectată") }) { TrackDetailLine(it) }
+                    }
+                    item { TrackDetailLine("Subtitrările externe se caută în player.") }
+                }
             }
-        ChoiceDialog(
-            Choice(
-                sourceTags(source, details[source.id]),
-                listOf("Înapoi la surse"),
-                0,
-                footer = sections.joinToString("\n\n"),
-            ) {},
-            onDismiss = { selected = null },
-        )
+        }
     }
+}
+
+@Composable
+private fun TrackDetailLine(label: String) {
+    var focused by remember { mutableStateOf(false) }
+    val colors = MaterialTheme.colorScheme
+    Text(
+        label,
+        style = MaterialTheme.typography.bodyMedium,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .onFocusChanged { focused = it.isFocused }
+                .focusable()
+                .background(if (focused) colors.surfaceVariant else colors.surface, MaterialTheme.shapes.small)
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+    )
 }
