@@ -284,6 +284,9 @@ class HubRepository(
                         CatalogSort.RECENT -> last.addedAt
                         CatalogSort.RATING -> last.card.rating
                         CatalogSort.TITLE -> last.card.name
+                        CatalogSort.IMDB -> last.card.imdbRating
+                        CatalogSort.RELEASE -> last.card.year
+                        CatalogSort.PLAYLIST -> last.playlistAddedAt
                     }
                 return CatalogPage(items, CatalogCursor(section, value, last.card.id))
             }

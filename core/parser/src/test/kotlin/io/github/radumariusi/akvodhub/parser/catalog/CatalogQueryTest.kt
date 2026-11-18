@@ -76,6 +76,31 @@ class CatalogQueryTest {
     }
 
     @Test
+    fun newSortsKeepEqualValuesAndNullsInSeparateCursorSegments() {
+        val sorts = mapOf(CatalogSort.IMDB to "imdbRating", CatalogSort.RELEASE to "year", CatalogSort.PLAYLIST to "playlistAddedAt")
+        for ((sort, column) in sorts) {
+            val filter = CatalogFilter(sort = sort, library = LibraryFilter.WATCHLIST)
+            val query = CatalogQuery.page(filter, 48, after = CatalogCursor(CatalogPageSection.VALUES, 7, 22))
+            assertTrue(query.sql.contains("t.$column <= ? AND (t.$column < ? OR t.id < ?)"))
+            assertTrue(query.sql.contains("FROM watchlist"))
+            assertEquals(listOf<Any>(7, 7, 22L, 48), query.args)
+            val afterNull = CatalogCursor(CatalogPageSection.NULLS, null, 10)
+            val nulls = CatalogQuery.page(filter, 48, afterNull.section, afterNull)
+            assertTrue(nulls.sql.contains("t.$column IS NULL AND t.id < ?"))
+            assertEquals(listOf<Any>(10L, 48), nulls.args)
+        }
+    }
+
+    @Test
+    fun savedCombinationsPreserveSelectionAndValidateFields() {
+        val filter = CatalogFilter(type = MediaType.TV, sort = CatalogSort.IMDB, language = "de", library = LibraryFilter.WATCHLIST)
+        val presets = listOf(FilterPreset("Seriale preferate", filter))
+        assertEquals(presets, BrowseFilters.decodePresets(MediaType.TV, BrowseFilters.encodePresets(presets)))
+        assertEquals(CatalogFilter(type = MediaType.MOVIE), BrowseFilters.decode(MediaType.MOVIE, "bad|bad|BAD|x|NA"))
+        assertNull(BrowseFilters.sanitize("unrelated", "value"))
+    }
+
+    @Test
     fun `cautarea foloseste FTS si pune intai titlurile care incep cu textul`() {
         val q = CatalogQuery.page(CatalogFilter(text = "Matrix"), 30)
         assertTrue(q.sql.contains("title_search MATCH ?"))

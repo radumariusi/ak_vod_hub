@@ -5,8 +5,11 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.radumariusi.akvodhub.data.catalog.HubRepository
 import io.github.radumariusi.akvodhub.data.db.TitleCard
+import io.github.radumariusi.akvodhub.data.player.PlaybackSettings
+import io.github.radumariusi.akvodhub.parser.catalog.BrowseFilters
 import io.github.radumariusi.akvodhub.parser.catalog.CatalogCursor
 import io.github.radumariusi.akvodhub.parser.catalog.CatalogFilter
+import io.github.radumariusi.akvodhub.parser.catalog.FilterPreset
 import io.github.radumariusi.akvodhub.parser.match.MediaType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -36,8 +39,35 @@ class Browser(
     initial: CatalogFilter,
     /** Căutarea nu arată nimic până nu scrii ceva sau alegi un filtru. */
     private val needsInput: Boolean,
+    private val preferences: PlaybackSettings? = null,
 ) {
-    private val mutableState = MutableStateFlow(BrowseState(initial))
+    private val type = initial.type
+    private val mutableState = MutableStateFlow(BrowseState(savedFilter() ?: initial))
+
+    fun presets(): List<FilterPreset> =
+        type?.let { BrowseFilters.decodePresets(it, preferences?.state?.value?.browseFilters?.get(BrowseFilters.presets(it))) }.orEmpty()
+
+    fun savePreset(name: String, filter: CatalogFilter) {
+        val media = type ?: return
+        val label = BrowseFilters.name(name)
+        if (label.isEmpty()) return
+        val presets = listOf(FilterPreset(label, filter)) + presets().filterNot { it.name.equals(label, ignoreCase = true) }
+        preferences?.setBrowseFilter(BrowseFilters.presets(media), BrowseFilters.encodePresets(presets))
+    }
+
+    fun removePreset(name: String) {
+        val media = type ?: return
+        preferences?.setBrowseFilter(BrowseFilters.presets(media), BrowseFilters.encodePresets(presets().filterNot { it.name == name }))
+    }
+
+    private fun savedFilter(): CatalogFilter? =
+        type?.let { BrowseFilters.decode(it, preferences?.state?.value?.browseFilters?.get(BrowseFilters.current(it))) }
+
+    fun restoreFilter() {
+        val restored = savedFilter() ?: return
+        if (restored == state.value.filter) return
+        if (started) load(restored, debounce = false) else mutableState.value = BrowseState(restored)
+    }
     val state: StateFlow<BrowseState> = mutableState.asStateFlow()
     private var job: Job? = null
     private var started = false
@@ -76,6 +106,7 @@ class Browser(
         val old = mutableState.value.filter
         if (filter == old) return
         load(filter, debounce = filter.text != old.text)
+        type?.let { preferences?.setBrowseFilter(BrowseFilters.current(it), BrowseFilters.encode(filter)) }
     }
 
     private fun load(
@@ -129,9 +160,10 @@ class BrowseViewModel
     @Inject
     constructor(
         private val repository: HubRepository,
+        private val preferences: PlaybackSettings,
     ) : ViewModel() {
-        val movies = Browser(viewModelScope, repository, CatalogFilter(type = MediaType.MOVIE), needsInput = false)
-        val series = Browser(viewModelScope, repository, CatalogFilter(type = MediaType.TV), needsInput = false)
+        val movies = Browser(viewModelScope, repository, CatalogFilter(type = MediaType.MOVIE), needsInput = false, preferences = preferences)
+        val series = Browser(viewModelScope, repository, CatalogFilter(type = MediaType.TV), needsInput = false, preferences = preferences)
         val search = Browser(viewModelScope, repository, CatalogFilter(), needsInput = true)
 
         private val mutableLanguages = MutableStateFlow<List<String>>(emptyList())
@@ -140,6 +172,12 @@ class BrowseViewModel
         val languages: StateFlow<List<String>> = mutableLanguages.asStateFlow()
 
         init {
+            viewModelScope.launch {
+                preferences.state.drop(1).collect {
+                    movies.restoreFilter()
+                    series.restoreFilter()
+                }
+            }
             viewModelScope.launch { mutableLanguages.value = repository.languages() }
             viewModelScope.launch {
                 repository.posterProgress.collect { value ->

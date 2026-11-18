@@ -159,6 +159,8 @@ object MatchState {
         Index(value = ["newEpisodeAt"]),
         Index(value = ["rating"]),
         Index(value = ["name"]),
+        Index(value = ["year"]),
+        Index(value = ["imdbRating"]),
         Index(value = ["imdbId"]),
     ],
 )
@@ -245,6 +247,7 @@ data class CatalogCard(
     @Embedded val card: TitleCard,
     val popularity: Double?,
     val addedAt: Long?,
+    val playlistAddedAt: Long?,
 )
 
 /** Un titlu din „Continuă vizionarea”, cu locul unde a rămas utilizatorul. */

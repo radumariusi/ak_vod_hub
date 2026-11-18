@@ -8,9 +8,19 @@ enum class CatalogSort(
     val label: String,
 ) {
     POPULAR("Populare"),
-    RECENT("Adăugate recent"),
-    RATING("Cele mai apreciate"),
+    RECENT("Surse actualizate recent"),
+    RATING("Notă TMDB (min. 100 voturi)"),
     TITLE("Alfabetic"),
+    IMDB("Notă IMDb"),
+    RELEASE("Anul lansării"),
+    PLAYLIST("Adăugate recent în playlist"),
+}
+
+enum class LibraryFilter(val label: String) {
+    ALL("Toate"),
+    UNWATCHED("Nevăzute"),
+    STARTED("Începute"),
+    WATCHLIST("În lista mea"),
 }
 
 enum class ProductionFilter(val label: String) {
@@ -54,10 +64,11 @@ data class CatalogFilter(
     val text: String = "",
     val originalAudioOnly: Boolean = false,
     val production: ProductionFilter = ProductionFilter.ALL,
+    val library: LibraryFilter = LibraryFilter.ALL,
 ) {
     val hasFilters: Boolean get() =
         genre != null || years != null || quality != null || language != null ||
-            originalAudioOnly || production != ProductionFilter.ALL
+            originalAudioOnly || production != ProductionFilter.ALL || library != LibraryFilter.ALL
 }
 
 /** O interogare SQL cu argumentele ei, gata de trimis la Room (`SimpleSQLiteQuery`). */
@@ -140,6 +151,13 @@ object CatalogQuery {
             where += "t.originalLanguage = ?"
             args += "en"
         }
+        when (filter.library) {
+            LibraryFilter.ALL -> Unit
+            LibraryFilter.UNWATCHED -> where += "NOT EXISTS (SELECT 1 FROM watch_history h WHERE h.titleId = t.id AND h.finished = 1)"
+            LibraryFilter.STARTED -> where +=
+                "EXISTS (SELECT 1 FROM watch_history h WHERE h.titleId = t.id AND h.finished = 0 AND h.progress > 0)"
+            LibraryFilter.WATCHLIST -> where += "EXISTS (SELECT 1 FROM watchlist w WHERE w.titleId = t.id)"
+        }
         val fts = ftsQuery(filter.text)
         if (fts != null) {
             where += "t.id IN (SELECT docid FROM title_search WHERE title_search MATCH ?)"
@@ -160,6 +178,9 @@ object CatalogQuery {
                 CatalogSort.RECENT -> "t.addedAt"
                 CatalogSort.RATING -> "t.rating"
                 CatalogSort.TITLE -> "t.name"
+                CatalogSort.IMDB -> "t.imdbRating"
+                CatalogSort.RELEASE -> "t.year"
+                CatalogSort.PLAYLIST -> "t.playlistAddedAt"
             }
         val alphabetical = filter.sort == CatalogSort.TITLE
         if (!alphabetical) where += if (section.nullValues) "$column IS NULL" else "$column IS NOT NULL"
@@ -184,7 +205,7 @@ object CatalogQuery {
             }
         args += limit
         return SqlQuery(
-            "SELECT $COLUMNS, t.popularity, t.addedAt FROM title t " +
+            "SELECT $COLUMNS, t.popularity, t.addedAt, t.playlistAddedAt FROM title t " +
                 "WHERE ${where.joinToString(" AND ")} ORDER BY $order LIMIT ?",
             args,
         )

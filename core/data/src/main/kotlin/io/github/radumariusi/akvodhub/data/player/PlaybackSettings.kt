@@ -2,6 +2,7 @@ package io.github.radumariusi.akvodhub.data.player
 
 import android.content.Context
 import io.github.radumariusi.akvodhub.parser.catalog.AccentColor
+import io.github.radumariusi.akvodhub.parser.catalog.BrowseFilters
 import io.github.radumariusi.akvodhub.parser.catalog.OriginalLanguage
 import io.github.radumariusi.akvodhub.parser.catalog.PosterBadge
 import io.github.radumariusi.akvodhub.parser.catalog.PosterBadges
@@ -48,6 +49,7 @@ data class PlaybackPrefs(
     val posterBadges: Set<PosterBadge> = PosterBadges.defaults,
     val posterSize: PosterSize = PosterSize.MEDIUM,
     val accentColor: AccentColor = AccentColor.RED,
+    val browseFilters: Map<String, String> = emptyMap(),
 ) {
     /** Prima limbă a subtitrărilor (pentru pistele încorporate), null = oprite. */
     val subtitleLanguage: String? get() = subtitleLanguages.firstOrNull()
@@ -119,6 +121,12 @@ class PlaybackSettings(
         ) {
             prefs.edit().putString(name, endMs.toString()).apply()
         }
+    }
+
+    fun setBrowseFilter(key: String, value: String) {
+        val safe = BrowseFilters.sanitize(key, value) ?: return
+        prefs.edit().putString(key, safe).apply()
+        mutableState.value = read()
     }
 
     fun setHomeHero(value: Boolean) {
@@ -243,6 +251,7 @@ class PlaybackSettings(
                     put(key, value)
                 }
             }
+            putAll(state.value.browseFilters)
             put("home_hero", state.value.homeHero.toString())
             put("default_speed", state.value.defaultSpeed.toString())
             put("auto_next", state.value.autoNext.toString())
@@ -271,6 +280,9 @@ class PlaybackSettings(
         values["home_hero"]?.toBooleanStrictOrNull()?.let { setHomeHero(it) }
         CONTENT_KEYS.forEach { key -> values[key]?.let { setContent(key, it) } }
         val edit = prefs.edit()
+        BrowseFilters.keys.forEach { key ->
+            values[key]?.let { BrowseFilters.sanitize(key, it) }?.let { edit.putString(key, it) }
+        }
         values[BUFFER]?.let { edit.putString(BUFFER, BufferPreset.decode(it).name) }
         values.forEach { (key, value) ->
             if (io.github.radumariusi.akvodhub.parser.player.SeriesPlayback.validSetting(
@@ -324,6 +336,7 @@ class PlaybackSettings(
                 }
             }
         return PlaybackPrefs(
+            browseFilters = BrowseFilters.keys.mapNotNull { key -> prefs.getString(key, null)?.let { key to it } }.toMap(),
             homeHero = prefs.getBoolean("home_hero", true),
             defaultSpeed =
                 io.github.radumariusi.akvodhub.parser.player.PlaybackDefaults.speed(
