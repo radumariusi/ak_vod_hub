@@ -53,6 +53,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -64,6 +66,7 @@ data class PlayRequest(
     val season: Int? = null,
     val episode: Int? = null,
     val resume: Boolean = false,
+    val openTrackMenu: Boolean = false,
 )
 
 /** O sursă în meniul „Sursă” al playerului. */
@@ -340,13 +343,25 @@ class PlayerViewModel
             if (details.title.mediaType != MediaType.TV) searchAddonSubtitles(null, null)
             val watch = repository.watchState(request.titleId)
             if (details.title.mediaType == MediaType.TV) {
-                val episodes = repository.episodes(request.titleId)
+                val localEpisodes = repository.episodes(request.titleId)
+                val episodes =
+                    if (localEpisodes.seasons.isEmpty()) {
+                        repository
+                            .refreshEpisodes(request.titleId)
+                            .map { repository.episodes(request.titleId) }
+                            .firstOrNull { it.seasons.isNotEmpty() } ?: localEpisodes
+                    } else {
+                        localEpisodes
+                    }
                 seasons = episodes.seasons
                 this.details = episodes.sources
                 val all = seasons.flatMap { it.episodes }
                 val episode =
                     (if (request.episode != null) EpisodeOrder.find(seasons, request.season, request.episode) else null)
                         ?: request.entryId?.let { id -> all.firstOrNull { e -> e.sources.any { it.id == id } } }
+                        ?: watch
+                            ?.takeIf { request.resume && request.episode == null && request.entryId == null }
+                            ?.let { EpisodeOrder.find(seasons, it.season, it.episode) }
                         ?: EpisodeOrder.linear(seasons).firstOrNull()
                         ?: all.firstOrNull()
                 if (episode == null) {
@@ -373,7 +388,7 @@ class PlayerViewModel
                             0L
                         }
                     }
-                playEpisode(episode, request.entryId, resumeAt)
+                playEpisode(episode, request.entryId, resumeAt, autoplay = !request.openTrackMenu)
             } else {
                 this.details = details.sources
                 val all = details.groups.flatMap { g -> g.languages.flatMap { it.sources } }
@@ -382,7 +397,7 @@ class PlayerViewModel
                     return
                 }
                 val resumeAt = if (request.resume) watch?.positionMs ?: 0L else 0L
-                play(all, request.entryId, resumeAt)
+                play(all, request.entryId, resumeAt, autoplay = !request.openTrackMenu)
             }
         }
 
@@ -390,6 +405,7 @@ class PlayerViewModel
             episode: MergedEpisode,
             chosen: Long?,
             positionMs: Long,
+            autoplay: Boolean = true,
         ) {
             this.episode = episode
             val next = EpisodeOrder.next(seasons, episode.season, episode.number)
@@ -397,20 +413,21 @@ class PlayerViewModel
                 it.copy(subtitle = episodeLabel(episode), next = next?.let(::episodeLabel), countdown = null)
             }
             searchAddonSubtitles(episode.season, episode.number)
-            play(episode.sources, chosen, positionMs)
+            play(episode.sources, chosen, positionMs, autoplay)
         }
 
         private fun play(
             list: List<SourceInfo>,
             chosen: Long?,
             positionMs: Long,
+            autoplay: Boolean,
         ) {
             countdownJob?.cancel()
             sources = list.associateBy { it.id }
             val ordered = repository.playOrder(list, title?.originalLanguage).map { it.id }
             queue = FallbackQueue(ordered, chosen?.takeIf { it in sources })
             mutableState.update { it.copy(error = null, failures = emptyList(), countdown = null) }
-            playCurrent(positionMs)
+            playCurrent(positionMs, autoplay)
         }
 
         private fun playCurrent(positionMs: Long, autoplay: Boolean = true) {

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-11-18 — Interfață TV panoramică
+
+- Acasă, Filme și Seriale au hero cu sigla titlului, Redă și Detalii. Meniul și posterele folosesc același stil.
+- Fișa are acțiuni verticale, acces la surse și piste, iar serialele au un ecran dedicat în două panouri pentru sezoane și episoade.
+- Setările și comenzile playerului folosesc aceeași paletă, cu accentul ales de utilizator.
+
 ## 2026-11-18 — Sigle mai rapide și recuperarea redării
 
 - Siglele au bugete de încărcare scurte, iar vecinul începe devreme și continuă dacă primește focus. Filme și Seriale folosesc posterele de pe Acasă.

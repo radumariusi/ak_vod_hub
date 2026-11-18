@@ -155,4 +155,32 @@ class TmdbDetailsTest {
             assertEquals("/3/tv/6/season/1/episode/2", episodeUrl?.encodedPath)
             assertEquals("en-US", episodeUrl?.queryParameter("language"))
         }
+
+    @Test
+    fun seasonEndpointLoadsEpisodeArtworkInOneRequest() =
+        runBlocking {
+            val requests = mutableListOf<HttpUrl>()
+            val http =
+                OkHttpClient
+                    .Builder()
+                    .addInterceptor { chain ->
+                        requests += chain.request().url
+                        Response
+                            .Builder()
+                            .request(chain.request())
+                            .protocol(Protocol.HTTP_1_1)
+                            .code(200)
+                            .message("OK")
+                            .body(
+                                """{"episodes":[{"episode_number":1,"name":"Pilot","still_path":"/one.jpg"},{"episode_number":2,"runtime":42}]}"""
+                                    .toResponseBody(),
+                            ).build()
+                    }.build()
+            val episodes = TmdbClient(http).season("example", 6, 3)
+            assertEquals(listOf(1, 2), episodes.map { it.number })
+            assertEquals("/one.jpg", episodes.first().stillPath)
+            assertEquals(42, episodes.last().runtime)
+            assertEquals("/3/tv/6/season/3", requests.single().encodedPath)
+            assertEquals("en-US", requests.single().queryParameter("language"))
+        }
 }
