@@ -2,9 +2,11 @@ package io.github.radumariusi.akvodhub.parser.catalog
 
 import io.github.radumariusi.akvodhub.parser.title.VideoQuality
 import org.junit.Assert.assertEquals
+import org.junit.Assert.fail
 import org.junit.Assume.assumeNoException
 import org.junit.Test
 import java.io.IOException
+import java.util.concurrent.TimeUnit
 
 class CatalogSqlTest {
     @Test
@@ -23,9 +25,13 @@ class CatalogSqlTest {
                     bestQuality, overview, dubLabel, imdbRating, imdbVotes, tmdbBadge, imdbBadge, hdrBadge,
                     isNew, watchProgress, popularity, addedAt, playlistAddedAt, sourceCount, originalLanguage
                 );
-                CREATE TABLE raw_entry (titleId INTEGER, quality, languages, visible, kind, groupTitle);
+                CREATE TABLE raw_entry (
+                    titleId INTEGER, quality TEXT, languages TEXT, visible INTEGER, kind TEXT, groupTitle TEXT
+                );
+                CREATE INDEX index_raw_entry_titleId ON raw_entry (titleId);
                 CREATE TABLE title_source_option (
-                    titleId, quality, language, originalAudio, PRIMARY KEY(titleId, quality, language, originalAudio)
+                    titleId INTEGER NOT NULL, quality TEXT NOT NULL, language TEXT NOT NULL,
+                    originalAudio INTEGER NOT NULL, PRIMARY KEY(titleId, quality, language, originalAudio)
                 );
                 WITH RECURSIVE ids(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM ids WHERE n < 111000)
                 INSERT INTO title (id, mediaType, name, popularity, sourceCount, originalLanguage)
@@ -39,6 +45,8 @@ class CatalogSqlTest {
             build, page, hide = sys.argv[1:4]
             params = sys.argv[4:7]
             db.execute(build)
+            plan = [row[3] for row in db.execute('EXPLAIN QUERY PLAN ' + page, params)]
+            assert any('SEARCH s ' in detail and '(titleId=' in detail for detail in plan), plan
             assert [row[0] for row in db.execute(page, params)] == [4, 2]
             db.execute(hide, sys.argv[7:])
             db.execute('DELETE FROM title_source_option')
@@ -56,7 +64,11 @@ class CatalogSqlTest {
                 assumeNoException("Python 3 cu modulul SQLite este opțional pentru testul SQL local.", e)
                 return
             }
+        if (!process.waitFor(45, TimeUnit.SECONDS)) {
+            process.destroyForcibly()
+            fail("Testul SQLite sintetic nu a terminat în 45 de secunde.")
+        }
         val output = process.inputStream.bufferedReader().use { it.readText() }
-        assertEquals(output, 0, process.waitFor())
+        assertEquals(output, 0, process.exitValue())
     }
 }
