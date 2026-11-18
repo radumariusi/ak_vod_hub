@@ -1,7 +1,10 @@
 package io.github.radumariusi.akvodhub.ui.hub
 
+import android.content.Context
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
@@ -21,8 +24,10 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
+import coil3.compose.asPainter
 import coil3.request.ImageRequest
 import coil3.svg.SvgDecoder
+import coil3.Image as CoilImage
 
 /** Textul rămâne vizibil până când logo-ul chiar s-a încărcat, inclusiv offline. */
 @Composable
@@ -32,27 +37,12 @@ fun TitleHeading(name: String, logoPaths: List<String>, height: Dp = 76.dp) {
     var loaded by remember(name, path) { mutableStateOf(false) }
     Box(Modifier.widthIn(max = 360.dp).height(height), contentAlignment = Alignment.CenterStart) {
         if (!loaded) {
-            Text(
-                name,
-                style = MaterialTheme.typography.headlineMedium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+            TitleHeadingText(name)
         }
         if (path != null) {
             key(name, path) {
                 val context = LocalContext.current
-                val model =
-                    remember(context, path) {
-                        ImageRequest
-                            .Builder(context)
-                            .data(Images.logo(path))
-                            .apply {
-                                if (path.endsWith(".svg", ignoreCase = true)) {
-                                    decoderFactory(SvgDecoder.Factory(density = SvgDecoder.NO_DENSITY))
-                                }
-                            }.build()
-                    }
+                val model = remember(context, path) { logoRequest(context, path).build() }
                 AsyncImage(
                     model = model,
                     contentDescription = name,
@@ -66,3 +56,45 @@ fun TitleHeading(name: String, logoPaths: List<String>, height: Dp = 76.dp) {
         }
     }
 }
+
+/** Folosește imaginea deja decodată, disponibilă chiar la prima desenare. */
+@Composable
+internal fun HeroHeading(name: String, logo: CoilImage?, height: Dp) {
+    Box(
+        Modifier.widthIn(max = 360.dp).fillMaxWidth().height(height),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        if (logo == null) {
+            TitleHeadingText(name)
+        } else {
+            val context = LocalContext.current
+            Image(
+                painter = remember(context, logo) { logo.asPainter(context) },
+                contentDescription = name,
+                contentScale = ContentScale.Fit,
+                alignment = Alignment.CenterStart,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun TitleHeadingText(name: String) {
+    Text(
+        name,
+        style = MaterialTheme.typography.headlineMedium,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+internal fun logoRequest(context: Context, path: String): ImageRequest.Builder =
+    ImageRequest
+        .Builder(context)
+        .data(Images.logo(path))
+        .apply {
+            if (path.endsWith(".svg", ignoreCase = true)) {
+                decoderFactory(SvgDecoder.Factory(density = SvgDecoder.NO_DENSITY))
+            }
+        }
