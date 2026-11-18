@@ -156,7 +156,7 @@ private fun HomeRows(
     }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val heroHeight = (maxHeight * 0.46f).coerceAtMost(228.dp)
+        val heroHeight = catalogHeroHeight(maxHeight)
         Column(Modifier.fillMaxSize()) {
             val prefs by viewModel.prefs.collectAsState()
             if (prefs.homeHero) {
@@ -168,6 +168,23 @@ private fun HomeRows(
                     onBackdropChanged,
                     neighborTitleIds = {
                         homeLogoNeighbors(rows, focusedRowKey.value, focused.value?.id, visibleRows)
+                    },
+                    onPlay = { card ->
+                        val item = rows.firstNotNullOfOrNull { it.continueInfo[card.id] }
+                        if (item != null) {
+                            play(item, resume = true)
+                        } else {
+                            context.startActivity(PlayerActivity.intent(context, PlayRequest(card.id, resume = true)))
+                        }
+                    },
+                    onDetails = { card ->
+                        val row =
+                            rows.firstOrNull {
+                                it.key == focusedRowKey.value &&
+                                    it.items.any { item -> item.id == card.id }
+                            }
+                                ?: rows.firstOrNull { it.items.any { item -> item.id == card.id } }
+                        if (row != null) onOpen(card, cardKey(row, card))
                     },
                 )
             }

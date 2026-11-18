@@ -13,14 +13,14 @@ private fun colors(accent: AccentColor) =
     darkColorScheme(
         primary = Color(accent.argb),
         onPrimary = Color(accent.onArgb),
-        secondary = Color(0xFF8AB4F8),
-        onSecondary = Color(0xFF14243A),
-        background = Color(0xFF0F1115),
+        secondary = Color(0xFF9CC8FC),
+        onSecondary = Color(0xFF13243A),
+        background = Color(0xFF0C1017),
         onBackground = Color(0xFFE8EAED),
-        surface = Color(0xFF181B21),
+        surface = Color(0xFF151D2A),
         onSurface = Color(0xFFE8EAED),
-        surfaceVariant = Color(0xFF242832),
-        onSurfaceVariant = Color(0xFFB0B4BC),
+        surfaceVariant = Color(0xFF202C3D),
+        onSurfaceVariant = Color(0xFFBBC6D6),
     )
 
 /** Temă întunecată, potrivită pentru TV. */
