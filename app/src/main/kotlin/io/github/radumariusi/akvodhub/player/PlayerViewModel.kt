@@ -431,7 +431,7 @@ class PlayerViewModel
                 return
             }
             showNotice(
-                "${short(failed)} nu merge ($reason). Încerc sursa ${q.position} din ${q.size}: ${short(next)}",
+                "Sursa ${short(failed)} a eșuat ($reason). Trec la ${short(next)}.",
             )
             playCurrent(position)
         }

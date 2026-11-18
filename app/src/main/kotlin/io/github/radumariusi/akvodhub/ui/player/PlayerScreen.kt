@@ -97,6 +97,7 @@ fun PlayerScreen(
     var technical by remember { mutableStateOf(false) }
     var jumping by remember { mutableStateOf(false) }
     var adjusting by remember { mutableStateOf(false) }
+    var advanced by remember { mutableStateOf(false) }
     val prefs by viewModel.prefs.collectAsState()
     val document by viewModel.externalDocument.collectAsState()
     var isPlaying by remember { mutableStateOf(player.isPlaying) }
@@ -107,8 +108,25 @@ fun PlayerScreen(
     val playFocus = remember { FocusRequester() }
     var openingKey by remember { mutableStateOf<Key?>(null) }
     var controlsHeight by remember { mutableIntStateOf(0) }
-    val adjustFocus = remember { FocusRequester() }
-    var returnToAdjust by remember { mutableStateOf(false) }
+    val moreFocus = remember { FocusRequester() }
+    var activeCommand by remember { mutableStateOf<FocusRequester?>(null) }
+    var restoreMore by remember { mutableStateOf(false) }
+    var menuWasOpen by remember { mutableStateOf(false) }
+    val menuOpen = choice != null || adjusting || jumping || technical
+    LaunchedEffect(menuOpen) {
+        if (!menuOpen && menuWasOpen && controls) {
+            runCatching { activeCommand?.requestFocus() }
+            lastInput++
+        }
+        menuWasOpen = menuOpen
+    }
+    LaunchedEffect(advanced, controls) {
+        if (controls && restoreMore) {
+            moreFocus.requestFocus()
+            restoreMore = false
+        }
+        if (!controls) advanced = false
+    }
 
     DisposableEffect(player) {
         val listener =
@@ -142,21 +160,9 @@ fun PlayerScreen(
     LaunchedEffect(controls, overlay) {
         if (!overlay) {
             runCatching {
-                when {
-                    !controls -> {
-                        rootFocus.requestFocus()
-                    }
-
-                    returnToAdjust && (state.externalSubtitle != null || state.subtitles.any { it.selected }) -> {
-                        adjustFocus.requestFocus()
-                    }
-
-                    else -> {
-                        playFocus.requestFocus()
-                    }
-                }
+                if (!controls) rootFocus.requestFocus()
+                else if (!advanced && !menuWasOpen) playFocus.requestFocus()
             }
-            returnToAdjust = false
         }
     }
 
@@ -165,6 +171,10 @@ fun PlayerScreen(
             adjusting -> adjusting = false
             state.error != null -> onExit()
             state.countdown != null -> viewModel.cancelCountdown()
+            controls && advanced -> {
+                restoreMore = true
+                advanced = false
+            }
             controls -> controls = false
             else -> onExit()
         }
@@ -320,14 +330,17 @@ fun PlayerScreen(
                 position = position,
                 duration = duration,
                 playFocus = playFocus,
-                adjustFocus = adjustFocus,
+                moreFocus = moreFocus,
+                advanced = advanced,
+                onFocusedCommand = { activeCommand = it },
+                onToggleAdvanced = {
+                    restoreMore = true
+                    advanced = !advanced
+                },
                 viewModel = viewModel,
                 onInput = { lastInput++ },
                 onChoice = { choice = it },
-                onAdjust = {
-                    returnToAdjust = true
-                    adjusting = true
-                },
+                onAdjust = { adjusting = true },
                 onJump = { jumping = true },
                 onTechnical = { technical = true },
                 modifier = Modifier.align(Alignment.BottomStart).onSizeChanged { controlsHeight = it.height },
@@ -364,7 +377,10 @@ private fun Controls(
     position: Long,
     duration: Long,
     playFocus: FocusRequester,
-    adjustFocus: FocusRequester,
+    moreFocus: FocusRequester,
+    advanced: Boolean,
+    onFocusedCommand: (FocusRequester) -> Unit,
+    onToggleAdvanced: () -> Unit,
     viewModel: PlayerViewModel,
     onInput: () -> Unit,
     onChoice: (Choice) -> Unit,
@@ -376,7 +392,10 @@ private fun Controls(
     val playbackPrefs by viewModel.prefs.collectAsState()
     var focusedCommand by remember { mutableStateOf("") }
     var seekFocused by remember { mutableStateOf(false) }
-    val onCommandFocus: (String) -> Unit = { focusedCommand = it }
+    val onCommandFocus: (String, FocusRequester) -> Unit = { label, requester ->
+        focusedCommand = label
+        onFocusedCommand(requester)
+    }
     Column(
         modifier =
             modifier
@@ -419,6 +438,7 @@ private fun Controls(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            if (!advanced) {
             PlayerCommand(
                 if (isPlaying) R.drawable.ic_player_pause else R.drawable.ic_player_play,
                 if (isPlaying) "Pauză" else "Redă",
@@ -426,17 +446,11 @@ private fun Controls(
                 modifier = Modifier.focusRequester(playFocus),
                 onClick = viewModel::togglePlay,
             )
-            PlayerCommand(R.drawable.ic_player_rewind, "Înapoi 10 secunde", onCommandFocus) {
-                viewModel.seekBy(-PlayerFactory.SEEK_MS)
-            }
-            PlayerCommand(R.drawable.ic_player_forward, "Înainte 10 secunde", onCommandFocus) {
-                viewModel.seekBy(PlayerFactory.SEEK_MS)
-            }
             if (state.audio.isNotEmpty()) {
                 PlayerCommand(R.drawable.ic_player_audio, "Audio (${state.audio.size})", onCommandFocus) {
                     onChoice(
                         Choice(
-                            "Audio",
+                            "Audio · piste detectate",
                             state.audio.map { it.label },
                             state.audio.indexOfFirst { it.selected }.takeIf { it >= 0 },
                         ) { i -> viewModel.selectTrack(state.audio[i]) },
@@ -455,20 +469,20 @@ private fun Controls(
                 },
                 onCommandFocus,
             ) { onChoice(subtitleChoice(state, viewModel)) }
-            if (state.externalSubtitle != null || state.subtitles.any { it.selected }) {
-                PlayerCommand(
-                    R.drawable.ic_player_adjust,
-                    "Ajustează subtitrările",
-                    onCommandFocus,
-                    modifier = Modifier.focusRequester(adjustFocus),
-                    onClick = onAdjust,
-                )
-            }
             if (state.sources.size > 1) {
                 PlayerCommand(R.drawable.ic_player_source, "Sursă (${state.sources.size})", onCommandFocus) {
                     onChoice(sourceChoice(state, viewModel))
                 }
             }
+            if (state.next != null) {
+                PlayerCommand(
+                    R.drawable.ic_player_next,
+                    "Episodul următor",
+                    onCommandFocus,
+                    onClick = viewModel::playNext,
+                )
+            }
+            } else {
             PlayerCommand(R.drawable.ic_player_screen, "Frecvență ecran", onCommandFocus) {
                 onChoice(
                     Choice(
@@ -579,14 +593,26 @@ private fun Controls(
                     )
                 }
             }
-            if (state.next != null) {
+            if (state.externalSubtitle != null || state.subtitles.any { it.selected }) {
                 PlayerCommand(
-                    R.drawable.ic_player_next,
-                    "Episodul următor",
+                    R.drawable.ic_player_adjust,
+                    "Ajustează subtitrările",
                     onCommandFocus,
-                    onClick = viewModel::playNext,
+                    onClick = onAdjust,
                 )
             }
+            PlayerCommand(R.drawable.ic_player_rewind, "Înapoi 10 secunde", onCommandFocus) {
+                viewModel.seekBy(-PlayerFactory.SEEK_MS)
+            }
+            PlayerCommand(R.drawable.ic_player_forward, "Înainte 10 secunde", onCommandFocus) {
+                viewModel.seekBy(PlayerFactory.SEEK_MS)
+            }
+
+            }
+            OutlinedButton(
+                onClick = onToggleAdvanced,
+                modifier = Modifier.focusRequester(moreFocus),
+            ) { Text(if (advanced) "Comenzi principale" else "Mai multe") }
         }
         Text(
             if (seekFocused) "OK redă sau pune pauză · Stânga/Dreapta derulează" else focusedCommand,
@@ -601,15 +627,19 @@ private fun Controls(
 private fun PlayerCommand(
     icon: Int,
     label: String,
-    onFocus: (String) -> Unit,
+    onFocus: (String, FocusRequester) -> Unit,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
-    LaunchedEffect(focused, label) { if (focused) onFocus(label) }
+    val requester = remember { FocusRequester() }
+    LaunchedEffect(focused, label) { if (focused) onFocus(label, requester) }
     OutlinedButton(
-        onClick = onClick,
-        modifier = modifier.size(48.dp).onFocusChanged { focused = it.isFocused },
+        onClick = {
+            onFocus(label, requester)
+            onClick()
+        },
+        modifier = modifier.focusRequester(requester).size(48.dp).onFocusChanged { focused = it.isFocused },
         contentPadding = PaddingValues(0.dp),
     ) {
         Icon(painterResource(icon), contentDescription = label, modifier = Modifier.size(22.dp))
