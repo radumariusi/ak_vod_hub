@@ -170,6 +170,11 @@ Vezi detalii despre schema Room și limitele cunoscute în [HANDOFF.md](HANDOFF.
 - Caută pe TMDB la focus stabil sau la deschiderea fișei. Folosește siglele englezești, apoi cele fără limbă declarată.
 - Acceptă PNG și SVG, încearcă alternativele când o imagine eșuează și actualizează cache-ul vechi la acces.
 
+## Sigle la navigare și episoade după v0.1.43
+
+- Sigla decodată se citește direct din memoria Coil pe Acasă, Filme și Seriale. Titlul curent are prioritate față de cei până la patru vecini.
+- Episoadele au rânduri cu miniatură, titlu și stare, selector de sezon și redare cu OK. Titlul, descrierea, durata și imaginea TMDB se cer la focus stabil.
+
 ## Ce ar îngreuna aplicația (de evitat sau doar opțional)
 
 1. **Trailere redate în aplicație / pe fundal** (YouTube, WebView): megabytes în plus și RAM. → Deschidem aplicația YouTube.

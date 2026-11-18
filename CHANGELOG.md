@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-18 — Sigle la navigare și lista episoadelor
+
+- Siglele deja decodate apar direct la revenire. Hero începe încărcarea pe focus și pregătește vecinii direcționali după ce termină.
+- Lista episoadelor folosește selector de sezon, miniaturi 16:9, durată și progres. Metadatele se cer pentru episodul pe care rămâne focusul.
+
 ## 2026-11-18 — Sigle pentru filme și seriale
 
 - Hero și fișă acceptă sigle TMDB PNG și SVG. Dacă o imagine nu se încarcă, se încearcă următoarea siglă în engleză sau neutră.

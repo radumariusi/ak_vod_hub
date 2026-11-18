@@ -187,6 +187,14 @@ data class TmdbFindResult(
 )
 
 @Serializable
+data class TmdbEpisode(
+    val name: String? = null,
+    val overview: String? = null,
+    val runtime: Int? = null,
+    @SerialName("still_path") val stillPath: String? = null,
+)
+
+@Serializable
 data class TmdbImages(val logos: List<TmdbLogo> = emptyList())
 
 @Serializable

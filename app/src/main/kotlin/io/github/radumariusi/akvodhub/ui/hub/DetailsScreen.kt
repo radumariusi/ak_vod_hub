@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -24,7 +23,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -46,9 +44,9 @@ import io.github.radumariusi.akvodhub.data.catalog.Credits
 import io.github.radumariusi.akvodhub.data.catalog.Person
 import io.github.radumariusi.akvodhub.data.catalog.SourceDetails
 import io.github.radumariusi.akvodhub.data.catalog.TitleDetails
-import io.github.radumariusi.akvodhub.data.db.EpisodeProgressEntity
 import io.github.radumariusi.akvodhub.data.db.TitleCard
 import io.github.radumariusi.akvodhub.data.db.isLocal
+import io.github.radumariusi.akvodhub.data.tmdb.TmdbEpisode
 import io.github.radumariusi.akvodhub.hub.DetailsState
 import io.github.radumariusi.akvodhub.hub.DetailsViewModel
 import io.github.radumariusi.akvodhub.parser.catalog.MergedEpisode
@@ -59,11 +57,9 @@ import io.github.radumariusi.akvodhub.parser.player.EpisodeOrder
 import io.github.radumariusi.akvodhub.parser.player.Resume
 import io.github.radumariusi.akvodhub.player.PlayRequest
 import io.github.radumariusi.akvodhub.player.PlayerActivity
-import io.github.radumariusi.akvodhub.ui.SelectionTab
 import io.github.radumariusi.akvodhub.ui.touch.Button
 import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
 import io.github.radumariusi.akvodhub.ui.touch.Surface
-import kotlinx.coroutines.CancellationException
 
 /**
  * Pagina unui film sau serial: fundal, poster, descriere, notă, genuri, distribuție, apoi sursele grupate
@@ -81,25 +77,6 @@ fun DetailsScreen(
     LaunchedEffect(titleId) { viewModel.open(titleId) }
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
-    var activeEpisode by remember(titleId) { mutableStateOf<MergedEpisode?>(null) }
-    var episodeMessage by remember(activeEpisode) { mutableStateOf("Se încarcă…") }
-    LaunchedEffect(activeEpisode) {
-        val requested = activeEpisode ?: return@LaunchedEffect
-        episodeMessage =
-            try {
-                viewModel.episodeOverview(requested) ?: "Descriere indisponibilă."
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                "Descrierea episodului nu a putut fi încărcată."
-            }
-    }
-    activeEpisode?.let {
-        ChoiceDialog(
-            Choice(episodeCode(it), listOf("Închide"), selected = 0, footer = episodeMessage) {},
-            onDismiss = { activeEpisode = null },
-        )
-    }
 
     fun play(request: PlayRequest) {
         context.startActivity(PlayerActivity.intent(context, request))
@@ -116,7 +93,7 @@ fun DetailsScreen(
                     onWatchlist = viewModel::toggleWatchlist,
                     onWatched = viewModel::toggleWatched,
                     onSelectSeason = viewModel::selectSeason,
-                    onEpisodeInfo = { activeEpisode = it },
+                    loadEpisodeMetadata = viewModel::episodeMetadata,
                     onActor = onActor,
                     sourceReason =
                         state.recommended?.let {
@@ -148,7 +125,7 @@ private fun DetailsContent(
     onWatchlist: () -> Unit,
     onWatched: () -> Unit,
     onSelectSeason: (Int) -> Unit,
-    onEpisodeInfo: (MergedEpisode) -> Unit,
+    loadEpisodeMetadata: suspend (MergedEpisode) -> TmdbEpisode?,
     onActor: (Person) -> Unit,
     onOpen: (TitleCard) -> Unit,
     sourceReason: String?,
@@ -218,19 +195,7 @@ private fun DetailsContent(
         if (episodes != null) {
             if (episodes.seasons.isNotEmpty()) {
                 item("seasons") {
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
-                    ) {
-                        items(episodes.seasons, key = { it.number }) { s ->
-                            val label = if (s.number == 0) "Altele" else "Sezonul ${s.number}"
-                            SelectionTab(
-                                label = label,
-                                active = s.number == state.selectedSeason,
-                                onClick = { onSelectSeason(s.number) },
-                            )
-                        }
-                    }
+                    EpisodeSeasonPicker(episodes.seasons, state.selectedSeason, onSelectSeason)
                 }
             } else {
                 item("no-episodes") {
@@ -246,20 +211,15 @@ private fun DetailsContent(
             season?.let { s ->
                 items(
                     s.episodes,
-                    key = { "e:${s.number}:${it.number ?: "source-${it.sources.first().id}"}" },
+                    key = { "e:${title.id}:${s.number}:${it.number ?: "source-${it.sources.first().id}"}" },
                 ) { episode ->
                     val progress = episode.number?.let { state.episodeProgress[episode.season to it] }
-                    val showInfo: (() -> Unit)? =
-                        if (!title.isLocal && episode.number != null) {
-                            { onEpisodeInfo(episode) }
-                        } else {
-                            null
-                        }
                     EpisodeRow(
                         episode,
                         next = nextEpisode == episode,
                         progress = progress,
-                        onInfo = showInfo,
+                        seriesBackdrop = title.backdropPath,
+                        loadMetadata = loadEpisodeMetadata.takeIf { !title.isLocal && episode.number != null },
                         onClick = {
                             onPlay(episodeRequest(title.id, episode, resume = progress?.finished == false))
                         },
@@ -475,56 +435,6 @@ private fun QualityRow(
         }
     }
     choice?.let { ChoiceDialog(it, onDismiss = { choice = null }) }
-}
-
-@Composable
-private fun EpisodeRow(
-    episode: MergedEpisode,
-    next: Boolean,
-    progress: EpisodeProgressEntity?,
-    onInfo: (() -> Unit)?,
-    onClick: () -> Unit,
-) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Surface(onClick = onClick, modifier = Modifier.weight(1f)) {
-            Row(
-                Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(18.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    episode.number?.let {
-                        "E%02d".format(it)
-                    } ?: "•",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.width(56.dp),
-                )
-                Column(Modifier.heightIn(min = 44.dp), verticalArrangement = Arrangement.Center) {
-                    Text(
-                        episode.title ?: episode.number?.let { "Episodul $it" } ?: "Episod",
-                        style = MaterialTheme.typography.titleSmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        listOfNotNull(
-                            "Următorul disponibil".takeIf { next },
-                            when {
-                                progress?.finished == true -> "Văzut"
-                                progress != null -> "Început · ${Resume.format(progress.positionMs)}"
-                                else -> null
-                            },
-                            "${episode.sources.size} " + if (episode.sources.size == 1) "sursă" else "surse",
-                        ).joinToString(" · "),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                    )
-                }
-            }
-        }
-        if (onInfo != null) OutlinedButton(onClick = onInfo) { Text("Detalii episod") }
-    }
 }
 
 /** Butoanele de redare din fișă: „Continuă de la 12:34” / „De la început” sau „Redă”. */

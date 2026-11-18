@@ -18,6 +18,7 @@ import io.github.radumariusi.akvodhub.data.player.PlaybackSettings
 import io.github.radumariusi.akvodhub.data.playlist.PlaylistImporter
 import io.github.radumariusi.akvodhub.data.playlist.xtream.XtreamClient
 import io.github.radumariusi.akvodhub.data.tmdb.TmdbClient
+import io.github.radumariusi.akvodhub.data.tmdb.TmdbEpisode
 import io.github.radumariusi.akvodhub.data.tmdb.TmdbSettings
 import io.github.radumariusi.akvodhub.parser.VodKind
 import io.github.radumariusi.akvodhub.parser.catalog.CatalogCursor
@@ -53,6 +54,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
@@ -428,20 +430,39 @@ class HubRepository(
             }
         }.conflate()
 
-    suspend fun episodeOverview(title: TitleEntity, season: Int, episode: Int): String? {
+    suspend fun episodeMetadata(title: TitleEntity, season: Int, episode: Int): TmdbEpisode? {
         if (title.isLocal || season < 0 || episode <= 0) return null
         val cache = db.discoverDao()
-        val cacheKey = "episode:en:${title.tmdbId}:$season:$episode"
+        val suffix = "${title.tmdbId}:$season:$episode"
+        val cacheKey = "episode:en:v2:$suffix"
         val now = System.currentTimeMillis()
         val old = cache.cached(cacheKey)
-        if (old != null && LocalizedOverview.isCached(old.fetchedAt, now)) return old.data.ifBlank { null }
-        val key = settings.apiKey() ?: return old?.data?.ifBlank { null }
-        val text = tmdb.episodeOverview(key, title.tmdbId, season, episode)
-        db.withTransaction {
-            cache.putCache(DiscoverCacheEntity(cacheKey, text.orEmpty(), now))
-            cache.trimEpisodes()
+        val decoded = old?.data?.let { runCatching { Json.decodeFromString<TmdbEpisode?>(it) } }
+        val cached = decoded?.getOrNull()
+        if (old != null && decoded?.isSuccess == true && LocalizedOverview.isCached(old.fetchedAt, now)) return cached
+
+        suspend fun fallback(): TmdbEpisode? =
+            cached
+                ?: cache
+                    .cached(
+                        "episode:en:$suffix",
+                    )?.data
+                    ?.takeIf(String::isNotBlank)
+                    ?.let { TmdbEpisode(overview = it) }
+
+        val key = settings.apiKey() ?: return fallback()
+        return try {
+            val metadata = tmdb.episode(key, title.tmdbId, season, episode)
+            db.withTransaction {
+                cache.putCache(DiscoverCacheEntity(cacheKey, Json.encodeToString(metadata), now))
+                cache.trimEpisodes()
+            }
+            metadata
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            fallback()
         }
-        return text
     }
 
     /** Distribuția de la TMDB (o cerere, ținută în memorie). null dacă nu avem cheie sau titlul e local. */

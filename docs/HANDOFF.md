@@ -412,3 +412,19 @@ PNG folosește TMDB w500, SVG folosește originalul și decodorul Coil SVG. Text
 de 128 de intrări pentru sigle. Siglele găsite expiră în 30 de zile, absențele confirmate într-o zi.
 Intrările vechi se reverifică la acces, iar căile vechi validate rămân rezervă offline. Nu există
 migrare Room. Verificarea pe Android TV trebuie să includă atât sigle PNG cât și SVG.
+
+
+### Sigle la navigare și episoade după v0.1.43
+
+Hero pornește citirea siglei odată cu focusul și afișează imediat imaginea decodată dacă este încă în memoria
+Coil (`hero-logo:<titleId>`). Pe o intrare necached, păstrează cadrul anterior până la încărcare sau cel mult
+300 ms la navigare. După încărcarea titlului și 350 ms de stabilitate, încearcă pe rând până la patru vecini.
+Grilele folosesc geometria coloanelor, iar Acasă poziția orizontală din rândurile vecine. Schimbarea focusului
+anulează preîncărcarea. Cache-ul Coil rămâne comun cu setarea de golire a imaginilor.
+
+Fișa unui serial are un selector de sezon și un singur card de redare pentru fiecare episod disponibil.
+Rândurile păstrează gruparea surselor, progresul, reluarea și indicatorul pentru episodul următor.
+La 220 ms de focus stabil se cer numele, descrierea, miniatura și durata TMDB pentru episodul respectiv.
+Rândul rămâne utilizabil cu datele din playlist și, dacă există, imaginea serialului. Cache-ul existent
+`discover_cache` păstrează până la 64 de rezultate pentru episoade, cu prefixul nou `episode:en:v2:`
+și rezervă pentru descrierile vechi offline. Fără migrare Room sau dependențe noi.
