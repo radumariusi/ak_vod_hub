@@ -5,6 +5,7 @@ import androidx.sqlite.db.SimpleSQLiteQuery
 import io.github.radumariusi.akvodhub.data.db.AkVodDatabase
 import io.github.radumariusi.akvodhub.data.db.ContinueItem
 import io.github.radumariusi.akvodhub.data.db.DiscoverCacheEntity
+import io.github.radumariusi.akvodhub.data.db.EpisodeProgressEntity
 import io.github.radumariusi.akvodhub.data.db.PlaylistType
 import io.github.radumariusi.akvodhub.data.db.RawEntryEntity
 import io.github.radumariusi.akvodhub.data.db.TitleCard
@@ -212,6 +213,11 @@ class HubRepository(
         return dao.cards(SimpleSQLiteQuery(query.sql, query.args.toTypedArray()))
     }
 
+    suspend fun episodeProgress(titleId: Long): List<EpisodeProgressEntity> = dao.episodeProgress(titleId)
+
+    suspend fun episodeProgress(titleId: Long, season: Int, episode: Int): EpisodeProgressEntity? =
+        dao.episodeProgress(titleId, season, episode)
+
     suspend fun watchState(titleId: Long): WatchStateEntity? = dao.watchState(titleId)
 
     private val watchChanged = MutableStateFlow(0L)
@@ -236,6 +242,7 @@ class HubRepository(
         progress: Double,
         finished: Boolean,
         at: Long,
+        episode: EpisodeProgressEntity? = null,
     ) {
         val history = db.discoverDao()
         db.withTransaction {
@@ -243,6 +250,12 @@ class HubRepository(
             val old = history.history(titleId)
             val value = progress.coerceIn(0.0, 1.0)
             if (finished) dao.setPosterProgress(titleId, 1.0)
+            if (episode != null) {
+                val previous = dao.episodeProgress(titleId, episode.season, episode.episode)
+                if (previous == null || episode.updatedAt >= previous.updatedAt) {
+                    dao.putEpisodeProgress(episode.copy(finished = episode.finished || previous?.finished == true))
+                }
+            }
             history.putHistory(
                 WatchHistoryEntity(
                     titleId = titleId,
@@ -435,6 +448,22 @@ class HubRepository(
                     }
                 }.awaitAll()
         }
+    }
+
+    suspend fun episodeOverview(title: TitleEntity, season: Int, episode: Int): String? {
+        if (title.isLocal || season < 0 || episode <= 0) return null
+        val cache = db.discoverDao()
+        val cacheKey = "episode:en:${title.tmdbId}:$season:$episode"
+        val now = System.currentTimeMillis()
+        val old = cache.cached(cacheKey)
+        if (old != null && LocalizedOverview.isCached(old.fetchedAt, now)) return old.data.ifBlank { null }
+        val key = settings.apiKey() ?: return old?.data?.ifBlank { null }
+        val text = tmdb.episodeOverview(key, title.tmdbId, season, episode)
+        db.withTransaction {
+            cache.putCache(DiscoverCacheEntity(cacheKey, text.orEmpty(), now))
+            cache.trimEpisodes()
+        }
+        return text
     }
 
     /** Distribuția de la TMDB (o cerere, ținută în memorie). null dacă nu avem cheie sau titlul e local. */

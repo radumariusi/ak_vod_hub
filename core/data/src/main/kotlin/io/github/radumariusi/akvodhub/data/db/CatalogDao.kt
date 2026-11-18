@@ -248,6 +248,30 @@ interface CatalogDao {
     @Query("UPDATE title SET watchProgress = :progress WHERE id = :titleId")
     suspend fun setPosterProgress(titleId: Long, progress: Double)
 
+    @Query("SELECT * FROM episode_progress WHERE titleId = :titleId ORDER BY updatedAt DESC")
+    suspend fun episodeProgress(titleId: Long): List<EpisodeProgressEntity>
+
+    @Query("SELECT * FROM episode_progress WHERE titleId = :titleId AND season = :season AND episode = :episode")
+    suspend fun episodeProgress(titleId: Long, season: Int, episode: Int): EpisodeProgressEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun putEpisodeProgress(value: EpisodeProgressEntity)
+
+    @Query(
+        "INSERT OR IGNORE INTO episode_progress " +
+            "SELECT :titleId, p.season, p.episode, p.positionMs, p.durationMs, p.finished, p.updatedAt " +
+            "FROM episode_progress p WHERE p.titleId IN (SELECT titleId FROM raw_entry WHERE id IN (:ids)) " +
+            "ORDER BY p.updatedAt DESC",
+    )
+    suspend fun carryEpisodeProgress(ids: List<Long>, titleId: Long)
+
+    @Query(
+        "INSERT OR IGNORE INTO watch_state SELECT :titleId, w.entryId, w.season, w.episode, w.positionMs, " +
+            "w.durationMs, w.updatedAt FROM watch_state w " +
+            "WHERE w.titleId IN (SELECT titleId FROM raw_entry WHERE id IN (:ids)) ORDER BY w.updatedAt DESC LIMIT 1",
+    )
+    suspend fun carryWatchState(ids: List<Long>, titleId: Long)
+
     @Query("DELETE FROM watch_state WHERE titleId = :titleId")
     suspend fun deleteWatchState(titleId: Long)
 

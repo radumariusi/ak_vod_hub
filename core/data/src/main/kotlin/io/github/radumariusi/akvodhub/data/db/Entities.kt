@@ -367,3 +367,15 @@ data class TitleSourceOption(
     val language: String,
     val originalAudio: Boolean,
 )
+
+
+@Entity(tableName = "episode_progress", primaryKeys = ["titleId", "season", "episode"])
+data class EpisodeProgressEntity(
+    val titleId: Long,
+    val season: Int,
+    val episode: Int,
+    val positionMs: Long,
+    val durationMs: Long,
+    val finished: Boolean,
+    val updatedAt: Long,
+)

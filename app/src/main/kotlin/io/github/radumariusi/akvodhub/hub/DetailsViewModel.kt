@@ -7,10 +7,13 @@ import io.github.radumariusi.akvodhub.data.catalog.Credits
 import io.github.radumariusi.akvodhub.data.catalog.HubRepository
 import io.github.radumariusi.akvodhub.data.catalog.SeriesEpisodes
 import io.github.radumariusi.akvodhub.data.catalog.TitleDetails
+import io.github.radumariusi.akvodhub.data.db.EpisodeProgressEntity
 import io.github.radumariusi.akvodhub.data.db.WatchStateEntity
 import io.github.radumariusi.akvodhub.data.discover.DiscoverRepository
 import io.github.radumariusi.akvodhub.data.discover.TitleDiscovery
+import io.github.radumariusi.akvodhub.parser.catalog.MergedEpisode
 import io.github.radumariusi.akvodhub.parser.match.MediaType
+import io.github.radumariusi.akvodhub.parser.player.EpisodeOrder
 import io.github.radumariusi.akvodhub.parser.match.SourceInfo
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,11 +39,26 @@ data class DetailsState(
     val changingLibrary: Boolean = false,
     /** Unde a rămas utilizatorul (pentru „Continuă”). */
     val watch: WatchStateEntity? = null,
+    val episodeProgress: Map<Pair<Int, Int>, EpisodeProgressEntity> = emptyMap(),
     /** Sursa pe care o alege playerul singur (profilul din Setări → Redare). */
     val recommended: SourceInfo? = null,
     /** Colecția, „Recomandate”, „Similare”, alte titluri ale regizorului (doar ce există în playlist). */
     val discovery: TitleDiscovery? = null,
-)
+) {
+    val nextEpisode: MergedEpisode?
+        get() {
+            val seasons = episodes?.seasons ?: return null
+            val available = EpisodeOrder.linear(seasons)
+            val resume = watch?.let { w -> EpisodeOrder.find(seasons, w.season, w.episode) }
+            if (resume != null) return resume
+            val last = episodeProgress.values.maxByOrNull { it.updatedAt }
+            val candidate = last?.let { saved ->
+                if (saved.finished) EpisodeOrder.next(seasons, saved.season, saved.episode)
+                else EpisodeOrder.find(seasons, saved.season, saved.episode)
+            }
+            return candidate ?: available.firstOrNull { it.number?.let { number -> episodeProgress[it.season to number]?.finished } != true }
+        }
+}
 
 /** Pagina de detalii a unui film sau serial: fișa, sursele grupate, episoadele unite, distribuția. */
 @HiltViewModel
@@ -95,6 +113,7 @@ class DetailsViewModel
                     val all = details?.groups.orEmpty().flatMap { g -> g.languages.flatMap { it.sources } }
                     val recommended = repository.playOrder(all, details?.title?.originalLanguage).firstOrNull()
                     val watch = repository.watchState(titleId)
+                    val progress = if (details?.title?.mediaType == MediaType.TV) repository.episodeProgress(titleId) else emptyList()
                     val listed = repository.inWatchlist(titleId)
                     val watched = repository.isWatched(titleId)
                     mutableState.update {
@@ -103,6 +122,7 @@ class DetailsViewModel
                             details = details,
                             recommended = recommended,
                             watch = watch,
+                            episodeProgress = progress.associateBy { it.season to it.episode },
                             inWatchlist = listed,
                             watched = watched,
                         )
@@ -135,7 +155,9 @@ class DetailsViewModel
             mutableState.update { s ->
                 val seasons = episodes.seasons.map { it.number }
                 val selected =
-                    s.selectedSeason?.takeIf { it in seasons } ?: seasons.firstOrNull { it > 0 }
+                    s.selectedSeason?.takeIf { it in seasons }
+                        ?: s.copy(episodes = episodes).nextEpisode?.season?.takeIf { it in seasons }
+                        ?: seasons.firstOrNull { it > 0 }
                         ?: seasons.firstOrNull()
                 s.copy(episodes = episodes, loadingEpisodes = loadingMore, selectedSeason = selected)
             }
@@ -176,8 +198,13 @@ class DetailsViewModel
             val watch = repository.watchState(titleId)
             val listed = repository.inWatchlist(titleId)
             val watched = repository.isWatched(titleId)
+            val progress = if (state.value.details?.title?.mediaType == MediaType.TV) {
+                repository.episodeProgress(titleId).associateBy { it.season to it.episode }
+            } else {
+                emptyMap()
+            }
             mutableState.update {
-                if (it.titleId == titleId) it.copy(watch = watch, inWatchlist = listed, watched = watched) else it
+                if (it.titleId == titleId) it.copy(watch = watch, episodeProgress = progress, inWatchlist = listed, watched = watched) else it
             }
         }
     }

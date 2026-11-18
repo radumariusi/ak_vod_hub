@@ -106,6 +106,8 @@ class TitleMatcher(
     private suspend fun linkKeepingLibrary(ids: List<Long>, titleId: Long) {
         dao.carryWatchlist(ids, titleId)
         dao.carryHistory(ids, titleId)
+        dao.carryEpisodeProgress(ids, titleId)
+        dao.carryWatchState(ids, titleId)
         dao.link(ids, titleId)
     }
 

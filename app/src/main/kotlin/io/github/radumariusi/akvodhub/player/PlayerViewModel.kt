@@ -14,6 +14,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.radumariusi.akvodhub.data.catalog.HubRepository
 import io.github.radumariusi.akvodhub.data.catalog.SourceDetails
+import io.github.radumariusi.akvodhub.data.db.EpisodeProgressEntity
 import io.github.radumariusi.akvodhub.data.db.TitleEntity
 import io.github.radumariusi.akvodhub.data.db.WatchStateEntity
 import io.github.radumariusi.akvodhub.data.db.isLocal
@@ -304,13 +305,16 @@ class PlayerViewModel
                     fatal("Nu am găsit episoade pentru acest serial.")
                     return
                 }
+                val savedEpisode = episode.number?.takeIf { request.resume }?.let {
+                    repository.episodeProgress(request.titleId, episode.season, it)
+                }
                 val resumeAt =
-                    if (request.resume && watch != null && watch.season == episode.season &&
-                        watch.episode == episode.number
-                    ) {
-                        watch.positionMs
-                    } else {
-                        0L
+                    when {
+                        request.resume && watch != null && watch.season == episode.season && watch.episode == episode.number ->
+                            watch.positionMs
+                        savedEpisode != null && Resume.shouldResume(savedEpisode.positionMs, savedEpisode.durationMs) &&
+                            !savedEpisode.finished -> savedEpisode.positionMs
+                        else -> 0L
                     }
                 val chosen = request.entryId ?: watch?.entryId?.takeIf { request.resume && resumeAt > 0 }
                 playEpisode(episode, chosen, resumeAt)
@@ -927,7 +931,10 @@ class PlayerViewModel
             val nextEntry = next?.let { repository.playOrder(it.sources, title.originalLanguage).firstOrNull()?.id }
             saveScope.launch {
                 if (finished || position >= Resume.MIN_POSITION_MS) {
-                    repository.recordWatch(title.id, position.toDouble() / duration, finished, now)
+                    val episodeProgress = current?.let { e ->
+                        e.number?.let { EpisodeProgressEntity(title.id, e.season, it, position, duration, finished, now) }
+                    }
+                    repository.recordWatch(title.id, position.toDouble() / duration, finished, now, episodeProgress)
                 }
                 when {
                     !finished && position >= Resume.MIN_POSITION_MS -> {
