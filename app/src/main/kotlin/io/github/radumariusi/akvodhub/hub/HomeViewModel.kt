@@ -67,7 +67,9 @@ class HomeViewModel
 
         private sealed interface HomeCursor {
             data class Catalog(val cursor: CatalogCursor) : HomeCursor
+
             data class News(val cursor: NewsCursor) : HomeCursor
+
             data class Watchlist(val id: Long) : HomeCursor
         }
 
@@ -113,7 +115,11 @@ class HomeViewModel
                 discover.installedAddons.drop(1).collect { loadCatalogs() }
             }
             viewModelScope.launch {
-                prefs.map { it.homeOrder to it.homeHidden }.distinctUntilChanged().drop(1).collect { reload() }
+                prefs
+                    .map { it.homeOrder to it.homeHidden }
+                    .distinctUntilChanged()
+                    .drop(1)
+                    .collect { reload() }
             }
         }
 
@@ -127,32 +133,39 @@ class HomeViewModel
 
         fun reload() {
             reloadJob?.cancel()
-            reloadJob = viewModelScope.launch {
-                loadingMore.values.forEach(Job::cancel)
-                loadingMore.clear()
-                windows.clear()
-                val rows = mutableListOf<HomeRow>()
-                if (enabled(CONTINUE)) continueRow()?.let { rows += it }
-                if (enabled(HomeRows.WATCHLIST)) newRow(HomeRows.WATCHLIST, "Lista mea")?.let { rows += it }
-                if (enabled(NEWS)) newRow(NEWS, "Nou în playlist")?.let { rows += it }
-                if (enabled(EPISODES)) newRow(EPISODES, "Episoade noi la serialele urmărite")?.let { rows += it }
-                for ((key, title, filter) in specs) {
-                    if (enabled(key)) newRow(key, title, filter)?.let { rows += it }
+            reloadJob =
+                viewModelScope.launch {
+                    personalJob?.cancel()
+                    catalogJob?.cancel()
+                    loadingMore.values.forEach(Job::cancel)
+                    loadingMore.clear()
+                    windows.clear()
+                    val rows = mutableListOf<HomeRow>()
+                    if (enabled(CONTINUE)) continueRow()?.let { rows += it }
+                    if (enabled(HomeRows.WATCHLIST)) newRow(HomeRows.WATCHLIST, "Lista mea")?.let { rows += it }
+                    if (enabled(NEWS)) newRow(NEWS, "Nou în playlist")?.let { rows += it }
+                    if (enabled(EPISODES)) newRow(EPISODES, "Episoade noi la serialele urmărite")?.let { rows += it }
+                    for ((key, title, filter) in specs) {
+                        if (enabled(key)) newRow(key, title, filter)?.let { rows += it }
+                    }
+                    base = rows
+                    loaded = true
+                    publish()
+                    // Disponibilitatea s-a putut schimba: refacem și rândurile de descoperire.
+                    loadPersonal()
+                    loadCatalogs()
                 }
-                base = rows
-                loaded = true
-                publish()
-                // Disponibilitatea s-a putut schimba: refacem și rândurile de descoperire.
-                loadPersonal()
-                loadCatalogs()
-            }
         }
 
         private suspend fun continueRow(): HomeRow? {
             val cards = repository.continueWatching()
             if (cards.isEmpty()) return null
             return HomeRow(
-                CONTINUE, "Continuă vizionarea", cards, null, endReached = true,
+                CONTINUE,
+                "Continuă vizionarea",
+                cards,
+                null,
+                endReached = true,
                 continueInfo = repository.continueItems(cards.size).associateBy { it.titleId },
             )
         }
@@ -189,7 +202,11 @@ class HomeViewModel
             return HomeRow(key, label, cards, filter, endReached = !window.hasLater)
         }
 
-        private suspend fun fetch(key: String, filter: CatalogFilter?, cursor: HomeCursor?): KeysetPage<HomeCursor, TitleCard> {
+        private suspend fun fetch(
+            key: String,
+            filter: CatalogFilter?,
+            cursor: HomeCursor?,
+        ): KeysetPage<HomeCursor, TitleCard> {
             if (filter != null) {
                 val page = repository.page(filter, PAGE, (cursor as? HomeCursor.Catalog)?.cursor)
                 return KeysetPage(page.items, page.next?.let { HomeCursor.Catalog(it) })
@@ -212,7 +229,10 @@ class HomeViewModel
             personalJob =
                 viewModelScope.launch {
                     delay(delayMs)
-                    val rows = withContext(Dispatchers.Default) { runCatching { discover.personalRows(recommendations, collections, because) }.getOrNull() }
+                    val rows =
+                        withContext(Dispatchers.Default) {
+                            runCatching { discover.personalRows(recommendations, collections, because) }.getOrNull()
+                        }
                     if (rows != null) {
                         personal = rows.map { it.toHomeRow() }
                         publish()
@@ -235,8 +255,10 @@ class HomeViewModel
 
         private fun publish() {
             val order = HomeRows.order(prefs.value.homeOrder).withIndex().associate { it.value to it.index }
-            val rows = (base + personal + catalogs).filter { enabled(it.key) }
-                .sortedBy { order[HomeRows.group(it.key)] ?: Int.MAX_VALUE }
+            val rows =
+                (base + personal + catalogs)
+                    .filter { enabled(it.key) }
+                    .sortedBy { order[HomeRows.group(it.key)] ?: Int.MAX_VALUE }
             mutableState.value = HomeState(loading = !loaded, rows = rows)
         }
 
@@ -246,18 +268,24 @@ class HomeViewModel
             if (reloadJob?.isActive == true || loadingMore[key]?.isActive == true) return
             val backwards = row.hasEarlier && index < PREFETCH / 2
             if (!backwards && (row.endReached || index < row.items.size - PREFETCH)) return
-            loadingMore[key] = viewModelScope.launch {
-                window.move(backwards) { fetch(key, row.filter, it) }
-                if (windows[key] !== window || !enabled(key)) return@launch
-                base = base.map {
-                    if (it.key == key) it.copy(
-                        items = window.items.distinctBy { card -> card.id },
-                        endReached = !window.hasLater,
-                        hasEarlier = window.hasEarlier,
-                    ) else it
+            loadingMore[key] =
+                viewModelScope.launch {
+                    window.move(backwards) { fetch(key, row.filter, it) }
+                    if (windows[key] !== window || !enabled(key)) return@launch
+                    base =
+                        base.map {
+                            if (it.key == key) {
+                                it.copy(
+                                    items = window.items.distinctBy { card -> card.id },
+                                    endReached = !window.hasLater,
+                                    hasEarlier = window.hasEarlier,
+                                )
+                            } else {
+                                it
+                            }
+                        }
+                    publish()
                 }
-                publish()
-            }
         }
 
         private fun DiscoverRow.toHomeRow() = HomeRow("d:$key", title, items, null, endReached = true)

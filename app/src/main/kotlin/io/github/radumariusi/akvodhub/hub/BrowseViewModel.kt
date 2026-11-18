@@ -48,29 +48,58 @@ class Browser(
     private val mutableState = MutableStateFlow(BrowseState(savedFilter() ?: initial))
 
     fun presets(): List<FilterPreset> =
-        type?.let { BrowseFilters.decodePresets(it, preferences?.state?.value?.browseFilters?.get(BrowseFilters.presets(it))) }.orEmpty()
+        type
+            ?.let {
+                BrowseFilters.decodePresets(
+                    it,
+                    preferences
+                        ?.state
+                        ?.value
+                        ?.browseFilters
+                        ?.get(BrowseFilters.presets(it)),
+                )
+            }.orEmpty()
 
     fun savePreset(name: String, filter: CatalogFilter) {
         val media = type ?: return
         val label = BrowseFilters.name(name)
         if (label.isEmpty()) return
-        val presets = listOf(FilterPreset(label, filter)) + presets().filterNot { it.name.equals(label, ignoreCase = true) }
+        val presets =
+            listOf(FilterPreset(label, filter)) + presets().filterNot { it.name.equals(label, ignoreCase = true) }
         preferences?.setBrowseFilter(BrowseFilters.presets(media), BrowseFilters.encodePresets(presets))
     }
 
     fun removePreset(name: String) {
         val media = type ?: return
-        preferences?.setBrowseFilter(BrowseFilters.presets(media), BrowseFilters.encodePresets(presets().filterNot { it.name == name }))
+        preferences?.setBrowseFilter(
+            BrowseFilters.presets(media),
+            BrowseFilters.encodePresets(
+                presets().filterNot {
+                    it.name ==
+                        name
+                },
+            ),
+        )
     }
 
     private fun savedFilter(): CatalogFilter? =
-        type?.let { BrowseFilters.decode(it, preferences?.state?.value?.browseFilters?.get(BrowseFilters.current(it))) }
+        type?.let {
+            BrowseFilters.decode(
+                it,
+                preferences
+                    ?.state
+                    ?.value
+                    ?.browseFilters
+                    ?.get(BrowseFilters.current(it)),
+            )
+        }
 
     fun restoreFilter() {
         val restored = savedFilter() ?: return
         if (restored == state.value.filter) return
         if (started) load(restored, debounce = false) else mutableState.value = BrowseState(restored)
     }
+
     val state: StateFlow<BrowseState> = mutableState.asStateFlow()
     private var job: Job? = null
     private var started = false
@@ -91,10 +120,11 @@ class Browser(
             return
         }
         mutableState.update { it.copy(loading = true) }
-        job = scope.launch {
-            window.refresh { fetch(filter, it) }
-            publishWindow()
-        }
+        job =
+            scope.launch {
+                window.refresh { fetch(filter, it) }
+                publishWindow()
+            }
     }
 
     /** Schimbă doar cardul deja încărcat, fără resetarea paginării sau a focusului. */
@@ -134,7 +164,8 @@ class Browser(
                 val fresh = PageWindow<CatalogCursor, TitleCard>()
                 if (!empty) fresh.move { fetch(filter, it) }
                 window = fresh
-                mutableState.value = BrowseState(filter, fresh.items, loading = false, endReached = empty || !fresh.hasLater)
+                mutableState.value =
+                    BrowseState(filter, fresh.items, loading = false, endReached = empty || !fresh.hasLater)
             }
     }
 
@@ -182,8 +213,22 @@ class BrowseViewModel
         private val repository: HubRepository,
         private val preferences: PlaybackSettings,
     ) : ViewModel() {
-        val movies = Browser(viewModelScope, repository, CatalogFilter(type = MediaType.MOVIE), needsInput = false, preferences = preferences)
-        val series = Browser(viewModelScope, repository, CatalogFilter(type = MediaType.TV), needsInput = false, preferences = preferences)
+        val movies =
+            Browser(
+                viewModelScope,
+                repository,
+                CatalogFilter(type = MediaType.MOVIE),
+                needsInput = false,
+                preferences = preferences,
+            )
+        val series =
+            Browser(
+                viewModelScope,
+                repository,
+                CatalogFilter(type = MediaType.TV),
+                needsInput = false,
+                preferences = preferences,
+            )
         val search = Browser(viewModelScope, repository, CatalogFilter(), needsInput = true)
 
         private val mutableLanguages = MutableStateFlow<List<String>>(emptyList())
@@ -201,8 +246,11 @@ class BrowseViewModel
             viewModelScope.launch { mutableLanguages.value = repository.languages() }
             viewModelScope.launch {
                 repository.watchVersion.drop(1).collect {
-                    listOf(movies, series, search).filter { it.state.value.filter.library !=
-                        io.github.radumariusi.akvodhub.parser.catalog.LibraryFilter.ALL }.forEach(Browser::reload)
+                    listOf(movies, series, search)
+                        .filter {
+                            it.state.value.filter.library !=
+                                io.github.radumariusi.akvodhub.parser.catalog.LibraryFilter.ALL
+                        }.forEach(Browser::reload)
                 }
             }
             viewModelScope.launch {

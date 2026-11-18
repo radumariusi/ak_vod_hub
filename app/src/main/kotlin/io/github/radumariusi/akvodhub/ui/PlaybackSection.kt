@@ -83,9 +83,10 @@ fun PlaybackSection(viewModel: PlaybackSettingsViewModel) {
         }
         OutlinedButton(onClick = {
             val options = PlaybackSettings.CONTROLS_SECONDS
-            choice = Choice("Durata comenzilor", options.map { "$it secunde" }, options.indexOf(prefs.controlsSeconds)) {
-                viewModel.setControlsSeconds(options[it])
-            }
+            choice =
+                Choice("Durata comenzilor", options.map { "$it secunde" }, options.indexOf(prefs.controlsSeconds)) {
+                    viewModel.setControlsSeconds(options[it])
+                }
         }) { Text("Durata comenzilor · ${prefs.controlsSeconds} secunde") }
         Text("Ambele preferințe se aplică imediat.")
         Text("Avansate", style = MaterialTheme.typography.titleLarge)

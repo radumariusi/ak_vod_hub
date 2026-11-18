@@ -28,14 +28,15 @@ class JsonObjectStreamTest {
     @Test
     fun readsCatalogSizedArray() {
         val record = """{"id":"42","optional":null}"""
-        val response = buildString {
-            append('[')
-            repeat(111_000) { index ->
-                if (index > 0) append(',')
-                append(record)
+        val response =
+            buildString {
+                append('[')
+                repeat(111_000) { index ->
+                    if (index > 0) append(',')
+                    append(record)
+                }
+                append(']')
             }
-            append(']')
-        }
         assertEquals(111_000, JsonObjectStream.objects(StringReader(response)).count())
     }
 }

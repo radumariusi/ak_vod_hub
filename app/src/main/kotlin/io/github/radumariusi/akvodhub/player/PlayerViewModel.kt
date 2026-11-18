@@ -305,16 +305,25 @@ class PlayerViewModel
                     fatal("Nu am găsit episoade pentru acest serial.")
                     return
                 }
-                val savedEpisode = episode.number?.takeIf { request.resume }?.let {
-                    repository.episodeProgress(request.titleId, episode.season, it)
-                }
+                val savedEpisode =
+                    episode.number?.takeIf { request.resume }?.let {
+                        repository.episodeProgress(request.titleId, episode.season, it)
+                    }
                 val resumeAt =
                     when {
-                        request.resume && watch != null && watch.season == episode.season && watch.episode == episode.number ->
+                        request.resume && watch != null && watch.season == episode.season &&
+                            watch.episode == episode.number -> {
                             watch.positionMs
+                        }
+
                         savedEpisode != null && Resume.shouldResume(savedEpisode.positionMs, savedEpisode.durationMs) &&
-                            !savedEpisode.finished -> savedEpisode.positionMs
-                        else -> 0L
+                            !savedEpisode.finished -> {
+                            savedEpisode.positionMs
+                        }
+
+                        else -> {
+                            0L
+                        }
                     }
                 val chosen = request.entryId ?: watch?.entryId?.takeIf { request.resume && resumeAt > 0 }
                 playEpisode(episode, chosen, resumeAt)
@@ -931,9 +940,20 @@ class PlayerViewModel
             val nextEntry = next?.let { repository.playOrder(it.sources, title.originalLanguage).firstOrNull()?.id }
             saveScope.launch {
                 if (finished || position >= Resume.MIN_POSITION_MS) {
-                    val episodeProgress = current?.let { e ->
-                        e.number?.let { EpisodeProgressEntity(title.id, e.season, it, position, duration, finished, now) }
-                    }
+                    val episodeProgress =
+                        current?.let { e ->
+                            e.number?.let {
+                                EpisodeProgressEntity(
+                                    title.id,
+                                    e.season,
+                                    it,
+                                    position,
+                                    duration,
+                                    finished,
+                                    now,
+                                )
+                            }
+                        }
                     repository.recordWatch(title.id, position.toDouble() / duration, finished, now, episodeProgress)
                 }
                 when {

@@ -44,7 +44,11 @@ class XtreamClient(
 
     suspend fun vodCategories(account: XtreamAccount): Map<String, String> = categories(account, "get_vod_categories")
 
-    suspend fun seriesCategories(account: XtreamAccount): Map<String, String> = categories(account, "get_series_categories")
+    suspend fun seriesCategories(account: XtreamAccount): Map<String, String> =
+        categories(
+            account,
+            "get_series_categories",
+        )
 
     private suspend fun categories(account: XtreamAccount, action: String): Map<String, String> =
         jsonOperation(action) {
@@ -98,7 +102,9 @@ class XtreamClient(
     /** Episoadele unui serial. Se cer la nevoie (un apel pe serial), nu la importul complet. */
     suspend fun episodes(account: XtreamAccount, seriesId: Long): List<XtreamEpisode> =
         jsonOperation("get_series_info") {
-            XtreamJson.episodes(XtreamJson.parse(getText(account, "get_series_info", "series_id" to seriesId.toString())))
+            XtreamJson.episodes(
+                XtreamJson.parse(getText(account, "get_series_info", "series_id" to seriesId.toString())),
+            )
         }
 
     private fun apiUrl(

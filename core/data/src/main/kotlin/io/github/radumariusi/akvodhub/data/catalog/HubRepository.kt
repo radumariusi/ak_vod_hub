@@ -137,11 +137,14 @@ class HubRepository(
 
     fun sourceReason(source: SourceInfo, originalLanguage: String?): String {
         val original = originalLanguage?.lowercase()
+        if (playback.state.value.preferOriginalLanguage && original != null && original in source.languages) {
+            return "Recomandată pentru limba originală declarată în playlist."
+        }
+        val rule = profile.rules.firstOrNull { it.matches(source) || it.matchesMulti(source) }
         return when {
-            playback.state.value.preferOriginalLanguage && original in source.languages ->
-                "limba originală declarată în playlist"
-            else -> profile.rules.firstOrNull { it.matches(source) }?.let { "regula ${it.label()} din profil" }
-                ?: "ordinea calității și a limbilor preferate"
+            rule == null -> "Recomandată după calitate și limbile preferate."
+            rule.matches(source) -> "Recomandată după regula ${rule.label()} din profil."
+            else -> "Recomandată după profil, cu eticheta MULTI. Limba se verifică la redare."
         }
     }
 

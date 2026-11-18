@@ -13,8 +13,8 @@ import io.github.radumariusi.akvodhub.data.discover.DiscoverRepository
 import io.github.radumariusi.akvodhub.data.discover.TitleDiscovery
 import io.github.radumariusi.akvodhub.parser.catalog.MergedEpisode
 import io.github.radumariusi.akvodhub.parser.match.MediaType
-import io.github.radumariusi.akvodhub.parser.player.EpisodeOrder
 import io.github.radumariusi.akvodhub.parser.match.SourceInfo
+import io.github.radumariusi.akvodhub.parser.player.EpisodeOrder
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -52,11 +52,19 @@ data class DetailsState(
             val resume = watch?.let { w -> EpisodeOrder.find(seasons, w.season, w.episode) }
             if (resume != null) return resume
             val last = episodeProgress.values.maxByOrNull { it.updatedAt }
-            val candidate = last?.let { saved ->
-                if (saved.finished) EpisodeOrder.next(seasons, saved.season, saved.episode)
-                else EpisodeOrder.find(seasons, saved.season, saved.episode)
+            val candidates =
+                if (last?.finished == true) {
+                    available.dropWhile {
+                        it.season < last.season ||
+                            (it.season == last.season && (it.number ?: 0) <= last.episode)
+                    }
+                } else {
+                    val current = last?.let { EpisodeOrder.find(seasons, it.season, it.episode) }
+                    listOfNotNull(current) + available
+                }
+            return candidates.firstOrNull { entry ->
+                entry.number?.let { episodeProgress[entry.season to it]?.finished } != true
             }
-            return candidate ?: available.firstOrNull { it.number?.let { number -> episodeProgress[it.season to number]?.finished } != true }
         }
 }
 
@@ -113,7 +121,14 @@ class DetailsViewModel
                     val all = details?.groups.orEmpty().flatMap { g -> g.languages.flatMap { it.sources } }
                     val recommended = repository.playOrder(all, details?.title?.originalLanguage).firstOrNull()
                     val watch = repository.watchState(titleId)
-                    val progress = if (details?.title?.mediaType == MediaType.TV) repository.episodeProgress(titleId) else emptyList()
+                    val progress =
+                        if (details?.title?.mediaType ==
+                            MediaType.TV
+                        ) {
+                            repository.episodeProgress(titleId)
+                        } else {
+                            emptyList()
+                        }
                     val listed = repository.inWatchlist(titleId)
                     val watched = repository.isWatched(titleId)
                     mutableState.update {
@@ -156,14 +171,22 @@ class DetailsViewModel
                 val seasons = episodes.seasons.map { it.number }
                 val selected =
                     s.selectedSeason?.takeIf { it in seasons }
-                        ?: s.copy(episodes = episodes).nextEpisode?.season?.takeIf { it in seasons }
+                        ?: s
+                            .copy(episodes = episodes)
+                            .nextEpisode
+                            ?.season
+                            ?.takeIf { it in seasons }
                         ?: seasons.firstOrNull { it > 0 }
                         ?: seasons.firstOrNull()
                 s.copy(episodes = episodes, loadingEpisodes = loadingMore, selectedSeason = selected)
             }
         }
 
-        fun sourceReason(source: SourceInfo, originalLanguage: String?): String = repository.sourceReason(source, originalLanguage)
+        fun sourceReason(source: SourceInfo, originalLanguage: String?): String =
+            repository.sourceReason(
+                source,
+                originalLanguage,
+            )
 
         suspend fun episodeOverview(episode: MergedEpisode): String? {
             val title = state.value.details?.title ?: return null
@@ -204,13 +227,23 @@ class DetailsViewModel
             val watch = repository.watchState(titleId)
             val listed = repository.inWatchlist(titleId)
             val watched = repository.isWatched(titleId)
-            val progress = if (state.value.details?.title?.mediaType == MediaType.TV) {
-                repository.episodeProgress(titleId).associateBy { it.season to it.episode }
-            } else {
-                emptyMap()
-            }
+            val progress =
+                if (state.value.details
+                        ?.title
+                        ?.mediaType == MediaType.TV
+                ) {
+                    repository.episodeProgress(titleId).associateBy { it.season to it.episode }
+                } else {
+                    emptyMap()
+                }
             mutableState.update {
-                if (it.titleId == titleId) it.copy(watch = watch, episodeProgress = progress, inWatchlist = listed, watched = watched) else it
+                if (it.titleId ==
+                    titleId
+                ) {
+                    it.copy(watch = watch, episodeProgress = progress, inWatchlist = listed, watched = watched)
+                } else {
+                    it
+                }
             }
         }
     }

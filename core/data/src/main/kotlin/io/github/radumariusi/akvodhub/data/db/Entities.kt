@@ -359,7 +359,6 @@ data class WatchlistEntity(
     val addedAt: Long,
 )
 
-
 @Entity(tableName = "title_source_option", primaryKeys = ["titleId", "quality", "language", "originalAudio"])
 data class TitleSourceOption(
     val titleId: Long,
@@ -367,7 +366,6 @@ data class TitleSourceOption(
     val language: String,
     val originalAudio: Boolean,
 )
-
 
 @Entity(tableName = "episode_progress", primaryKeys = ["titleId", "season", "episode"])
 data class EpisodeProgressEntity(

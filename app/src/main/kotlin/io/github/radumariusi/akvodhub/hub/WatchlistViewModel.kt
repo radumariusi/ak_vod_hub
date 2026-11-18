@@ -40,7 +40,7 @@ class WatchlistViewModel
             mutableState.value = mutableState.value.copy(loading = true)
             job =
                 viewModelScope.launch {
-                    if (window.items.isEmpty()) window.move(fetch = ::fetch) else window.refresh(::fetch)
+                    window.refresh(::fetch)
                     publish()
                 }
         }
@@ -51,9 +51,12 @@ class WatchlistViewModel
         }
 
         private fun publish() {
-            mutableState.value = WatchlistState(
-                window.items.distinctBy { it.id }, loading = false, endReached = !window.hasLater,
-            )
+            mutableState.value =
+                WatchlistState(
+                    window.items.distinctBy { it.id },
+                    loading = false,
+                    endReached = !window.hasLater,
+                )
         }
 
         fun onVisible(first: Int, last: Int) {
@@ -62,10 +65,11 @@ class WatchlistViewModel
             val backwards = window.hasEarlier && first < 8
             if (!backwards && (old.endReached || last < old.items.size - 18)) return
             mutableState.value = old.copy(loading = true)
-            job = viewModelScope.launch {
-                window.move(backwards, ::fetch)
-                publish()
-            }
+            job =
+                viewModelScope.launch {
+                    window.move(backwards, ::fetch)
+                    publish()
+                }
         }
 
         private companion object {

@@ -13,7 +13,10 @@ object JsonObjectStream {
             var next = reader.read()
             if (next == BOM) next = reader.read()
             when (reader.skipWhitespace(next)) {
-                '{'.code -> yield(reader.readObject())
+                '{'.code -> {
+                    yield(reader.readObject())
+                }
+
                 '['.code -> {
                     var start = reader.skipWhitespace()
                     if (start != ']'.code) {
@@ -28,7 +31,10 @@ object JsonObjectStream {
                         }
                     }
                 }
-                else -> invalid("obiect sau listă așteptată")
+
+                else -> {
+                    invalid("obiect sau listă așteptată")
+                }
             }
             if (reader.skipWhitespace() != -1) invalid("date după finalul răspunsului")
         }

@@ -160,23 +160,41 @@ fun PlayerScreen(
     LaunchedEffect(controls, overlay) {
         if (!overlay) {
             runCatching {
-                if (!controls) rootFocus.requestFocus()
-                else if (!advanced && !menuWasOpen) playFocus.requestFocus()
+                if (!controls) {
+                    rootFocus.requestFocus()
+                } else if (!advanced && !menuWasOpen) {
+                    playFocus.requestFocus()
+                }
             }
         }
     }
 
     BackHandler {
         when {
-            adjusting -> adjusting = false
-            state.error != null -> onExit()
-            state.countdown != null -> viewModel.cancelCountdown()
+            adjusting -> {
+                adjusting = false
+            }
+
+            state.error != null -> {
+                onExit()
+            }
+
+            state.countdown != null -> {
+                viewModel.cancelCountdown()
+            }
+
             controls && advanced -> {
                 restoreMore = true
                 advanced = false
             }
-            controls -> controls = false
-            else -> onExit()
+
+            controls -> {
+                controls = false
+            }
+
+            else -> {
+                onExit()
+            }
         }
     }
 
@@ -439,175 +457,174 @@ private fun Controls(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (!advanced) {
-            PlayerCommand(
-                if (isPlaying) R.drawable.ic_player_pause else R.drawable.ic_player_play,
-                if (isPlaying) "Pauză" else "Redă",
-                onCommandFocus,
-                modifier = Modifier.focusRequester(playFocus),
-                onClick = viewModel::togglePlay,
-            )
-            if (state.audio.isNotEmpty()) {
-                PlayerCommand(R.drawable.ic_player_audio, "Audio (${state.audio.size})", onCommandFocus) {
-                    onChoice(
-                        Choice(
-                            "Audio · piste detectate",
-                            state.audio.map { it.label },
-                            state.audio.indexOfFirst { it.selected }.takeIf { it >= 0 },
-                        ) { i -> viewModel.selectTrack(state.audio[i]) },
-                    )
-                }
-            }
-            val subtitleCount = state.subtitles.size + state.addonSubtitles.size
-            PlayerCommand(
-                R.drawable.ic_player_subtitles,
-                if (subtitleCount ==
-                    0
-                ) {
-                    "Subtitrări"
-                } else {
-                    "Subtitrări ($subtitleCount)"
-                },
-                onCommandFocus,
-            ) { onChoice(subtitleChoice(state, viewModel)) }
-            if (state.sources.size > 1) {
-                PlayerCommand(R.drawable.ic_player_source, "Sursă (${state.sources.size})", onCommandFocus) {
-                    onChoice(sourceChoice(state, viewModel))
-                }
-            }
-            if (state.next != null) {
                 PlayerCommand(
-                    R.drawable.ic_player_next,
-                    "Episodul următor",
+                    if (isPlaying) R.drawable.ic_player_pause else R.drawable.ic_player_play,
+                    if (isPlaying) "Pauză" else "Redă",
                     onCommandFocus,
-                    onClick = viewModel::playNext,
+                    modifier = Modifier.focusRequester(playFocus),
+                    onClick = viewModel::togglePlay,
                 )
-            }
-            } else {
-            PlayerCommand(R.drawable.ic_player_screen, "Frecvență ecran", onCommandFocus) {
-                onChoice(
-                    Choice(
-                        "Frecvență ecran · poate clipi la schimbare",
-                        listOf("Dezactivată", "Potrivește cu filmul"),
-                        if (playbackPrefs.matchFrameRate) 1 else 0,
-                    ) {
-                        viewModel.setMatchFrameRate(it == 1)
-                    },
-                )
-            }
-            PlayerCommand(R.drawable.ic_player_output, "Ieșire audio · passthrough", onCommandFocus) {
-                onChoice(
-                    Choice(
-                        "Passthrough · la redeschiderea playerului",
-                        listOf("Dezactivat · PCM", "Automat · ieșire compatibilă"),
-                        if (playbackPrefs.audioPassthrough) 1 else 0,
-                    ) {
-                        viewModel.setAudioPassthrough(it == 1)
-                    },
-                )
-            }
-            PlayerCommand(R.drawable.ic_player_night, "Mod noapte", onCommandFocus) {
-                onChoice(
-                    Choice(
-                        "Mod noapte · la redeschidere, fără passthrough",
-                        listOf("Dezactivat", "Dialog mai clar · compresie PCM"),
-                        if (playbackPrefs.nightMode) 1 else 0,
-                    ) {
-                        viewModel.setNightMode(it == 1)
-                    },
-                )
-            }
-            PlayerCommand(R.drawable.ic_player_format, "Format imagine", onCommandFocus) {
-                onChoice(
-                    Choice(
-                        "Format imagine",
-                        listOf("Potrivit", "Zoom", "Întins"),
-                        state.pictureMode,
-                        onPick = viewModel::setPictureMode,
-                    ),
-                )
-            }
-            PlayerCommand(R.drawable.ic_player_speed, "Viteză ${state.speed}×", onCommandFocus) {
-                val speeds = listOf(0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
-                onChoice(
-                    Choice(
-                        "Viteză de redare",
-                        listOf("0,75×", "1×", "1,25×", "1,5×", "1,75×", "2×"),
-                        speeds.indexOf(state.speed),
-                    ) {
-                        viewModel.setSpeed(speeds[it])
-                    },
-                )
-            }
-            PlayerCommand(R.drawable.ic_player_buffer, "Buffer", onCommandFocus) {
-                onChoice(
-                    Choice(
-                        "Buffer · la redeschiderea playerului",
-                        BufferPreset.entries.map {
-                            it.label
-                        },
-                        BufferPreset.entries.indexOf(playbackPrefs.bufferPreset),
-                    ) {
-                        viewModel.setBufferPreset(BufferPreset.entries[it])
-                    },
-                )
-            }
-            PlayerCommand(R.drawable.ic_player_timer, "Timer de somn · ${state.sleepLabel}", onCommandFocus) {
-                val minutes = if (state.isSeries) listOf(0, 30, 60, 90, -1) else listOf(0, 30, 60, 90)
-                val labels =
-                    listOf("Oprit", "30 minute", "60 minute", "90 minute") +
-                        if (state.isSeries) listOf("Sfârșitul episodului") else emptyList()
-                onChoice(
-                    Choice(
-                        "Timer de somn · ${state.sleepLabel}",
-                        labels,
-                        null,
-                    ) { viewModel.setSleepTimer(minutes[it]) },
-                )
-            }
-            PlayerCommand(R.drawable.ic_player_info, "Info tehnic", onCommandFocus, onClick = onTechnical)
-            PlayerCommand(R.drawable.ic_player_timer, "Salt la minut", onCommandFocus, onClick = onJump)
-            if (state.isSeries) {
+                if (state.audio.isNotEmpty()) {
+                    PlayerCommand(R.drawable.ic_player_audio, "Audio (${state.audio.size})", onCommandFocus) {
+                        onChoice(
+                            Choice(
+                                "Audio · piste detectate",
+                                state.audio.map { it.label },
+                                state.audio.indexOfFirst { it.selected }.takeIf { it >= 0 },
+                            ) { i -> viewModel.selectTrack(state.audio[i]) },
+                        )
+                    }
+                }
+                val subtitleCount = state.subtitles.size + state.addonSubtitles.size
                 PlayerCommand(
-                    R.drawable.ic_player_reset,
-                    "Resetează audio/subtitrare serial",
+                    R.drawable.ic_player_subtitles,
+                    if (subtitleCount ==
+                        0
+                    ) {
+                        "Subtitrări"
+                    } else {
+                        "Subtitrări ($subtitleCount)"
+                    },
                     onCommandFocus,
-                    onClick = viewModel::resetSeriesTracks,
-                )
-                if (SeriesPlayback.canSkip(position, duration, state.introEndMs)) {
+                ) { onChoice(subtitleChoice(state, viewModel)) }
+                if (state.sources.size > 1) {
+                    PlayerCommand(R.drawable.ic_player_source, "Sursă (${state.sources.size})", onCommandFocus) {
+                        onChoice(sourceChoice(state, viewModel))
+                    }
+                }
+                if (state.next != null) {
                     PlayerCommand(
                         R.drawable.ic_player_next,
-                        "Sari intro",
+                        "Episodul următor",
                         onCommandFocus,
-                        onClick = viewModel::skipIntro,
+                        onClick = viewModel::playNext,
                     )
                 }
-                PlayerCommand(R.drawable.ic_player_bookmark, "Marcaj intro serial", onCommandFocus) {
+            } else {
+                PlayerCommand(R.drawable.ic_player_screen, "Frecvență ecran", onCommandFocus) {
                     onChoice(
                         Choice(
-                            "Intro pentru acest serial",
-                            listOf("Marchează sfârșitul aici", "Șterge marcajul"),
-                            null,
+                            "Frecvență ecran · poate clipi la schimbare",
+                            listOf("Dezactivată", "Potrivește cu filmul"),
+                            if (playbackPrefs.matchFrameRate) 1 else 0,
                         ) {
-                            if (it == 0) viewModel.markIntro() else viewModel.clearIntro()
+                            viewModel.setMatchFrameRate(it == 1)
                         },
                     )
                 }
-            }
-            if (state.externalSubtitle != null || state.subtitles.any { it.selected }) {
-                PlayerCommand(
-                    R.drawable.ic_player_adjust,
-                    "Ajustează subtitrările",
-                    onCommandFocus,
-                    onClick = onAdjust,
-                )
-            }
-            PlayerCommand(R.drawable.ic_player_rewind, "Înapoi 10 secunde", onCommandFocus) {
-                viewModel.seekBy(-PlayerFactory.SEEK_MS)
-            }
-            PlayerCommand(R.drawable.ic_player_forward, "Înainte 10 secunde", onCommandFocus) {
-                viewModel.seekBy(PlayerFactory.SEEK_MS)
-            }
-
+                PlayerCommand(R.drawable.ic_player_output, "Ieșire audio · passthrough", onCommandFocus) {
+                    onChoice(
+                        Choice(
+                            "Passthrough · la redeschiderea playerului",
+                            listOf("Dezactivat · PCM", "Automat · ieșire compatibilă"),
+                            if (playbackPrefs.audioPassthrough) 1 else 0,
+                        ) {
+                            viewModel.setAudioPassthrough(it == 1)
+                        },
+                    )
+                }
+                PlayerCommand(R.drawable.ic_player_night, "Mod noapte", onCommandFocus) {
+                    onChoice(
+                        Choice(
+                            "Mod noapte · la redeschidere, fără passthrough",
+                            listOf("Dezactivat", "Dialog mai clar · compresie PCM"),
+                            if (playbackPrefs.nightMode) 1 else 0,
+                        ) {
+                            viewModel.setNightMode(it == 1)
+                        },
+                    )
+                }
+                PlayerCommand(R.drawable.ic_player_format, "Format imagine", onCommandFocus) {
+                    onChoice(
+                        Choice(
+                            "Format imagine",
+                            listOf("Potrivit", "Zoom", "Întins"),
+                            state.pictureMode,
+                            onPick = viewModel::setPictureMode,
+                        ),
+                    )
+                }
+                PlayerCommand(R.drawable.ic_player_speed, "Viteză ${state.speed}×", onCommandFocus) {
+                    val speeds = listOf(0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
+                    onChoice(
+                        Choice(
+                            "Viteză de redare",
+                            listOf("0,75×", "1×", "1,25×", "1,5×", "1,75×", "2×"),
+                            speeds.indexOf(state.speed),
+                        ) {
+                            viewModel.setSpeed(speeds[it])
+                        },
+                    )
+                }
+                PlayerCommand(R.drawable.ic_player_buffer, "Buffer", onCommandFocus) {
+                    onChoice(
+                        Choice(
+                            "Buffer · la redeschiderea playerului",
+                            BufferPreset.entries.map {
+                                it.label
+                            },
+                            BufferPreset.entries.indexOf(playbackPrefs.bufferPreset),
+                        ) {
+                            viewModel.setBufferPreset(BufferPreset.entries[it])
+                        },
+                    )
+                }
+                PlayerCommand(R.drawable.ic_player_timer, "Timer de somn · ${state.sleepLabel}", onCommandFocus) {
+                    val minutes = if (state.isSeries) listOf(0, 30, 60, 90, -1) else listOf(0, 30, 60, 90)
+                    val labels =
+                        listOf("Oprit", "30 minute", "60 minute", "90 minute") +
+                            if (state.isSeries) listOf("Sfârșitul episodului") else emptyList()
+                    onChoice(
+                        Choice(
+                            "Timer de somn · ${state.sleepLabel}",
+                            labels,
+                            null,
+                        ) { viewModel.setSleepTimer(minutes[it]) },
+                    )
+                }
+                PlayerCommand(R.drawable.ic_player_info, "Info tehnic", onCommandFocus, onClick = onTechnical)
+                PlayerCommand(R.drawable.ic_player_timer, "Salt la minut", onCommandFocus, onClick = onJump)
+                if (state.isSeries) {
+                    PlayerCommand(
+                        R.drawable.ic_player_reset,
+                        "Resetează audio/subtitrare serial",
+                        onCommandFocus,
+                        onClick = viewModel::resetSeriesTracks,
+                    )
+                    if (SeriesPlayback.canSkip(position, duration, state.introEndMs)) {
+                        PlayerCommand(
+                            R.drawable.ic_player_next,
+                            "Sari intro",
+                            onCommandFocus,
+                            onClick = viewModel::skipIntro,
+                        )
+                    }
+                    PlayerCommand(R.drawable.ic_player_bookmark, "Marcaj intro serial", onCommandFocus) {
+                        onChoice(
+                            Choice(
+                                "Intro pentru acest serial",
+                                listOf("Marchează sfârșitul aici", "Șterge marcajul"),
+                                null,
+                            ) {
+                                if (it == 0) viewModel.markIntro() else viewModel.clearIntro()
+                            },
+                        )
+                    }
+                }
+                if (state.externalSubtitle != null || state.subtitles.any { it.selected }) {
+                    PlayerCommand(
+                        R.drawable.ic_player_adjust,
+                        "Ajustează subtitrările",
+                        onCommandFocus,
+                        onClick = onAdjust,
+                    )
+                }
+                PlayerCommand(R.drawable.ic_player_rewind, "Înapoi 10 secunde", onCommandFocus) {
+                    viewModel.seekBy(-PlayerFactory.SEEK_MS)
+                }
+                PlayerCommand(R.drawable.ic_player_forward, "Înainte 10 secunde", onCommandFocus) {
+                    viewModel.seekBy(PlayerFactory.SEEK_MS)
+                }
             }
             OutlinedButton(
                 onClick = onToggleAdvanced,

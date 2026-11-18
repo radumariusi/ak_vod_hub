@@ -147,7 +147,11 @@ class DiscoverRepository(
      * Rândurile personalizate de pe Acasă. Gol dacă nu s-a văzut nimic încă. Doar titluri cu surse, fără cele
      * deja văzute sau începute.
      */
-    suspend fun personalRows(forYouEnabled: Boolean, collectionsEnabled: Boolean, becauseEnabled: Boolean): List<DiscoverRow> {
+    suspend fun personalRows(
+        forYouEnabled: Boolean,
+        collectionsEnabled: Boolean,
+        becauseEnabled: Boolean,
+    ): List<DiscoverRow> {
         val now = clock()
         val history = dao.recentHistory(MAX_HISTORY)
         if (history.isEmpty() || !(forYouEnabled || collectionsEnabled || becauseEnabled)) return emptyList()
@@ -201,14 +205,16 @@ class DiscoverRepository(
             refs.getOrPut(ref) { mutableListOf() } += action
         }
 
-        for ((seedId, r) in related) {
-            val w = weights[seedId] ?: continue
-            r.recommendations.forEachIndexed { rank, c -> hook(c.ref) { signals.related(it, rank, w) } }
-            r.similar.forEachIndexed { rank, c -> hook(c.ref) { signals.related(it, rank, w * SIMILAR_FACTOR) } }
+        if (forYouEnabled) {
+            for ((seedId, r) in related) {
+                val w = weights[seedId] ?: continue
+                r.recommendations.forEachIndexed { rank, c -> hook(c.ref) { signals.related(it, rank, w) } }
+                r.similar.forEachIndexed { rank, c -> hook(c.ref) { signals.related(it, rank, w * SIMILAR_FACTOR) } }
+            }
         }
         // Colecțiile titlurilor văzute și ce urmează în ele.
         val collections =
-            if (key == null) {
+            if (key == null || (!collectionsEnabled && !forYouEnabled)) {
                 emptyList()
             } else {
                 related.values
@@ -216,9 +222,11 @@ class DiscoverRepository(
                     .distinct()
                     .mapNotNull { collection(key, it) }
             }
-        collections.forEach { c -> c.parts.forEach { p -> hook(p.ref) { signals.collection(it) } } }
+        if (forYouEnabled) {
+            collections.forEach { c -> c.parts.forEach { p -> hook(p.ref) { signals.collection(it) } } }
+        }
         // Filmografia persoanelor preferate (regizori, actori principali).
-        if (key != null) {
+        if (key != null && forYouEnabled) {
             val top = profile.topPeople(MAX_PEOPLE)
             val films =
                 coroutineScope { top.map { p -> async { p to filmography(key, p) } }.awaitAll() }
@@ -233,7 +241,7 @@ class DiscoverRepository(
         val pool = LinkedHashMap<Long, DiscoverTitle>()
         resolved.forEach { pool[it.id] = it }
         // Plus cele mai populare titluri din genurile preferate (merge și fără cheie TMDB).
-        for (genre in profile.topGenres(MAX_GENRES)) {
+        for (genre in if (forYouEnabled) profile.topGenres(MAX_GENRES) else emptyList()) {
             dao.popularInGenre("%,$genre,%", GENRE_POOL).forEach { pool.getOrPut(it.id) { it } }
         }
 

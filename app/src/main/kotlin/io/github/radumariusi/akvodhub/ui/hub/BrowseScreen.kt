@@ -140,8 +140,13 @@ fun BrowseScreen(
             ) { Text("Filtre și sortare") }
             Text(filter.summary(), maxLines = 2, style = MaterialTheme.typography.bodySmall)
         }
-        if (filter.type == MediaType.TV && (filter.quality != null || filter.language != null || filter.originalAudioOnly)) {
-            Text("Potrivire pe o sursă declarată. Episoadele pot avea alte variante.", style = MaterialTheme.typography.bodySmall)
+        if (filter.type == MediaType.TV &&
+            (filter.quality != null || filter.language != null || filter.originalAudioOnly)
+        ) {
+            Text(
+                "Potrivire pe o sursă declarată. Episoadele pot avea alte variante.",
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
 
         when {
@@ -234,15 +239,17 @@ private fun FilterPanel(
                     OutlinedButton(onClick = { naming = true }) { Text("Salvează combinația") }
                     if (presets.isNotEmpty()) {
                         OutlinedButton(onClick = {
-                            choice = Choice("Combinații salvate", presets.map { it.name }, selected = null) {
-                                draft = presets[it].filter
-                            }
+                            choice =
+                                Choice("Combinații salvate", presets.map { it.name }, selected = null) {
+                                    draft = presets[it].filter
+                                }
                         }) { Text("Combinații") }
                         OutlinedButton(onClick = {
-                            choice = Choice("Șterge combinația", presets.map { it.name }, selected = null) {
-                                browser.removePreset(presets[it].name)
-                                presets = browser.presets()
-                            }
+                            choice =
+                                Choice("Șterge combinația", presets.map { it.name }, selected = null) {
+                                    browser.removePreset(presets[it].name)
+                                    presets = browser.presets()
+                                }
                         }) { Text("Șterge") }
                     }
                 }
@@ -380,9 +387,11 @@ private fun FilterBar(
         item("library") {
             FilterButton("Vizionare", filter.library.label, onClick = {
                 val options = LibraryFilter.entries
-                onChoose(Choice("Vizionare", options.map { it.label }, filter.library.ordinal) {
-                    onChange(filter.copy(library = options[it]))
-                })
+                onChoose(
+                    Choice("Vizionare", options.map { it.label }, filter.library.ordinal) {
+                        onChange(filter.copy(library = options[it]))
+                    },
+                )
             })
         }
     }

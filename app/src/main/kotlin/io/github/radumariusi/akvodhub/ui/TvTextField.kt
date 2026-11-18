@@ -54,18 +54,20 @@ fun TvTextField(
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(label, style = MaterialTheme.typography.labelLarge, color = colors.onSurfaceVariant)
         if (!editing) {
-            val shown = when {
-                value.isEmpty() -> placeholder.ifEmpty { "Apasă OK pentru a edita" }
-                password -> "•".repeat(value.length.coerceAtMost(24))
-                else -> value
-            }
+            val shown =
+                when {
+                    value.isEmpty() -> placeholder.ifEmpty { "Apasă OK pentru a edita" }
+                    password -> "•".repeat(value.length.coerceAtMost(24))
+                    else -> value
+                }
             Surface(
                 onClick = { editing = true },
-                modifier = modifier
-                    .widthIn(max = 640.dp)
-                    .fillMaxWidth()
-                    .onFocusChanged { fieldFocused = it.isFocused }
-                    .border(2.dp, if (fieldFocused) colors.primary else colors.surfaceVariant, shape),
+                modifier =
+                    modifier
+                        .widthIn(max = 640.dp)
+                        .fillMaxWidth()
+                        .onFocusChanged { fieldFocused = it.isFocused }
+                        .border(2.dp, if (fieldFocused) colors.primary else colors.surfaceVariant, shape),
             ) {
                 Text(
                     shown,
@@ -76,47 +78,50 @@ fun TvTextField(
                 )
             }
         } else {
-        LaunchedEffect(Unit) {
-            requester.requestFocus()
-            keyboard?.show()
-        }
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            singleLine = true,
-            textStyle = MaterialTheme.typography.bodyLarge.copy(color = colors.onSurface),
-            cursorBrush = SolidColor(colors.primary),
-            visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
-            keyboardOptions =
-                KeyboardOptions(
-                    keyboardType = if (password) KeyboardType.Password else keyboardType,
-                    imeAction = imeAction,
-                    autoCorrectEnabled = false,
-                ),
-            modifier =
-                modifier
-                    .widthIn(max = 640.dp)
-                    .fillMaxWidth()
-                    .focusRequester(requester)
-                    .onFocusChanged {
-                        if (editorFocused && !it.isFocused) {
-                            keyboard?.hide()
-                            editing = false
+            LaunchedEffect(Unit) {
+                requester.requestFocus()
+                keyboard?.show()
+            }
+            BasicTextField(
+                value = value,
+                onValueChange = onValueChange,
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = colors.onSurface),
+                cursorBrush = SolidColor(colors.primary),
+                visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
+                keyboardOptions =
+                    KeyboardOptions(
+                        keyboardType = if (password) KeyboardType.Password else keyboardType,
+                        imeAction = imeAction,
+                        autoCorrectEnabled = false,
+                    ),
+                modifier =
+                    modifier
+                        .widthIn(max = 640.dp)
+                        .fillMaxWidth()
+                        .focusRequester(requester)
+                        .onFocusChanged {
+                            if (editorFocused && !it.isFocused) {
+                                keyboard?.hide()
+                                editing = false
+                            }
+                            editorFocused = it.isFocused
+                        }.background(colors.surfaceVariant, shape)
+                        .border(2.dp, if (editorFocused) colors.primary else colors.surfaceVariant, shape)
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                decorationBox = { inner ->
+                    Box {
+                        if (value.isEmpty() && placeholder.isNotEmpty()) {
+                            Text(
+                                placeholder,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = colors.onSurfaceVariant,
+                            )
                         }
-                        editorFocused = it.isFocused
+                        inner()
                     }
-                    .background(colors.surfaceVariant, shape)
-                    .border(2.dp, if (editorFocused) colors.primary else colors.surfaceVariant, shape)
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-            decorationBox = { inner ->
-                Box {
-                    if (value.isEmpty() && placeholder.isNotEmpty()) {
-                        Text(placeholder, style = MaterialTheme.typography.bodyLarge, color = colors.onSurfaceVariant)
-                    }
-                    inner()
-                }
-            },
-        )
+                },
+            )
         }
     }
 }

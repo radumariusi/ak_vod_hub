@@ -10,20 +10,22 @@ object HomeRows {
     const val BECAUSE = "d:because"
     const val ADDONS = "d:catalog"
 
-    val labels = linkedMapOf(
-        CONTINUE to "Continuă vizionarea",
-        EPISODES to "Episoade noi",
-        WATCHLIST to "Lista mea",
-        RECOMMENDATIONS to "Recomandări",
-        NEWS to "Nou în playlist",
-        "movies" to "Filme populare",
-        "series" to "Seriale populare",
-        "rated" to "Cele mai apreciate",
-    ) + Genres.home.associate { "genre:${it.key}" to it.label } + mapOf(
-        COLLECTIONS to "Continuă colecția",
-        BECAUSE to "Pentru că ai văzut",
-        ADDONS to "Cataloage din addon-uri",
-    )
+    val labels =
+        linkedMapOf(
+            CONTINUE to "Continuă vizionarea",
+            EPISODES to "Episoade noi",
+            WATCHLIST to "Lista mea",
+            RECOMMENDATIONS to "Recomandări",
+            NEWS to "Nou în playlist",
+            "movies" to "Filme populare",
+            "series" to "Seriale populare",
+            "rated" to "Cele mai apreciate",
+        ) + Genres.home.associate { "genre:${it.key}" to it.label } +
+            mapOf(
+                COLLECTIONS to "Continuă colecția",
+                BECAUSE to "Pentru că ai văzut",
+                ADDONS to "Cataloage din addon-uri",
+            )
 
     fun group(key: String): String =
         when {

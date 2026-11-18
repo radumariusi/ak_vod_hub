@@ -152,11 +152,23 @@ object CatalogQuery {
             args += "en"
         }
         when (filter.library) {
-            LibraryFilter.ALL -> Unit
-            LibraryFilter.UNWATCHED -> where += "NOT EXISTS (SELECT 1 FROM watch_history h WHERE h.titleId = t.id AND h.finished = 1)"
-            LibraryFilter.STARTED -> where +=
-                "EXISTS (SELECT 1 FROM watch_history h WHERE h.titleId = t.id AND h.finished = 0 AND h.progress > 0)"
-            LibraryFilter.WATCHLIST -> where += "EXISTS (SELECT 1 FROM watchlist w WHERE w.titleId = t.id)"
+            LibraryFilter.ALL -> {
+                Unit
+            }
+
+            LibraryFilter.UNWATCHED -> {
+                where +=
+                    "NOT EXISTS (SELECT 1 FROM watch_history h WHERE h.titleId = t.id AND h.finished = 1)"
+            }
+
+            LibraryFilter.STARTED -> {
+                where +=
+                    "EXISTS (SELECT 1 FROM watch_history h WHERE h.titleId = t.id AND h.finished = 0 AND h.progress > 0)"
+            }
+
+            LibraryFilter.WATCHLIST -> {
+                where += "EXISTS (SELECT 1 FROM watchlist w WHERE w.titleId = t.id)"
+            }
         }
         val fts = ftsQuery(filter.text)
         if (fts != null) {

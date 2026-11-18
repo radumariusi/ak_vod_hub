@@ -68,9 +68,17 @@ class PlaybackSettingsViewModel
         init {
             loadLanguages()
             viewModelScope.launch {
-                prefs.map { Triple(it.hiddenLanguages, it.hiddenCategories, it.hideAdultMovies) }.distinctUntilChanged().collect {
-                    repository.prepare()
-                }
+                prefs
+                    .map {
+                        Triple(
+                            it.hiddenLanguages,
+                            it.hiddenCategories,
+                            it.hideAdultMovies,
+                        )
+                    }.distinctUntilChanged()
+                    .collect {
+                        repository.prepare()
+                    }
             }
         }
 

@@ -138,7 +138,8 @@ class PlaybackSettings(
     }
 
     fun setHomeRows(order: List<String>, hidden: Set<String>) {
-        prefs.edit()
+        prefs
+            .edit()
             .putString("home_order", HomeRows.keys(order.joinToString(",")).joinToString(","))
             .putString("home_hidden", HomeRows.keys(hidden.joinToString(",")).joinToString(","))
             .apply()
@@ -169,14 +170,45 @@ class PlaybackSettings(
     fun resetCategory(category: Int) {
         val keys =
             when (category) {
-                0 -> listOf("content_languages", "hidden_languages", "hidden_categories", "hide_adult_movies", ORIGINAL)
-                1 -> listOf(POSTER_SIZE, ACCENT, BADGES, "home_hero", "home_order", "home_hidden")
-                2 -> listOf(PROFILE, BUFFER, FRAME_RATE, "default_speed", "auto_next", "controls_seconds", "continue_direct")
-                3 -> listOf(NIGHT, PASSTHROUGH, "audio_language")
-                4 -> listOf(SUBTITLES, ADDON_AUTO, SCALE, STYLE, "subtitle_delay_ms")
-                5 -> listOf("show_playlist_statistics")
-                7 -> listOf("start_screen")
-                else -> emptyList()
+                0 -> {
+                    listOf("content_languages", "hidden_languages", "hidden_categories", "hide_adult_movies", ORIGINAL)
+                }
+
+                1 -> {
+                    listOf(POSTER_SIZE, ACCENT, BADGES, "home_hero", "home_order", "home_hidden")
+                }
+
+                2 -> {
+                    listOf(
+                        PROFILE,
+                        BUFFER,
+                        FRAME_RATE,
+                        "default_speed",
+                        "auto_next",
+                        "controls_seconds",
+                        "continue_direct",
+                    )
+                }
+
+                3 -> {
+                    listOf(NIGHT, PASSTHROUGH, "audio_language")
+                }
+
+                4 -> {
+                    listOf(SUBTITLES, ADDON_AUTO, SCALE, STYLE, "subtitle_delay_ms")
+                }
+
+                5 -> {
+                    listOf("show_playlist_statistics")
+                }
+
+                7 -> {
+                    listOf("start_screen")
+                }
+
+                else -> {
+                    emptyList()
+                }
             }
         val edit = prefs.edit()
         keys.forEach(edit::remove)
@@ -354,7 +386,11 @@ class PlaybackSettings(
             values[key]?.toBooleanStrictOrNull()?.let { edit.putBoolean(key, it) }
         }
         values["start_screen"]?.takeIf { it in START_SCREENS }?.let { edit.putString("start_screen", it) }
-        values["controls_seconds"]?.toIntOrNull()?.takeIf { it in CONTROLS_SECONDS }?.let { edit.putInt("controls_seconds", it) }
+        values["controls_seconds"]
+            ?.toIntOrNull()
+            ?.takeIf {
+                it in CONTROLS_SECONDS
+            }?.let { edit.putInt("controls_seconds", it) }
         BrowseFilters.keys.forEach { key ->
             values[key]?.let { BrowseFilters.sanitize(key, it) }?.let { edit.putString(key, it) }
         }
@@ -411,7 +447,11 @@ class PlaybackSettings(
                 }
             }
         return PlaybackPrefs(
-            browseFilters = BrowseFilters.keys.mapNotNull { key -> prefs.getString(key, null)?.let { key to it } }.toMap(),
+            browseFilters =
+                BrowseFilters.keys
+                    .mapNotNull { key ->
+                        prefs.getString(key, null)?.let { key to it }
+                    }.toMap(),
             homeOrder = prefs.getString("home_order", "").orEmpty(),
             homeHidden = HomeRows.keys(prefs.getString("home_hidden", "").orEmpty()).toSet(),
             continueDirect = prefs.getBoolean("continue_direct", false),

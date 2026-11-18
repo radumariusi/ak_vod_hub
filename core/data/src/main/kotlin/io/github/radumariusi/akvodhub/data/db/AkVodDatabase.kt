@@ -64,9 +64,11 @@ abstract class AkVodDatabase : RoomDatabase() {
             object : Migration(16, 17) {
                 override fun migrate(db: SupportSQLiteDatabase) {
                     db.execSQL(
-                        "CREATE TABLE IF NOT EXISTS episode_progress (titleId INTEGER NOT NULL, season INTEGER NOT NULL, " +
+                        "CREATE TABLE IF NOT EXISTS episode_progress (titleId INTEGER NOT NULL, " +
+                            "season INTEGER NOT NULL, " +
                             "episode INTEGER NOT NULL, positionMs INTEGER NOT NULL, durationMs INTEGER NOT NULL, " +
-                            "finished INTEGER NOT NULL, updatedAt INTEGER NOT NULL, PRIMARY KEY(titleId, season, episode))",
+                            "finished INTEGER NOT NULL, updatedAt INTEGER NOT NULL, " +
+                            "PRIMARY KEY(titleId, season, episode))",
                     )
                     db.execSQL(
                         "INSERT INTO episode_progress SELECT titleId, COALESCE(season, 0), episode, positionMs, " +

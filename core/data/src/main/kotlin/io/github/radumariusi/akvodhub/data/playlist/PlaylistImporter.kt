@@ -405,6 +405,7 @@ class PlaylistImporter(
                                 parsed.copy(
                                     id = old.id,
                                     firstSeenAt = old.firstSeenAt,
+                                    visible = old.visible,
                                     titleId = if (sameTitle) old.titleId else null,
                                     matchState = if (sameTitle) old.matchState else entry.matchState,
                                 )

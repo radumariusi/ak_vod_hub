@@ -169,7 +169,10 @@ interface CatalogDao {
     @Query("SELECT * FROM raw_entry WHERE titleId = :titleId AND visible = 1 AND kind <> 'EPISODE'")
     suspend fun sources(titleId: Long): List<RawEntryEntity>
 
-    @Query("SELECT * FROM raw_entry WHERE titleId = :titleId AND visible = 1 AND kind = 'EPISODE' ORDER BY season, episode")
+    @Query(
+        "SELECT * FROM raw_entry WHERE titleId = :titleId AND visible = 1 AND kind = 'EPISODE' " +
+            "ORDER BY season, episode",
+    )
     suspend fun episodes(titleId: Long): List<RawEntryEntity>
 
     @Query("SELECT matchState AS state, COUNT(*) AS count FROM raw_entry WHERE matchState <> 3 GROUP BY matchState")
@@ -308,7 +311,8 @@ interface CatalogDao {
     /** Rezumatele surselor pentru fiecare titlu (vezi [TitleEntity]). `bestQuality` = `VideoQuality.ordinal`. */
     @Query(
         "UPDATE title SET " +
-            "playlistAddedAt = (SELECT MIN(r.firstSeenAt) FROM raw_entry r WHERE r.titleId = title.id AND r.visible = 1), " +
+            "playlistAddedAt = (SELECT MIN(r.firstSeenAt) FROM raw_entry r " +
+            "WHERE r.titleId = title.id AND r.visible = 1), " +
             "sourceCount = (SELECT COUNT(*) FROM raw_entry r WHERE r.titleId = title.id AND r.visible = 1), " +
             "addedAt = (SELECT MAX(CASE WHEN r.providerAddedAt IS NULL THEN r.firstSeenAt " +
             "WHEN r.providerAddedAt < 100000000000 THEN r.providerAddedAt * 1000 ELSE r.providerAddedAt END) " +
@@ -324,7 +328,8 @@ interface CatalogDao {
 
     /** Titlurile locale rămase fără surse (potrivite între timp pe TMDB sau scoase din playlist). */
     @Query(
-        "DELETE FROM title WHERE tmdbId < 0 AND sourceCount = 0 AND NOT EXISTS(SELECT 1 FROM raw_entry r WHERE r.titleId = title.id) " +
+        "DELETE FROM title WHERE tmdbId < 0 AND sourceCount = 0 " +
+            "AND NOT EXISTS(SELECT 1 FROM raw_entry r WHERE r.titleId = title.id) " +
             "AND id NOT IN (SELECT titleId FROM watchlist) AND id NOT IN (SELECT titleId FROM watch_history)",
     )
     suspend fun deleteEmptyLocalTitles(): Int

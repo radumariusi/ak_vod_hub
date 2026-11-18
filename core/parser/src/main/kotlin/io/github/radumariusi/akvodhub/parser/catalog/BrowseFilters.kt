@@ -26,6 +26,7 @@ object BrowseFilters {
 
     fun decode(type: MediaType, value: String?): CatalogFilter {
         val fields = value.orEmpty().take(300).split('|')
+
         fun get(index: Int) = fields.getOrNull(index)
         return CatalogFilter(
             type = type,
@@ -46,14 +47,30 @@ object BrowseFilters {
         values.take(MAX_PRESETS).joinToString("\n") { "${name(it.name)}\t${encode(it.filter)}" }
 
     fun decodePresets(type: MediaType, value: String?): List<FilterPreset> =
-        value.orEmpty().take(4000).lineSequence().mapNotNull { line ->
-            val label = name(line.substringBefore('\t'))
-            if (label.isEmpty() || '\t' !in line) null else FilterPreset(label, decode(type, line.substringAfter('\t')))
-        }.distinctBy { it.name.lowercase() }.take(MAX_PRESETS).toList()
+        value
+            .orEmpty()
+            .take(4000)
+            .lineSequence()
+            .mapNotNull { line ->
+                val label = name(line.substringBefore('\t'))
+                if (label.isEmpty() ||
+                    '\t' !in line
+                ) {
+                    null
+                } else {
+                    FilterPreset(label, decode(type, line.substringAfter('\t')))
+                }
+            }.distinctBy { it.name.lowercase() }
+            .take(MAX_PRESETS)
+            .toList()
 
     fun sanitize(key: String, value: String): String? {
         val type = MediaType.entries.firstOrNull { key == current(it) || key == presets(it) } ?: return null
-        return if (key == current(type)) encode(decode(type, value)) else encodePresets(decodePresets(type, value))
+        return if (key == current(type)) {
+            encode(decode(type, value))
+        } else {
+            encodePresets(decodePresets(type, value))
+        }
     }
 
     const val MAX_PRESETS = 8

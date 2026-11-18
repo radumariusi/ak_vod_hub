@@ -43,16 +43,16 @@ class PageWindowTest {
     }
 
     private fun runImmediately(block: suspend () -> Unit) {
-        var result: Result<Unit>? = null
+        var outcome: Result<Unit>? = null
         block.startCoroutine(
             object : Continuation<Unit> {
                 override val context = EmptyCoroutineContext
 
-                override fun resumeWith(outcome: Result<Unit>) {
-                    result = outcome
+                override fun resumeWith(result: Result<Unit>) {
+                    outcome = result
                 }
             },
         )
-        checkNotNull(result).getOrThrow()
+        checkNotNull(outcome).getOrThrow()
     }
 }

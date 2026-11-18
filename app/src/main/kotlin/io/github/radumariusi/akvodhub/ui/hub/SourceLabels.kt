@@ -15,7 +15,8 @@ fun sourceTags(
             .joinToString(
                 "+",
             ) { SourceGrouping.languageLabel(it) }
-            .takeIf { it.isNotEmpty() }?.let { "Audio declarat $it" },
+            .takeIf { it.isNotEmpty() }
+            ?.let { "Audio declarat $it" },
         source.hdr?.name?.replace('_', ' '),
         entry?.codec?.name,
         entry?.containerExt?.uppercase(),

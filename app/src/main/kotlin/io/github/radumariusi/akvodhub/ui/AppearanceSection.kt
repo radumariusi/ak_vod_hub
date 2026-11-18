@@ -6,9 +6,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -74,7 +74,6 @@ fun AppearanceSection(viewModel: PlaybackSettingsViewModel) {
     }
 }
 
-
 @Composable
 private fun HomeRowsDialog(
     initialOrder: List<String>,
@@ -84,6 +83,7 @@ private fun HomeRowsDialog(
 ) {
     var order by remember { mutableStateOf(initialOrder) }
     var hidden by remember { mutableStateOf(initialHidden) }
+
     fun move(from: Int, to: Int) {
         order = order.toMutableList().apply { add(to, removeAt(from)) }
     }
@@ -97,7 +97,10 @@ private fun HomeRowsDialog(
                             Text("${HomeRows.labels[key]} · " + if (key in hidden) "ascuns" else "vizibil")
                         }
                         OutlinedButton(onClick = { move(index, index - 1) }, enabled = index > 0) { Text("Sus") }
-                        OutlinedButton(onClick = { move(index, index + 1) }, enabled = index < order.lastIndex) { Text("Jos") }
+                        OutlinedButton(
+                            onClick = { move(index, index + 1) },
+                            enabled = index < order.lastIndex,
+                        ) { Text("Jos") }
                     }
                 }
             }

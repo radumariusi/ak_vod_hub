@@ -186,10 +186,12 @@ class CatalogIndexer(
             "WITH RECURSIVE options(titleId, quality, language, originalAudio, rest) AS (" +
                 "SELECT t.id, COALESCE(r.quality, ''), '', CASE WHEN t.originalLanguage IS NOT NULL AND " +
                 "instr(',' || r.languages || ',', ',' || lower(t.originalLanguage) || ',') > 0 THEN 1 ELSE 0 END, " +
-                "COALESCE(r.languages || ',', '') FROM raw_entry r JOIN title t ON t.id = r.titleId WHERE r.visible = 1 " +
+                "COALESCE(r.languages || ',', '') FROM raw_entry r JOIN title t ON t.id = r.titleId " +
+                "WHERE r.visible = 1 " +
                 "UNION ALL SELECT titleId, quality, substr(rest, 1, instr(rest, ',') - 1), originalAudio, " +
                 "substr(rest, instr(rest, ',') + 1) FROM options WHERE rest <> '') " +
-                "INSERT OR IGNORE INTO title_source_option SELECT titleId, quality, language, originalAudio FROM options",
+                "INSERT OR IGNORE INTO title_source_option " +
+                "SELECT titleId, quality, language, originalAudio FROM options",
         )
     }
 

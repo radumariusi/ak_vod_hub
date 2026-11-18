@@ -50,7 +50,7 @@ class PageWindow<K : Any, T>(
         backwards: Boolean = false,
         fetch: suspend (K?) -> KeysetPage<K, T>,
     ) {
-        if (backwards && !hasEarlier || !backwards && !hasLater) return
+        if ((backwards && !hasEarlier) || (!backwards && !hasLater)) return
         val index = if (backwards) pages.first().index - 1 else (pages.lastOrNull()?.index ?: -1) + 1
         val start = if (backwards) starts[index] else pages.lastOrNull()?.next
         val result = fetch(start)

@@ -177,17 +177,19 @@ fun SettingsScreen(
                             onRefresh = playlistsViewModel::refresh,
                             onDelete = playlistsViewModel::delete,
                         )
-                        OutlinedButton(onClick = { playbackViewModel.setShowPlaylistStatistics(!prefs.showPlaylistStatistics) }) {
+                        OutlinedButton(
+                            onClick = { playbackViewModel.setShowPlaylistStatistics(!prefs.showPlaylistStatistics) },
+                        ) {
                             Text(if (prefs.showPlaylistStatistics) "Ascunde statisticile" else "Arată statisticile")
                         }
                         if (prefs.showPlaylistStatistics) {
-                        val statistics by playbackViewModel.statistics.collectAsState()
-                        LaunchedEffect(Unit) { playbackViewModel.loadStatistics() }
-                        Text("Statistici bibliotecă", style = MaterialTheme.typography.titleLarge)
-                        Text(statistics)
-                        Text(
-                            "Titluri unice după grupare; numărul surselor audio poate include aceeași sursă în mai multe limbi.",
-                        )
+                            val statistics by playbackViewModel.statistics.collectAsState()
+                            LaunchedEffect(Unit) { playbackViewModel.loadStatistics() }
+                            Text("Statistici bibliotecă", style = MaterialTheme.typography.titleLarge)
+                            Text(statistics)
+                            Text(
+                                "Titluri unice după grupare; numărul surselor audio poate include aceeași sursă în mai multe limbi.",
+                            )
                         }
                     }
 
@@ -245,9 +247,10 @@ fun SettingsScreen(
                         val destinations = Destination.entries
                         val startScreen = destinations.firstOrNull { it.name == prefs.startScreen } ?: Destination.HOME
                         OutlinedButton(onClick = {
-                            choice = Choice("Ecran de pornire", destinations.map { it.label }, startScreen.ordinal) {
-                                playbackViewModel.setStartScreen(destinations[it].name)
-                            }
+                            choice =
+                                Choice("Ecran de pornire", destinations.map { it.label }, startScreen.ordinal) {
+                                    playbackViewModel.setStartScreen(destinations[it].name)
+                                }
                         }) { Text("Ecran de pornire · ${startScreen.label}") }
                         Text("Se aplică la următoarea pornire a aplicației.")
 
@@ -295,15 +298,15 @@ fun SettingsScreen(
                 if (selected != 6) {
                     OutlinedButton(onClick = {
                         val category = selected
-                        choice = Choice(
-                            "Resetează ${categories[category]}",
-                            listOf("Păstrează setările", "Resetează preferințele"),
-                            selected = 0,
-                            footer = "Conturile, cheile și playlist-urile sunt păstrate.",
-                        ) { if (it == 1) playbackViewModel.resetCategory(category) }
+                        choice =
+                            Choice(
+                                "Resetează ${categories[category]}",
+                                listOf("Păstrează setările", "Resetează preferințele"),
+                                selected = 0,
+                                footer = "Conturile, cheile și playlist-urile sunt păstrate.",
+                            ) { if (it == 1) playbackViewModel.resetCategory(category) }
                     }) { Text("Resetează categoria") }
                 }
-
             }
         }
     }

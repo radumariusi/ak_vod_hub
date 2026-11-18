@@ -93,13 +93,14 @@ fun DetailsScreen(
     var episodeMessage by remember(activeEpisode) { mutableStateOf("Se încarcă…") }
     LaunchedEffect(activeEpisode) {
         val requested = activeEpisode ?: return@LaunchedEffect
-        episodeMessage = try {
-            viewModel.episodeOverview(requested) ?: "Descriere indisponibilă."
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Exception) {
-            "Descrierea episodului nu a putut fi încărcată."
-        }
+        episodeMessage =
+            try {
+                viewModel.episodeOverview(requested) ?: "Descriere indisponibilă."
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                "Descrierea episodului nu a putut fi încărcată."
+            }
     }
     activeEpisode?.let {
         ChoiceDialog(
@@ -163,7 +164,13 @@ fun DetailsScreen(
                     onSelectSeason = viewModel::selectSeason,
                     onEpisodeInfo = { activeEpisode = it },
                     onActor = onActor,
-                    sourceReason = state.recommended?.let { viewModel.sourceReason(it, details.title.originalLanguage) },
+                    sourceReason =
+                        state.recommended?.let {
+                            viewModel.sourceReason(
+                                it,
+                                details.title.originalLanguage,
+                            )
+                        },
                     onOpen = onOpen,
                 )
             }
@@ -230,7 +237,12 @@ private fun DetailsContent(
     ) {
         item("header") {
             Header(details, state.credits, state.logoPath) {
-                val first = nextEpisode ?: episodes?.seasons?.firstOrNull()?.episodes?.firstOrNull()
+                val first =
+                    nextEpisode ?: episodes
+                        ?.seasons
+                        ?.firstOrNull()
+                        ?.episodes
+                        ?.firstOrNull()
                 PlayActions(state, title.id, first, playFocus, onPlay)
             }
         }
@@ -263,7 +275,7 @@ private fun DetailsContent(
             item("sources-title") {
                 Text("Surse (${details.sources.size})", style = MaterialTheme.typography.titleMedium)
                 sourceReason?.let {
-                    Text("Sursa recomandată după $it", style = MaterialTheme.typography.bodySmall)
+                    Text(it, style = MaterialTheme.typography.bodySmall)
                 }
             }
             items(details.groups, key = { "q:${it.quality}" }) { group ->
@@ -294,11 +306,12 @@ private fun DetailsContent(
             season?.let { s ->
                 items(s.episodes, key = { "e:${s.number}:${it.number}:${it.sources.first().id}" }) { episode ->
                     val progress = episode.number?.let { state.episodeProgress[episode.season to it] }
-                    val showInfo: (() -> Unit)? = if (!title.isLocal && episode.number != null) {
-                        { onEpisodeInfo(episode) }
-                    } else {
-                        null
-                    }
+                    val showInfo: (() -> Unit)? =
+                        if (!title.isLocal && episode.number != null) {
+                            { onEpisodeInfo(episode) }
+                        } else {
+                            null
+                        }
                     EpisodeRow(
                         episode,
                         next = nextEpisode == episode,
@@ -322,7 +335,13 @@ private fun DetailsContent(
                         contentPadding = PaddingValues(12.dp),
                     ) {
                         items(cast) { person ->
-                            Surface(onClick = { if (person.id > 0) onActor(person) }, modifier = Modifier.width(120.dp)) {
+                            Surface(onClick = {
+                                if (person.id >
+                                    0
+                                ) {
+                                    onActor(person)
+                                }
+                            }, modifier = Modifier.width(120.dp)) {
                                 Column(
                                     Modifier.fillMaxWidth().padding(6.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -466,7 +485,6 @@ private fun Header(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-
     }
 }
 
@@ -525,44 +543,44 @@ private fun EpisodeRow(
     onClick: () -> Unit,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-    Surface(onClick = onClick, modifier = Modifier.weight(1f)) {
-        Row(
-            Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                episode.number?.let {
-                    "E%02d".format(it)
-                } ?: "•",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.width(56.dp),
-            )
-            Column(Modifier.height(44.dp), verticalArrangement = Arrangement.Center) {
+        Surface(onClick = onClick, modifier = Modifier.weight(1f)) {
+            Row(
+                Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(
-                    episode.title ?: episode.number?.let { "Episodul $it" } ?: "Episod",
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    episode.number?.let {
+                        "E%02d".format(it)
+                    } ?: "•",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.width(56.dp),
                 )
-                Text(
-                    listOfNotNull(
-                        "Următorul disponibil".takeIf { next },
-                        when {
-                            progress?.finished == true -> "Văzut"
-                            progress != null -> "Început · ${Resume.format(progress.positionMs)}"
-                            else -> null
-                        },
-                        "${episode.sources.size} " + if (episode.sources.size == 1) "sursă" else "surse",
-                    ).joinToString(" · "),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                )
+                Column(Modifier.height(44.dp), verticalArrangement = Arrangement.Center) {
+                    Text(
+                        episode.title ?: episode.number?.let { "Episodul $it" } ?: "Episod",
+                        style = MaterialTheme.typography.titleSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        listOfNotNull(
+                            "Următorul disponibil".takeIf { next },
+                            when {
+                                progress?.finished == true -> "Văzut"
+                                progress != null -> "Început · ${Resume.format(progress.positionMs)}"
+                                else -> null
+                            },
+                            "${episode.sources.size} " + if (episode.sources.size == 1) "sursă" else "surse",
+                        ).joinToString(" · "),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
             }
         }
-    }
-    if (onInfo != null) OutlinedButton(onClick = onInfo) { Text("Detalii episod") }
+        if (onInfo != null) OutlinedButton(onClick = onInfo) { Text("Detalii episod") }
     }
 }
 

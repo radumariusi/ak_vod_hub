@@ -50,6 +50,7 @@ import io.github.radumariusi.akvodhub.data.db.TitleCard
 import io.github.radumariusi.akvodhub.data.playlist.LibraryTotals
 import io.github.radumariusi.akvodhub.hub.HomeRow
 import io.github.radumariusi.akvodhub.hub.HomeViewModel
+import io.github.radumariusi.akvodhub.parser.catalog.HomeRows
 import io.github.radumariusi.akvodhub.parser.player.Resume
 import io.github.radumariusi.akvodhub.player.PlayRequest
 import io.github.radumariusi.akvodhub.player.PlayerActivity
@@ -72,9 +73,17 @@ fun HomeScreen(
     onRestored: () -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
+    val prefs by viewModel.prefs.collectAsState()
     when {
         totals != null && totals.playlists == 0 -> {
             EmptyLibrary(onOpenSettings)
+        }
+
+        !state.loading && prefs.homeHidden.containsAll(HomeRows.labels.keys) -> {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Message("Toate rândurile de pe Acasă sunt ascunse.")
+                OutlinedButton(onClick = onOpenSettings) { Text("Deschide Setări") }
+            }
         }
 
         state.rows.isEmpty() -> {
@@ -113,74 +122,90 @@ private fun HomeRows(
     val context = LocalContext.current
 
     fun play(item: ContinueItem, resume: Boolean) {
-        context.startActivity(PlayerActivity.intent(context, PlayRequest(item.titleId, season = item.season, episode = item.episode, resume = resume)))
+        context.startActivity(
+            PlayerActivity.intent(
+                context,
+                PlayRequest(item.titleId, season = item.season, episode = item.episode, resume = resume),
+            ),
+        )
     }
 
     fun actions(card: TitleCard, key: String, info: ContinueItem) {
         returnToCard = key
-        choice = Choice("Continuă vizionarea", listOf("Continuă", "Detalii", "De la început", "Scoate din continuare"), 0) {
-            when (it) {
-                0 -> play(info, resume = true)
-                1 -> onOpen(card, key)
-                2 -> play(info, resume = false)
-                3 -> {
-                    returnToCard = null
-                    viewModel.removeContinue(card.id)
+        choice =
+            Choice("Continuă vizionarea", listOf("Continuă", "Detalii", "De la început", "Scoate din continuare"), 0) {
+                when (it) {
+                    0 -> {
+                        play(info, resume = true)
+                    }
+
+                    1 -> {
+                        onOpen(card, key)
+                    }
+
+                    2 -> {
+                        play(info, resume = false)
+                    }
+
+                    3 -> {
+                        returnToCard = null
+                        viewModel.removeContinue(card.id)
+                    }
                 }
             }
-        }
     }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val extra = if (rows.any { it.key == HomeViewModel.CONTINUE }) 64.dp else 0.dp
         val heroHeight = (maxHeight - PosterHeight - 108.dp - extra).coerceIn(0.dp, 200.dp)
         Column(Modifier.fillMaxSize()) {
-        val prefs by viewModel.prefs.collectAsState()
-        if (prefs.homeHero && heroHeight >= 104.dp) {
-            Hero(focused, fallback = rows[0].items[0], logo = viewModel::logo, height = heroHeight)
-        }
-        LazyColumn(
-            state = rememberLazyListState(),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(bottom = 24.dp),
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            items(rows, key = { it.key }) { row ->
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(row.title, style = MaterialTheme.typography.titleMedium)
-                    LazyRow(
-                        state = rememberLazyListState(),
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 10.dp),
-                        modifier = Modifier.focusRestorer(),
-                    ) {
-                        itemsIndexed(row.items, key = { _, card -> card.id }) { index, card ->
-                            val key = cardKey(row, card)
-                            val info = row.continueInfo[card.id]
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                PosterCard(
-                                    card = card,
-                                    onClick = {
-                                        when {
-                                            info == null -> onOpen(card, key)
-                                            prefs.continueDirect -> play(info, resume = true)
-                                            else -> actions(card, key, info)
-                                        }
-                                    },
-                                    onFocused = {
-                                        focused.value = card
-                                        viewModel.onItemFocused(row.key, index)
-                                    },
-                                    requestFocus = key == focusKey || (choice == null && key == returnToCard),
-                                    onFocusRequested = {
-                                        initialFocusDone = true
-                                        returnToCard = null
-                                        onRestored()
-                                    },
-                                    supportingText = info?.progressLabel(),
-                                )
-                                if (info != null && prefs.continueDirect) {
-                                    OutlinedButton(onClick = { actions(card, key, info) }) { Text("Acțiuni") }
+            val prefs by viewModel.prefs.collectAsState()
+            if (prefs.homeHero && heroHeight >= 104.dp) {
+                Hero(focused, fallback = rows[0].items[0], logo = viewModel::logo, height = heroHeight)
+            }
+            LazyColumn(
+                state = rememberLazyListState(),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(bottom = 24.dp),
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                items(rows, key = { it.key }) { row ->
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(row.title, style = MaterialTheme.typography.titleMedium)
+                        LazyRow(
+                            state = rememberLazyListState(),
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 10.dp),
+                            modifier = Modifier.focusRestorer(),
+                        ) {
+                            itemsIndexed(row.items, key = { _, card -> card.id }) { index, card ->
+                                val key = cardKey(row, card)
+                                val info = row.continueInfo[card.id]
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    PosterCard(
+                                        card = card,
+                                        onClick = {
+                                            when {
+                                                info == null -> onOpen(card, key)
+                                                prefs.continueDirect -> play(info, resume = true)
+                                                else -> actions(card, key, info)
+                                            }
+                                        },
+                                        onFocused = {
+                                            focused.value = card
+                                            viewModel.onItemFocused(row.key, index)
+                                        },
+                                        requestFocus = key == focusKey || (choice == null && key == returnToCard),
+                                        onFocusRequested = {
+                                            initialFocusDone = true
+                                            returnToCard = null
+                                            onRestored()
+                                        },
+                                        supportingText = info?.progressLabel(),
+                                    )
+                                    if (info != null && prefs.continueDirect) {
+                                        OutlinedButton(onClick = { actions(card, key, info) }) { Text("Acțiuni") }
+                                    }
                                 }
                             }
                         }
@@ -189,9 +214,7 @@ private fun HomeRows(
             }
         }
     }
-    }
     choice?.let { ChoiceDialog(it, onDismiss = { choice = null }) }
-
 }
 
 private fun ContinueItem.progressLabel(): String? =
