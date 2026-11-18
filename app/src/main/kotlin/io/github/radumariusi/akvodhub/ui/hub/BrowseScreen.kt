@@ -7,7 +7,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
@@ -23,8 +26,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -33,6 +39,7 @@ import io.github.radumariusi.akvodhub.hub.Browser
 import io.github.radumariusi.akvodhub.parser.catalog.CatalogFilter
 import io.github.radumariusi.akvodhub.parser.catalog.CatalogSort
 import io.github.radumariusi.akvodhub.parser.catalog.Genres
+import io.github.radumariusi.akvodhub.parser.catalog.LibraryFilter
 import io.github.radumariusi.akvodhub.parser.catalog.ProductionFilter
 import io.github.radumariusi.akvodhub.parser.catalog.YearRange
 import io.github.radumariusi.akvodhub.parser.match.MediaType
@@ -40,6 +47,7 @@ import io.github.radumariusi.akvodhub.parser.match.SourceGrouping
 import io.github.radumariusi.akvodhub.parser.title.ParsedTitle
 import io.github.radumariusi.akvodhub.parser.title.VideoQuality
 import io.github.radumariusi.akvodhub.ui.TvTextField
+import io.github.radumariusi.akvodhub.ui.theme.ThemedPanel
 import io.github.radumariusi.akvodhub.ui.touch.Button
 import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -63,7 +71,15 @@ fun BrowseScreen(
     LaunchedEffect(browser) { browser.start() }
     val state by browser.state.collectAsState()
     val filter = state.filter
-    var choice by remember { mutableStateOf<Choice?>(null) }
+    var showFilters by remember { mutableStateOf(false) }
+    var restoreFiltersFocus by remember { mutableStateOf(false) }
+    val filtersFocus = remember { FocusRequester() }
+    LaunchedEffect(showFilters) {
+        if (!showFilters && restoreFiltersFocus) {
+            filtersFocus.requestFocus()
+            restoreFiltersFocus = false
+        }
+    }
     val grid = rememberLazyGridState()
 
     // Filtru nou → grila revine la început (dar nu la întoarcerea din detalii, cu același filtru).
@@ -76,13 +92,10 @@ fun BrowseScreen(
     }
     LaunchedEffect(grid, browser) {
         snapshotFlow {
-            val lastVisible =
-                grid.layoutInfo.visibleItemsInfo
-                    .lastOrNull()
-                    ?.index ?: -1
-            lastVisible to state.items.size
+            val visible = grid.layoutInfo.visibleItemsInfo
+            (visible.firstOrNull()?.index ?: -1) to (visible.lastOrNull()?.index ?: -1)
         }.distinctUntilChanged()
-            .collect { (index, _) -> browser.onVisible(index) }
+            .collect { (first, last) -> browser.onVisible(first, last) }
     }
     LaunchedEffect(restoreKey, state.items) {
         val id = restoreKey?.takeIf { it.startsWith("browse:$screenKey:") }?.substringAfterLast(':')?.toLongOrNull()
@@ -120,7 +133,21 @@ fun BrowseScreen(
                 VoiceSearchButton { browser.setFilter(filter.copy(text = it)) }
             }
         }
-        FilterBar(filter, languages, search, onChange = browser::setFilter, onChoose = { choice = it })
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(
+                onClick = { showFilters = true },
+                modifier = Modifier.focusRequester(filtersFocus),
+            ) { Text("Filtre și sortare") }
+            Text(filter.summary(), maxLines = 2, style = MaterialTheme.typography.bodySmall)
+        }
+        if (filter.type == MediaType.TV &&
+            (filter.quality != null || filter.language != null || filter.originalAudioOnly)
+        ) {
+            Text(
+                "Potrivire pe o sursă declarată. Episoadele pot avea alte variante.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
 
         when {
             state.items.isNotEmpty() -> {
@@ -160,6 +187,97 @@ fun BrowseScreen(
         }
     }
 
+    if (showFilters) {
+        FilterPanel(filter, languages, search, browser) {
+            restoreFiltersFocus = true
+            showFilters = false
+        }
+    }
+}
+
+private fun CatalogFilter.summary(): String =
+    listOfNotNull(
+        sort.label,
+        genre?.label,
+        years?.label,
+        quality?.let(SourceGrouping::qualityLabel),
+        language?.let(::languageName),
+        production.takeIf { it != ProductionFilter.ALL }?.label,
+        library.takeIf { it != LibraryFilter.ALL }?.label,
+        "Audio original".takeIf { originalAudioOnly },
+    ).joinToString(" · ")
+
+@Composable
+private fun FilterPanel(
+    filter: CatalogFilter,
+    languages: List<String>,
+    search: Boolean,
+    browser: Browser,
+    dismiss: () -> Unit,
+) {
+    var draft by remember { mutableStateOf(filter) }
+    var choice by remember { mutableStateOf<Choice?>(null) }
+    var naming by remember { mutableStateOf(false) }
+    var presetName by remember { mutableStateOf("") }
+    var presets by remember { mutableStateOf(browser.presets()) }
+    val applyFocus = remember { FocusRequester() }
+    Dialog(onDismissRequest = dismiss) {
+        ThemedPanel(Modifier.width(560.dp)) {
+            LaunchedEffect(Unit) { applyFocus.requestFocus() }
+            Text("Filtre și sortare", style = MaterialTheme.typography.headlineSmall)
+            Text(draft.summary(), style = MaterialTheme.typography.bodySmall)
+            FilterBar(
+                draft,
+                languages,
+                search,
+                onChange = { draft = it },
+                onChoose = { choice = it },
+                modifier = Modifier.heightIn(max = 310.dp).weight(1f, fill = false),
+            )
+            if (!search && !naming) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { naming = true }) { Text("Salvează combinația") }
+                    if (presets.isNotEmpty()) {
+                        OutlinedButton(onClick = {
+                            choice =
+                                Choice("Combinații salvate", presets.map { it.name }, selected = null) {
+                                    draft = presets[it].filter
+                                }
+                        }) { Text("Combinații") }
+                        OutlinedButton(onClick = {
+                            choice =
+                                Choice("Șterge combinația", presets.map { it.name }, selected = null) {
+                                    browser.removePreset(presets[it].name)
+                                    presets = browser.presets()
+                                }
+                        }) { Text("Șterge") }
+                    }
+                }
+            }
+            if (naming) {
+                TvTextField(presetName, { presetName = it.take(36) }, label = "Nume combinație")
+                OutlinedButton(
+                    enabled = presetName.isNotBlank(),
+                    onClick = {
+                        browser.savePreset(presetName, draft)
+                        presets = browser.presets()
+                        presetName = ""
+                        naming = false
+                    },
+                ) { Text("Salvează") }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(modifier = Modifier.focusRequester(applyFocus), onClick = {
+                    browser.setFilter(draft)
+                    dismiss()
+                }) { Text("Aplică") }
+                OutlinedButton(onClick = {
+                    draft = CatalogFilter(type = filter.type.takeUnless { search }, text = filter.text)
+                }) { Text("Resetează") }
+                OutlinedButton(onClick = dismiss) { Text("Anulează") }
+            }
+        }
+    }
     choice?.let { ChoiceDialog(it, onDismiss = { choice = null }) }
 }
 
@@ -170,12 +288,14 @@ private fun FilterBar(
     search: Boolean,
     onChange: (CatalogFilter) -> Unit,
     onChoose: (Choice) -> Unit,
+    modifier: Modifier,
 ) {
     val qualities = listOf(VideoQuality.UHD, VideoQuality.FHD, VideoQuality.HD, VideoQuality.SD)
     val types = listOf(MediaType.MOVIE, MediaType.TV)
-    LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+    LazyColumn(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
     ) {
         if (search) {
             item("type") {
@@ -264,21 +384,15 @@ private fun FilterBar(
                 )
             })
         }
-        if (filter.hasFilters) {
-            item("reset") {
-                OutlinedButton(onClick = {
-                    onChange(
-                        filter.copy(
-                            genre = null,
-                            years = null,
-                            quality = null,
-                            language = null,
-                            originalAudioOnly = false,
-                            production = ProductionFilter.ALL,
-                        ),
-                    )
-                }) { Text("Șterge filtrele") }
-            }
+        item("library") {
+            FilterButton("Vizionare", filter.library.label, onClick = {
+                val options = LibraryFilter.entries
+                onChoose(
+                    Choice("Vizionare", options.map { it.label }, filter.library.ordinal) {
+                        onChange(filter.copy(library = options[it]))
+                    },
+                )
+            })
         }
     }
 }

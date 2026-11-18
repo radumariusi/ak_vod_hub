@@ -5,6 +5,7 @@ import androidx.sqlite.db.SimpleSQLiteQuery
 import io.github.radumariusi.akvodhub.data.db.AkVodDatabase
 import io.github.radumariusi.akvodhub.data.db.ContinueItem
 import io.github.radumariusi.akvodhub.data.db.DiscoverCacheEntity
+import io.github.radumariusi.akvodhub.data.db.EpisodeProgressEntity
 import io.github.radumariusi.akvodhub.data.db.PlaylistType
 import io.github.radumariusi.akvodhub.data.db.RawEntryEntity
 import io.github.radumariusi.akvodhub.data.db.TitleCard
@@ -106,7 +107,6 @@ class HubRepository(
 ) {
     private val dao = db.catalogDao()
     private val playlistDao = db.playlistDao()
-    private val overviewMutex = Mutex()
     private val logoMutex = Mutex()
     private val trailerMutex = Mutex()
     private val creditsCache = ConcurrentHashMap<Long, Credits>()
@@ -135,6 +135,19 @@ class HubRepository(
             originalLanguage.takeIf { playback.state.value.preferOriginalLanguage },
         )
 
+    fun sourceReason(source: SourceInfo, originalLanguage: String?): String {
+        val original = originalLanguage?.lowercase()
+        if (playback.state.value.preferOriginalLanguage && original != null && original in source.languages) {
+            return "Recomandată pentru limba originală declarată în playlist."
+        }
+        val rule = profile.rules.firstOrNull { it.matches(source) || it.matchesMulti(source) }
+        return when {
+            rule == null -> "Recomandată după calitate și limbile preferate."
+            rule.matches(source) -> "Recomandată după regula ${rule.label()} din profil."
+            else -> "Recomandată după profil, cu eticheta MULTI. Limba se verifică la redare."
+        }
+    }
+
     /** Agregări SQL la deschiderea panoului; doar grupurile de limbi se parcurg în flux. */
     suspend fun statistics(): String =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -152,7 +165,7 @@ class HubRepository(
                             "Potrivite TMDB: ${c.getLong(3)} din ${c.getLong(4)} titluri vizibile"
                     }
             val languages = mutableMapOf<String, Long>()
-            sql.query("SELECT languages, COUNT(*) FROM raw_entry GROUP BY languages").use { c ->
+            sql.query("SELECT languages, COUNT(*) FROM raw_entry WHERE visible = 1 GROUP BY languages").use { c ->
                 while (c.moveToNext()) {
                     val codes =
                         c
@@ -165,7 +178,7 @@ class HubRepository(
                     codes.forEach { code -> languages[code] = (languages[code] ?: 0L) + c.getLong(1) }
                 }
             }
-            totals + "\nSurse pe limbi (inclusiv cele ascunse; MULTI separat):\n" +
+            totals + "\nSurse vizibile pe limbi (etichete din playlist):\n" +
                 languages.entries
                     .sortedByDescending { it.value }
                     .take(
@@ -203,6 +216,11 @@ class HubRepository(
         return dao.cards(SimpleSQLiteQuery(query.sql, query.args.toTypedArray()))
     }
 
+    suspend fun episodeProgress(titleId: Long): List<EpisodeProgressEntity> = dao.episodeProgress(titleId)
+
+    suspend fun episodeProgress(titleId: Long, season: Int, episode: Int): EpisodeProgressEntity? =
+        dao.episodeProgress(titleId, season, episode)
+
     suspend fun watchState(titleId: Long): WatchStateEntity? = dao.watchState(titleId)
 
     private val watchChanged = MutableStateFlow(0L)
@@ -227,6 +245,7 @@ class HubRepository(
         progress: Double,
         finished: Boolean,
         at: Long,
+        episode: EpisodeProgressEntity? = null,
     ) {
         val history = db.discoverDao()
         db.withTransaction {
@@ -234,6 +253,12 @@ class HubRepository(
             val old = history.history(titleId)
             val value = progress.coerceIn(0.0, 1.0)
             if (finished) dao.setPosterProgress(titleId, 1.0)
+            if (episode != null) {
+                val previous = dao.episodeProgress(titleId, episode.season, episode.episode)
+                if (previous == null || episode.updatedAt >= previous.updatedAt) {
+                    dao.putEpisodeProgress(episode.copy(finished = episode.finished || previous?.finished == true))
+                }
+            }
             history.putHistory(
                 WatchHistoryEntity(
                     titleId = titleId,
@@ -274,6 +299,9 @@ class HubRepository(
                         CatalogSort.RECENT -> last.addedAt
                         CatalogSort.RATING -> last.card.rating
                         CatalogSort.TITLE -> last.card.name
+                        CatalogSort.IMDB -> last.card.imdbRating
+                        CatalogSort.RELEASE -> last.card.year
+                        CatalogSort.PLAYLIST -> last.playlistAddedAt
                     }
                 return CatalogPage(items, CatalogCursor(section, value, last.card.id))
             }
@@ -300,7 +328,6 @@ class HubRepository(
     suspend fun languages(): List<String> =
         dao
             .languageCombinations()
-            .flatMap { it.split(',') }
             .map { it.trim().lowercase() }
             .filter { it.isNotEmpty() }
             .distinct()
@@ -358,7 +385,7 @@ class HubRepository(
             val title = dao.titleById(titleId) ?: return@withLock null
             if (title.isLocal) return@withLock null
             val cache = db.discoverDao()
-            val cacheKey = "logo:${title.mediaType}:${title.tmdbId}"
+            val cacheKey = "logo:en:${title.mediaType}:${title.tmdbId}"
             val old = cache.cached(cacheKey)
             val now = System.currentTimeMillis()
             if (old != null && LocalizedOverview.isCached(old.fetchedAt, now)) return@withLock old.data.ifBlank { null }
@@ -368,7 +395,6 @@ class HubRepository(
                 val path =
                     TitleLogo.choose(
                         images.logos.map { LogoCandidate(it.path, it.language, it.votes) },
-                        title.originalLanguage,
                     )
                 db.withTransaction {
                     cache.putCache(DiscoverCacheEntity(cacheKey, path.orEmpty(), now))
@@ -382,26 +408,6 @@ class HubRepository(
             }
         }
 
-    /** Numai fișa deschisă cere traducerea. Erorile păstrează descrierea existentă și permit reîncercarea. */
-    suspend fun romanianOverview(titleId: Long): TitleEntity? =
-        overviewMutex.withLock {
-            val title = dao.titleById(titleId) ?: return@withLock null
-            if (title.isLocal || LocalizedOverview.isCached(title.overviewRoFetchedAt, System.currentTimeMillis())) {
-                return@withLock title
-            }
-            val key = settings.apiKey() ?: return@withLock title
-            val overview =
-                try {
-                    tmdb.romanianOverview(key, title.mediaType, title.tmdbId)
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    return@withLock title
-                }
-            dao.setRomanianOverview(titleId, LocalizedOverview.clean(overview), System.currentTimeMillis())
-            dao.titleById(titleId)
-        }
-
     /**
      * Episoadele unui serial din toate sursele, unite pe sezon + episod. La Xtream, lista de episoade se cere
      * de la server la prima deschidere în sesiune ([refresh] = true), apoi vine din baza locală.
@@ -410,7 +416,10 @@ class HubRepository(
         titleId: Long,
         refresh: Boolean,
     ): SeriesEpisodes {
-        if (refresh) loadXtreamEpisodes(titleId)
+        if (refresh) {
+            loadXtreamEpisodes(titleId)
+            indexer.refresh()
+        }
         val entries = dao.episodes(titleId)
         val sources = describe(entries)
         val seasons =
@@ -433,6 +442,7 @@ class HubRepository(
                         try {
                             importer.loadXtreamEpisodes(s.sourceId, s.streamId!!)
                         } catch (e: CancellationException) {
+                            episodesLoaded.remove(s.id)
                             throw e
                         } catch (e: Exception) {
                             // Serverul nu răspunde: rămân episoadele știute; reîncercăm la următoarea deschidere.
@@ -441,6 +451,22 @@ class HubRepository(
                     }
                 }.awaitAll()
         }
+    }
+
+    suspend fun episodeOverview(title: TitleEntity, season: Int, episode: Int): String? {
+        if (title.isLocal || season < 0 || episode <= 0) return null
+        val cache = db.discoverDao()
+        val cacheKey = "episode:en:${title.tmdbId}:$season:$episode"
+        val now = System.currentTimeMillis()
+        val old = cache.cached(cacheKey)
+        if (old != null && LocalizedOverview.isCached(old.fetchedAt, now)) return old.data.ifBlank { null }
+        val key = settings.apiKey() ?: return old?.data?.ifBlank { null }
+        val text = tmdb.episodeOverview(key, title.tmdbId, season, episode)
+        db.withTransaction {
+            cache.putCache(DiscoverCacheEntity(cacheKey, text.orEmpty(), now))
+            cache.trimEpisodes()
+        }
+        return text
     }
 
     /** Distribuția de la TMDB (o cerere, ținută în memorie). null dacă nu avem cheie sau titlul e local. */

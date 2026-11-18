@@ -75,6 +75,7 @@ data class RawEntryEntity(
     val providerAddedAt: Long? = null,
     val firstSeenAt: Long,
     val seenRun: Long,
+    @ColumnInfo(defaultValue = "1") val visible: Boolean = true,
     /** Titlul curat scos de parser din [name] (ex. „The Matrix” din „EN| The Matrix (1999) 4K”). */
     val title: String? = null,
     val year: Int? = null,
@@ -158,6 +159,8 @@ object MatchState {
         Index(value = ["newEpisodeAt"]),
         Index(value = ["rating"]),
         Index(value = ["name"]),
+        Index(value = ["year"]),
+        Index(value = ["imdbRating"]),
         Index(value = ["imdbId"]),
     ],
 )
@@ -244,6 +247,7 @@ data class CatalogCard(
     @Embedded val card: TitleCard,
     val popularity: Double?,
     val addedAt: Long?,
+    val playlistAddedAt: Long?,
 )
 
 /** Un titlu din „Continuă vizionarea”, cu locul unde a rămas utilizatorul. */
@@ -353,4 +357,23 @@ data class PersonCreditEntity(
 data class WatchlistEntity(
     @PrimaryKey val titleId: Long,
     val addedAt: Long,
+)
+
+@Entity(tableName = "title_source_option", primaryKeys = ["titleId", "quality", "language", "originalAudio"])
+data class TitleSourceOption(
+    val titleId: Long,
+    val quality: String,
+    val language: String,
+    val originalAudio: Boolean,
+)
+
+@Entity(tableName = "episode_progress", primaryKeys = ["titleId", "season", "episode"])
+data class EpisodeProgressEntity(
+    val titleId: Long,
+    val season: Int,
+    val episode: Int,
+    val positionMs: Long,
+    val durationMs: Long,
+    val finished: Boolean,
+    val updatedAt: Long,
 )

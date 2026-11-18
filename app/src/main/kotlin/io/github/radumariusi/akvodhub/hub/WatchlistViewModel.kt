@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.radumariusi.akvodhub.data.catalog.HubRepository
 import io.github.radumariusi.akvodhub.data.db.TitleCard
+import io.github.radumariusi.akvodhub.parser.catalog.KeysetPage
+import io.github.radumariusi.akvodhub.parser.catalog.PageWindow
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,6 +27,7 @@ class WatchlistViewModel
         private val mutableState = MutableStateFlow(WatchlistState())
         val state = mutableState.asStateFlow()
         private var job: Job? = null
+        private var window = PageWindow<Long, TitleCard>()
 
         init {
             reload()
@@ -34,29 +37,38 @@ class WatchlistViewModel
 
         private fun reload() {
             job?.cancel()
-            val keep = maxOf(PAGE, mutableState.value.items.size)
             mutableState.value = mutableState.value.copy(loading = true)
             job =
                 viewModelScope.launch {
-                    val items = mutableListOf<TitleCard>()
-                    var more: List<TitleCard>
-                    do {
-                        more = repository.watchlistPage(items.lastOrNull()?.id ?: 0, PAGE)
-                        items += more
-                    } while (more.size == PAGE && items.size < keep)
-                    mutableState.value = WatchlistState(items, loading = false, endReached = more.size < PAGE)
+                    window.refresh(::fetch)
+                    publish()
                 }
         }
 
-        fun onVisible(index: Int) {
+        private suspend fun fetch(after: Long?): KeysetPage<Long, TitleCard> {
+            val items = repository.watchlistPage(after ?: 0, PAGE)
+            return KeysetPage(items, items.lastOrNull()?.id?.takeIf { items.size == PAGE })
+        }
+
+        private fun publish() {
+            mutableState.value =
+                WatchlistState(
+                    window.items.distinctBy { it.id },
+                    loading = false,
+                    endReached = !window.hasLater,
+                )
+        }
+
+        fun onVisible(first: Int, last: Int) {
             val old = mutableState.value
-            if (old.loading || old.endReached || index < old.items.size - 18) return
+            if (old.loading || first < 0 || old.items.isEmpty()) return
+            val backwards = window.hasEarlier && first < 8
+            if (!backwards && (old.endReached || last < old.items.size - 18)) return
             mutableState.value = old.copy(loading = true)
             job =
                 viewModelScope.launch {
-                    val more = repository.watchlistPage(old.items.lastOrNull()?.id ?: 0, PAGE)
-                    mutableState.value =
-                        old.copy(items = old.items + more, loading = false, endReached = more.size < PAGE)
+                    window.move(backwards, ::fetch)
+                    publish()
                 }
         }
 

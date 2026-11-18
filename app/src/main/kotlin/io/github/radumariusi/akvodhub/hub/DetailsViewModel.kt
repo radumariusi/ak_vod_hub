@@ -7,12 +7,14 @@ import io.github.radumariusi.akvodhub.data.catalog.Credits
 import io.github.radumariusi.akvodhub.data.catalog.HubRepository
 import io.github.radumariusi.akvodhub.data.catalog.SeriesEpisodes
 import io.github.radumariusi.akvodhub.data.catalog.TitleDetails
+import io.github.radumariusi.akvodhub.data.db.EpisodeProgressEntity
 import io.github.radumariusi.akvodhub.data.db.WatchStateEntity
 import io.github.radumariusi.akvodhub.data.discover.DiscoverRepository
 import io.github.radumariusi.akvodhub.data.discover.TitleDiscovery
-import io.github.radumariusi.akvodhub.parser.catalog.LocalizedOverview
+import io.github.radumariusi.akvodhub.parser.catalog.MergedEpisode
 import io.github.radumariusi.akvodhub.parser.match.MediaType
 import io.github.radumariusi.akvodhub.parser.match.SourceInfo
+import io.github.radumariusi.akvodhub.parser.player.EpisodeOrder
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -37,11 +39,28 @@ data class DetailsState(
     val changingLibrary: Boolean = false,
     /** Unde a rămas utilizatorul (pentru „Continuă”). */
     val watch: WatchStateEntity? = null,
+    val episodeProgress: Map<Pair<Int, Int>, EpisodeProgressEntity> = emptyMap(),
     /** Sursa pe care o alege playerul singur (profilul din Setări → Redare). */
     val recommended: SourceInfo? = null,
     /** Colecția, „Recomandate”, „Similare”, alte titluri ale regizorului (doar ce există în playlist). */
     val discovery: TitleDiscovery? = null,
-)
+) {
+    val nextEpisode: MergedEpisode?
+        get() {
+            val seasons = episodes?.seasons ?: return null
+            val last = episodeProgress.values.maxByOrNull { it.updatedAt }
+            return EpisodeOrder.resumeOrNext(
+                seasons,
+                watch?.season,
+                watch?.episode,
+                last?.season,
+                last?.episode,
+                last?.finished == true,
+            ) { entry ->
+                entry.number?.let { episodeProgress[entry.season to it]?.finished } == true
+            }
+        }
+}
 
 /** Pagina de detalii a unui film sau serial: fișa, sursele grupate, episoadele unite, distribuția. */
 @HiltViewModel
@@ -87,14 +106,7 @@ class DetailsViewModel
 
         fun open(titleId: Long) {
             val current = mutableState.value.details?.title
-            if (mutableState.value.titleId == titleId && current != null &&
-                (
-                    current.tmdbId < 0 ||
-                        LocalizedOverview.isCached(current.overviewRoFetchedAt, System.currentTimeMillis())
-                )
-            ) {
-                return
-            }
+            if (mutableState.value.titleId == titleId && current != null) return
             job?.cancel()
             mutableState.value = DetailsState(titleId = titleId)
             job =
@@ -103,6 +115,14 @@ class DetailsViewModel
                     val all = details?.groups.orEmpty().flatMap { g -> g.languages.flatMap { it.sources } }
                     val recommended = repository.playOrder(all, details?.title?.originalLanguage).firstOrNull()
                     val watch = repository.watchState(titleId)
+                    val progress =
+                        if (details?.title?.mediaType ==
+                            MediaType.TV
+                        ) {
+                            repository.episodeProgress(titleId)
+                        } else {
+                            emptyList()
+                        }
                     val listed = repository.inWatchlist(titleId)
                     val watched = repository.isWatched(titleId)
                     mutableState.update {
@@ -111,6 +131,7 @@ class DetailsViewModel
                             details = details,
                             recommended = recommended,
                             watch = watch,
+                            episodeProgress = progress.associateBy { it.season to it.episode },
                             inWatchlist = listed,
                             watched = watched,
                         )
@@ -119,18 +140,6 @@ class DetailsViewModel
                     launch {
                         val logo = repository.logo(titleId)
                         mutableState.update { if (it.titleId == titleId) it.copy(logoPath = logo) else it }
-                    }
-                    launch overview@{
-                        val localized = repository.romanianOverview(titleId) ?: return@overview
-                        mutableState.update { state ->
-                            if (state.titleId ==
-                                titleId
-                            ) {
-                                state.copy(details = state.details?.copy(title = localized))
-                            } else {
-                                state
-                            }
-                        }
                     }
                     launch {
                         val credits = repository.credits(details.title)
@@ -155,10 +164,28 @@ class DetailsViewModel
             mutableState.update { s ->
                 val seasons = episodes.seasons.map { it.number }
                 val selected =
-                    s.selectedSeason?.takeIf { it in seasons } ?: seasons.firstOrNull { it > 0 }
+                    s.selectedSeason?.takeIf { it in seasons }
+                        ?: s
+                            .copy(episodes = episodes)
+                            .nextEpisode
+                            ?.season
+                            ?.takeIf { it in seasons }
+                        ?: seasons.firstOrNull { it > 0 }
                         ?: seasons.firstOrNull()
                 s.copy(episodes = episodes, loadingEpisodes = loadingMore, selectedSeason = selected)
             }
+        }
+
+        fun sourceReason(source: SourceInfo, originalLanguage: String?): String =
+            repository.sourceReason(
+                source,
+                originalLanguage,
+            )
+
+        suspend fun episodeOverview(episode: MergedEpisode): String? {
+            val title = state.value.details?.title ?: return null
+            val number = episode.number ?: return null
+            return repository.episodeOverview(title, episode.season, number)
         }
 
         suspend fun trailer(titleId: Long): String? = repository.trailer(titleId)
@@ -194,8 +221,35 @@ class DetailsViewModel
             val watch = repository.watchState(titleId)
             val listed = repository.inWatchlist(titleId)
             val watched = repository.isWatched(titleId)
+            val progress =
+                if (state.value.details
+                        ?.title
+                        ?.mediaType == MediaType.TV
+                ) {
+                    repository.episodeProgress(titleId).associateBy { it.season to it.episode }
+                } else {
+                    emptyMap()
+                }
             mutableState.update {
-                if (it.titleId == titleId) it.copy(watch = watch, inWatchlist = listed, watched = watched) else it
+                if (it.titleId ==
+                    titleId
+                ) {
+                    val updated =
+                        it.copy(
+                            watch = watch,
+                            episodeProgress = progress,
+                            inWatchlist = listed,
+                            watched = watched,
+                        )
+                    val changedEpisode = it.watch?.season != watch?.season || it.watch?.episode != watch?.episode
+                    if (changedEpisode) {
+                        updated.copy(selectedSeason = updated.nextEpisode?.season ?: it.selectedSeason)
+                    } else {
+                        updated
+                    }
+                } else {
+                    it
+                }
             }
         }
     }

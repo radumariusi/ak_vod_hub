@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.radumariusi.akvodhub.data.catalog.HubRepository
+import io.github.radumariusi.akvodhub.data.db.ContinueItem
 import io.github.radumariusi.akvodhub.data.db.TitleCard
 import io.github.radumariusi.akvodhub.data.discover.DiscoverRepository
 import io.github.radumariusi.akvodhub.data.discover.DiscoverRow
@@ -11,7 +12,10 @@ import io.github.radumariusi.akvodhub.parser.catalog.CatalogCursor
 import io.github.radumariusi.akvodhub.parser.catalog.CatalogFilter
 import io.github.radumariusi.akvodhub.parser.catalog.CatalogSort
 import io.github.radumariusi.akvodhub.parser.catalog.Genres
+import io.github.radumariusi.akvodhub.parser.catalog.HomeRows
+import io.github.radumariusi.akvodhub.parser.catalog.KeysetPage
 import io.github.radumariusi.akvodhub.parser.catalog.NewsCursor
+import io.github.radumariusi.akvodhub.parser.catalog.PageWindow
 import io.github.radumariusi.akvodhub.parser.match.MediaType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -19,7 +23,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -34,13 +40,14 @@ data class HomeRow(
     val items: List<TitleCard>,
     val filter: CatalogFilter?,
     val endReached: Boolean,
-    val newsCursor: NewsCursor? = null,
-    val catalogCursor: CatalogCursor? = null,
+    val hasEarlier: Boolean = false,
+    val continueInfo: Map<Long, ContinueItem> = emptyMap(),
 )
 
 data class HomeState(
     val loading: Boolean = true,
     val rows: List<HomeRow> = emptyList(),
+    val catalogLabels: Map<String, String> = emptyMap(),
 )
 
 /**
@@ -59,7 +66,16 @@ class HomeViewModel
         private val mutableState = MutableStateFlow(HomeState())
         val state: StateFlow<HomeState> = mutableState.asStateFlow()
 
-        private val loadingMore = mutableSetOf<String>()
+        private sealed interface HomeCursor {
+            data class Catalog(val cursor: CatalogCursor) : HomeCursor
+
+            data class News(val cursor: NewsCursor) : HomeCursor
+
+            data class Watchlist(val id: Long) : HomeCursor
+        }
+
+        private val windows = mutableMapOf<String, PageWindow<HomeCursor, TitleCard>>()
+        private val loadingMore = mutableMapOf<String, Job>()
 
         /** Rândurile din catalog (paginate) și „Continuă vizionarea”. */
         private var base: List<HomeRow> = emptyList()
@@ -68,6 +84,7 @@ class HomeViewModel
         private var personal: List<HomeRow> = emptyList()
         private var catalogs: List<HomeRow> = emptyList()
         private var loaded = false
+        private var reloadJob: Job? = null
         private var personalJob: Job? = null
         private var catalogJob: Job? = null
 
@@ -91,94 +108,141 @@ class HomeViewModel
                 repository.watchVersion.drop(1).collect {
                     refreshContinueWatching()
                     refreshEpisodeNews()
+                    refreshWatchlist()
                     loadPersonal(delayMs = PERSONAL_DEBOUNCE_MS)
                 }
             }
             viewModelScope.launch {
                 discover.installedAddons.drop(1).collect { loadCatalogs() }
             }
+            viewModelScope.launch {
+                prefs
+                    .map { it.homeOrder to it.homeHidden }
+                    .distinctUntilChanged()
+                    .drop(1)
+                    .collect { reload() }
+            }
         }
 
         suspend fun logo(titleId: Long): String? = repository.logo(titleId)
 
+        private var catalogLabels: Map<String, String> = emptyMap()
+
+        private fun enabled(key: String): Boolean =
+            key !in prefs.value.homeHidden && HomeRows.group(key) !in prefs.value.homeHidden
+
+        fun removeContinue(titleId: Long) {
+            viewModelScope.launch { repository.clearWatchState(titleId) }
+        }
+
         fun reload() {
-            viewModelScope.launch {
-                val keep = base.associate { it.key to it.items.size }
-                val rows = mutableListOf<HomeRow>()
-                val watching = repository.continueWatching()
-                if (watching.isNotEmpty()) {
-                    rows += HomeRow(CONTINUE, "Continuă vizionarea", watching, null, endReached = true)
-                }
-                for (key in listOf(NEWS, EPISODES)) {
-                    newsRow(key, maxOf(PAGE, keep[key] ?: 0))?.let { rows += it }
-                }
-                for ((key, title, filter) in specs) {
-                    // Păstrăm câte titluri erau deja încărcate, ca rândul să nu „sară” sub focus.
-                    val size = maxOf(PAGE, keep[key] ?: 0)
-                    val page = repository.page(filter, size)
-                    if (page.items.isNotEmpty()) {
-                        rows += HomeRow(key, title, page.items, filter, page.next == null, catalogCursor = page.next)
+            reloadJob?.cancel()
+            reloadJob =
+                viewModelScope.launch {
+                    personalJob?.cancel()
+                    catalogJob?.cancel()
+                    loadingMore.values.forEach(Job::cancel)
+                    loadingMore.clear()
+                    windows.clear()
+                    val rows = mutableListOf<HomeRow>()
+                    if (enabled(CONTINUE)) continueRow()?.let { rows += it }
+                    if (enabled(HomeRows.WATCHLIST)) newRow(HomeRows.WATCHLIST, "Lista mea")?.let { rows += it }
+                    if (enabled(NEWS)) newRow(NEWS, "Nou în playlist")?.let { rows += it }
+                    if (enabled(EPISODES)) newRow(EPISODES, "Episoade noi la serialele urmărite")?.let { rows += it }
+                    for ((key, title, filter) in specs) {
+                        if (enabled(key)) newRow(key, title, filter)?.let { rows += it }
                     }
+                    base = rows
+                    loaded = true
+                    publish()
+                    // Disponibilitatea s-a putut schimba: refacem și rândurile de descoperire.
+                    loadPersonal()
+                    loadCatalogs()
                 }
-                base = rows
-                loaded = true
-                publish()
-                // Disponibilitatea s-a putut schimba: refacem și rândurile de descoperire.
-                loadPersonal()
-                loadCatalogs()
-            }
         }
 
-        /** După player: actualizează doar rândul „Continuă vizionarea”. */
-        fun refreshContinueWatching() {
-            viewModelScope.launch {
-                if (!loaded) return@launch
-                val watching = repository.continueWatching()
-                val rest = base.filter { it.key != CONTINUE }
-                val row = HomeRow(CONTINUE, "Continuă vizionarea", watching, null, endReached = true)
-                base = if (watching.isEmpty()) rest else listOf(row) + rest
-                publish()
-            }
-        }
-
-        private suspend fun newsRow(key: String, desired: Int): HomeRow? {
-            var cursor: NewsCursor? = null
-            val cards = mutableListOf<TitleCard>()
-            var end: Boolean
-            do {
-                val page = repository.newsPage(key == EPISODES, cursor, PAGE)
-                cards += page.items
-                cursor = page.cursor
-                end = page.endReached
-            } while (!end && cards.size < desired)
+        private suspend fun continueRow(): HomeRow? {
+            val cards = repository.continueWatching()
             if (cards.isEmpty()) return null
             return HomeRow(
-                key,
-                if (key == NEWS) "Nou în playlist" else "Episoade noi la serialele urmărite",
+                CONTINUE,
+                "Continuă vizionarea",
                 cards,
                 null,
-                end,
-                cursor,
+                endReached = true,
+                continueInfo = repository.continueItems(cards.size).associateBy { it.titleId },
             )
         }
 
-        private fun refreshEpisodeNews() {
+        fun refreshContinueWatching() {
             viewModelScope.launch {
-                if (!loaded) return@launch
-                val desired = base.firstOrNull { it.key == EPISODES }?.items?.size ?: PAGE
-                val row = newsRow(EPISODES, desired)
-                val rest = base.filter { it.key != EPISODES }
-                base = if (row == null) rest else rest + row
+                if (!loaded || !enabled(CONTINUE)) return@launch
+                val row = continueRow()
+                base = base.filter { it.key != CONTINUE } + listOfNotNull(row)
                 publish()
             }
+        }
+
+        private fun refreshWatchlist() = refreshRow(HomeRows.WATCHLIST, "Lista mea")
+
+        private fun refreshEpisodeNews() = refreshRow(EPISODES, "Episoade noi la serialele urmărite")
+
+        private fun refreshRow(key: String, title: String) {
+            if (!loaded || !enabled(key) || reloadJob?.isActive == true) return
+            loadingMore.remove(key)?.cancel()
+            viewModelScope.launch {
+                val row = newRow(key, title)
+                base = base.filter { it.key != key } + listOfNotNull(row)
+                publish()
+            }
+        }
+
+        private suspend fun newRow(key: String, label: String, filter: CatalogFilter? = null): HomeRow? {
+            val window = PageWindow<HomeCursor, TitleCard>(maxPages = 4)
+            window.move { fetch(key, filter, it) }
+            val cards = window.items
+            if (cards.isEmpty()) return null
+            windows[key] = window
+            return HomeRow(key, label, cards, filter, endReached = !window.hasLater)
+        }
+
+        private suspend fun fetch(
+            key: String,
+            filter: CatalogFilter?,
+            cursor: HomeCursor?,
+        ): KeysetPage<HomeCursor, TitleCard> {
+            if (filter != null) {
+                val page = repository.page(filter, PAGE, (cursor as? HomeCursor.Catalog)?.cursor)
+                return KeysetPage(page.items, page.next?.let { HomeCursor.Catalog(it) })
+            }
+            if (key == HomeRows.WATCHLIST) {
+                val items = repository.watchlistPage((cursor as? HomeCursor.Watchlist)?.id ?: 0, PAGE)
+                val next = items.lastOrNull()?.id?.takeIf { items.size == PAGE }
+                return KeysetPage(items, next?.let { HomeCursor.Watchlist(it) })
+            }
+            val page = repository.newsPage(key == EPISODES, (cursor as? HomeCursor.News)?.cursor, PAGE)
+            return KeysetPage(page.items, page.cursor?.takeUnless { page.endReached }?.let { HomeCursor.News(it) })
         }
 
         private fun loadPersonal(delayMs: Long = 0) {
             personalJob?.cancel()
+            val recommendations = enabled(HomeRows.RECOMMENDATIONS)
+            val collections = enabled(HomeRows.COLLECTIONS)
+            val becauseSlots = (0..1).filter { enabled(HomeRows.because(it)) }.toSet()
+            if (!(recommendations || collections || becauseSlots.isNotEmpty())) return
             personalJob =
                 viewModelScope.launch {
                     delay(delayMs)
-                    val rows = withContext(Dispatchers.Default) { runCatching { discover.personalRows() }.getOrNull() }
+                    val rows =
+                        withContext(Dispatchers.Default) {
+                            runCatching {
+                                discover.personalRows(
+                                    recommendations,
+                                    collections,
+                                    becauseSlots,
+                                )
+                            }.getOrNull()
+                        }
                     if (rows != null) {
                         personal = rows.map { it.toHomeRow() }
                         publish()
@@ -188,66 +252,68 @@ class HomeViewModel
 
         private fun loadCatalogs() {
             catalogJob?.cancel()
+            if (!enabled(HomeRows.ADDONS)) return
             catalogJob =
                 viewModelScope.launch {
-                    val rows = withContext(Dispatchers.Default) { runCatching { discover.catalogRows() }.getOrNull() }
-                    if (rows != null) {
-                        catalogs = rows.map { it.toHomeRow() }
+                    val hidden = prefs.value.homeHidden
+                    val result =
+                        withContext(Dispatchers.Default) { runCatching { discover.catalogRows(hidden) }.getOrNull() }
+                    if (result != null) {
+                        catalogLabels = result.labels
+                        catalogs = result.rows.map { it.toHomeRow() }
                         publish()
                     }
                 }
         }
 
-        /** Ordinea pe Acasă: Continuă, recomandările personale, cataloagele addon-urilor, apoi restul. */
         private fun publish() {
-            val cont = base.filter { it.key == CONTINUE }
-            val news = base.filter { it.key == NEWS || it.key == EPISODES }
-            val rest = base.filter { it.key != CONTINUE && it.key != NEWS && it.key != EPISODES }
-            mutableState.value = HomeState(loading = !loaded, rows = cont + news + personal + catalogs + rest)
+            val order = HomeRows.order(prefs.value.homeOrder).withIndex().associate { it.value to it.index }
+            val rows =
+                (base + personal + catalogs)
+                    .filter { enabled(it.key) }
+                    .sortedBy { order[it.key] ?: order[HomeRows.group(it.key)] ?: Int.MAX_VALUE }
+            mutableState.value = HomeState(loading = !loaded, rows = rows, catalogLabels = catalogLabels)
         }
 
-        /** Focusul a ajuns la [index] în rândul [key]: dacă e aproape de capăt, aducem pagina următoare. */
-        fun onItemFocused(
-            key: String,
-            index: Int,
-        ) {
+        fun onItemFocused(key: String, index: Int) {
             val row = base.firstOrNull { it.key == key } ?: return
-            val news = key == NEWS || key == EPISODES
-            val filter = row.filter
-            if (!news && filter == null) return
-            if (row.endReached || index < row.items.size - PREFETCH || !loadingMore.add(key)) return
-            viewModelScope.launch {
-                try {
-                    val newsPage = if (news) repository.newsPage(key == EPISODES, row.newsCursor, PAGE) else null
-                    val catalogPage = filter?.let { repository.page(it, PAGE, checkNotNull(row.catalogCursor)) }
-                    val more = newsPage?.items ?: checkNotNull(catalogPage).items
+            val window = windows[key] ?: return
+            if (reloadJob?.isActive == true || loadingMore[key]?.isActive == true) return
+            val backwards = row.hasEarlier && index < PREFETCH / 2
+            if (!backwards && (row.endReached || index < row.items.size - PREFETCH)) return
+            loadingMore[key] =
+                viewModelScope.launch {
+                    window.move(backwards) { fetch(key, row.filter, it) }
+                    if (windows[key] !== window || !enabled(key)) return@launch
                     base =
                         base.map {
-                            if (it !== row) {
-                                it
-                            } else {
-                                val known = it.items.mapTo(HashSet()) { c -> c.id }
+                            if (it.key == key) {
                                 it.copy(
-                                    items = it.items + more.filter { c -> c.id !in known },
-                                    endReached = newsPage?.endReached ?: (catalogPage?.next == null),
-                                    newsCursor = newsPage?.cursor,
-                                    catalogCursor = catalogPage?.next,
+                                    items = window.items.distinctBy { card -> card.id },
+                                    endReached = !window.hasLater,
+                                    hasEarlier = window.hasEarlier,
                                 )
+                            } else {
+                                it
                             }
                         }
                     publish()
-                } finally {
-                    loadingMore.remove(key)
                 }
-            }
         }
 
-        private fun DiscoverRow.toHomeRow() = HomeRow("d:$key", title, items, null, endReached = true)
+        private fun DiscoverRow.toHomeRow() =
+            HomeRow(
+                if (key.startsWith("d:")) key else "d:$key",
+                title,
+                items,
+                null,
+                endReached = true,
+            )
 
         companion object {
-            const val NEWS = "news"
-            const val EPISODES = "new-episodes"
-            const val CONTINUE = "continue"
+            const val NEWS = HomeRows.NEWS
+            const val EPISODES = HomeRows.EPISODES
+            const val CONTINUE = HomeRows.CONTINUE
             const val PAGE = 24
             const val PREFETCH = 8
             const val PERSONAL_DEBOUNCE_MS = 3_000L

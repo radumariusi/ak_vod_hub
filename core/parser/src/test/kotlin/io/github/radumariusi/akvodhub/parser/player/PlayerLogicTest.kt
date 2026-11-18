@@ -97,5 +97,12 @@ class PlayerLogicTest {
         assertNull(EpisodeOrder.next(seasons, 2, 1))
         assertNull(EpisodeOrder.next(seasons, 1, null))
         assertEquals(2, EpisodeOrder.find(seasons, 1, 2)?.number)
+        assertEquals(
+            next,
+            EpisodeOrder.resumeOrNext(seasons, null, null, 1, 1, true) {
+                it.season == 1 && it.number == 2
+            },
+        )
+        assertNull(EpisodeOrder.resumeOrNext(seasons, null, null, 2, 1, true) { false })
     }
 }

@@ -15,12 +15,13 @@ fun sourceTags(
             .joinToString(
                 "+",
             ) { SourceGrouping.languageLabel(it) }
-            .ifEmpty { SourceGrouping.languageLabel(null) },
+            .takeIf { it.isNotEmpty() }
+            ?.let { "Audio declarat $it" },
         source.hdr?.name?.replace('_', ' '),
         entry?.codec?.name,
         entry?.containerExt?.uppercase(),
         source.subtitles.takeIf { it.isNotEmpty() }?.let {
-            "SUB " +
+            "Subtitrări declarate " +
                 it.joinToString("+") { s -> SourceGrouping.languageLabel(s) }
         },
     ).joinToString(" · ")

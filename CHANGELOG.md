@@ -1,5 +1,13 @@
 # Changelog
 
+## Etapa 16 — UX și corecții TV
+
+- Refresh Xtream atomic, cu diagnostic pe operație și păstrarea catalogului anterior la eroare.
+- Antet, postere și portrete corectate, metadate în engleză și câmpuri separate pentru notele TMDB și IMDb.
+- Filtre pe aceeași sursă, sortări explicite, combinații salvate, Acasă configurabilă și progres pe episod.
+- Comenzi player pe două niveluri, setări de vizibilitate, tastatură la activare și ferestre de paginare limitate.
+
+
 ## 2026-11-18 — Corecții UI și player TV
 - Spațiu de focus, contrast, titluri și distribuție centrate, un singur indicator de filă.
 - Comenzi compacte, un singur play/pauză la OK pe bară, subtitrări interne și externe și meniuri întunecate.

@@ -20,8 +20,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ImdbRatingStage::class,
         PersonCreditEntity::class,
         WatchlistEntity::class,
+        TitleSourceOption::class,
+        EpisodeProgressEntity::class,
     ],
-    version = 14,
+    version = 17,
     exportSchema = false,
 )
 abstract class AkVodDatabase : RoomDatabase() {
@@ -49,11 +51,51 @@ abstract class AkVodDatabase : RoomDatabase() {
                     MIGRATION_11_12,
                     MIGRATION_12_13,
                     MIGRATION_13_14,
+                    MIGRATION_14_15,
+                    MIGRATION_15_16,
+                    MIGRATION_16_17,
                 ).addCallback(
                     object : RoomDatabase.Callback() {
                         override fun onOpen(db: SupportSQLiteDatabase) = createSearchTable(db)
                     },
                 ).build()
+
+        val MIGRATION_16_17 =
+            object : Migration(16, 17) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS episode_progress (titleId INTEGER NOT NULL, " +
+                            "season INTEGER NOT NULL, " +
+                            "episode INTEGER NOT NULL, positionMs INTEGER NOT NULL, durationMs INTEGER NOT NULL, " +
+                            "finished INTEGER NOT NULL, updatedAt INTEGER NOT NULL, " +
+                            "PRIMARY KEY(titleId, season, episode))",
+                    )
+                    db.execSQL(
+                        "INSERT INTO episode_progress SELECT titleId, COALESCE(season, 0), episode, positionMs, " +
+                            "durationMs, 0, updatedAt FROM watch_state WHERE episode IS NOT NULL AND positionMs > 0",
+                    )
+                }
+            }
+
+        val MIGRATION_15_16 =
+            object : Migration(15, 16) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("CREATE INDEX IF NOT EXISTS index_title_year ON title (year)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS index_title_imdbRating ON title (imdbRating)")
+                }
+            }
+
+        val MIGRATION_14_15 =
+            object : Migration(14, 15) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE raw_entry ADD COLUMN visible INTEGER NOT NULL DEFAULT 1")
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS title_source_option (titleId INTEGER NOT NULL, " +
+                            "quality TEXT NOT NULL, language TEXT NOT NULL, originalAudio INTEGER NOT NULL, " +
+                            "PRIMARY KEY(titleId, quality, language, originalAudio))",
+                    )
+                }
+            }
 
         /** Etapa 12.7: rezumate locale ale noutăților, completate în fundal de indexer. */
         val MIGRATION_13_14 =

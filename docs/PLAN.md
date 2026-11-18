@@ -194,6 +194,18 @@ Documentele astea, `.gitignore`, workflow de curățenie automată, reguli de lu
 - 14.4: selecție ABI și publicare universal + variante pregătite. Verificarea variantelor semnate și a tranziției TV este în așteptare.
 - Room rămâne v14. Livrarea se face după generarea profilului, CI verde și merge.
 
+### Etapa 16: UX și corecții
+
+- 16.1 Refresh Xtream atomic și diagnostic pe operație. Incidentul de pe TV cere confirmare cu noul mesaj.
+- 16.2 Vizibilitatea antetului și titlurilor cardurilor, portrete dreptunghiulare, metadate în engleză și note TMDB/IMDb.
+- 16.3 Rezumate de surse eligibile, filtre combinate și ascundere separată pe limbă și categorie.
+- 16.4 Panou aplicat unitar, sortări și filtre de vizionare, combinații personale, FTS și paginare după cheie.
+- 16.5 Acasă configurabilă și acțiuni accesibile în Continuă vizionarea.
+- 16.6 Progres, episod următor, revenire la sezonul vizionat și detalii de episod la cerere.
+- 16.7 Comenzile playerului pe două niveluri cu restaurarea focusului.
+- 16.8 Organizare setări, tastatură la OK/click/atingere, filtru pentru categorii de adulți și backup.
+- 16.9 Ferestre limitate pentru postere și date sintetice. CI Android, merge, Release și validare updater după etapa completă.
+
 ## Corecții UI și player TV
 
 Vezi [planul separat al corecțiilor și verificarea pe Android 11 TV](CORECTII_TV.md).

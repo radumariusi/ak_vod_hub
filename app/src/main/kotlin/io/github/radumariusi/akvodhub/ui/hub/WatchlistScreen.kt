@@ -36,11 +36,15 @@ fun WatchlistScreen(
     var initialFocusDone by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(grid) {
         snapshotFlow {
-            grid.layoutInfo.visibleItemsInfo
-                .lastOrNull()
-                ?.index ?: -1
+            val visible = grid.layoutInfo.visibleItemsInfo
+            (visible.firstOrNull()?.index ?: -1) to (visible.lastOrNull()?.index ?: -1)
         }.distinctUntilChanged()
-            .collect(viewModel::onVisible)
+            .collect { (first, last) -> viewModel.onVisible(first, last) }
+    }
+    LaunchedEffect(restoreKey, state.items) {
+        val id = restoreKey?.substringAfterLast(':')?.toLongOrNull() ?: return@LaunchedEffect
+        val index = state.items.indexOfFirst { it.id == id }
+        if (index >= 0 && grid.layoutInfo.visibleItemsInfo.none { it.key == id }) grid.scrollToItem(index)
     }
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Lista mea", style = MaterialTheme.typography.headlineMedium)

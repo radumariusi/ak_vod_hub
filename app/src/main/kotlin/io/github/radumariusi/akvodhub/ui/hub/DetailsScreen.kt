@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -22,7 +21,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -53,11 +51,11 @@ import io.github.radumariusi.akvodhub.data.catalog.Credits
 import io.github.radumariusi.akvodhub.data.catalog.Person
 import io.github.radumariusi.akvodhub.data.catalog.SourceDetails
 import io.github.radumariusi.akvodhub.data.catalog.TitleDetails
+import io.github.radumariusi.akvodhub.data.db.EpisodeProgressEntity
 import io.github.radumariusi.akvodhub.data.db.TitleCard
 import io.github.radumariusi.akvodhub.data.db.isLocal
 import io.github.radumariusi.akvodhub.hub.DetailsState
 import io.github.radumariusi.akvodhub.hub.DetailsViewModel
-import io.github.radumariusi.akvodhub.parser.catalog.LocalizedOverview
 import io.github.radumariusi.akvodhub.parser.catalog.MergedEpisode
 import io.github.radumariusi.akvodhub.parser.match.MediaType
 import io.github.radumariusi.akvodhub.parser.match.QualityGroup
@@ -91,6 +89,26 @@ fun DetailsScreen(
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var activeEpisode by remember(titleId) { mutableStateOf<MergedEpisode?>(null) }
+    var episodeMessage by remember(activeEpisode) { mutableStateOf("Se încarcă…") }
+    LaunchedEffect(activeEpisode) {
+        val requested = activeEpisode ?: return@LaunchedEffect
+        episodeMessage =
+            try {
+                viewModel.episodeOverview(requested) ?: "Descriere indisponibilă."
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                "Descrierea episodului nu a putut fi încărcată."
+            }
+    }
+    activeEpisode?.let {
+        ChoiceDialog(
+            Choice(episodeCode(it), listOf("Închide"), selected = 0, footer = episodeMessage) {},
+            onDismiss = { activeEpisode = null },
+        )
+    }
+
     var loadingTrailer by remember(titleId) { mutableStateOf(false) }
     val trailerJob = remember(titleId) { mutableStateOf<Job?>(null) }
     DisposableEffect(titleId) { onDispose { trailerJob.value?.cancel() } }
@@ -144,7 +162,15 @@ fun DetailsScreen(
                     loadingTrailer = loadingTrailer,
                     onWatched = viewModel::toggleWatched,
                     onSelectSeason = viewModel::selectSeason,
+                    onEpisodeInfo = { activeEpisode = it },
                     onActor = onActor,
+                    sourceReason =
+                        state.recommended?.let {
+                            viewModel.sourceReason(
+                                it,
+                                details.title.originalLanguage,
+                            )
+                        },
                     onOpen = onOpen,
                 )
             }
@@ -170,8 +196,10 @@ private fun DetailsContent(
     loadingTrailer: Boolean,
     onWatched: () -> Unit,
     onSelectSeason: (Int) -> Unit,
+    onEpisodeInfo: (MergedEpisode) -> Unit,
     onActor: (Person) -> Unit,
     onOpen: (TitleCard) -> Unit,
+    sourceReason: String?,
 ) {
     val title = details.title
     val background = MaterialTheme.colorScheme.background
@@ -201,6 +229,7 @@ private fun DetailsContent(
 
     val episodes = state.episodes
     val season = episodes?.seasons?.firstOrNull { it.number == state.selectedSeason }
+    val nextEpisode = state.nextEpisode
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 48.dp, vertical = 32.dp),
@@ -208,7 +237,12 @@ private fun DetailsContent(
     ) {
         item("header") {
             Header(details, state.credits, state.logoPath) {
-                val first = episodes?.let { EpisodeOrder.linear(it.seasons).firstOrNull() }
+                val first =
+                    nextEpisode ?: episodes
+                        ?.seasons
+                        ?.firstOrNull()
+                        ?.episodes
+                        ?.firstOrNull()
                 PlayActions(state, title.id, first, playFocus, onPlay)
             }
         }
@@ -240,6 +274,9 @@ private fun DetailsContent(
         if (title.mediaType == MediaType.MOVIE && details.groups.isNotEmpty()) {
             item("sources-title") {
                 Text("Surse (${details.sources.size})", style = MaterialTheme.typography.titleMedium)
+                sourceReason?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall)
+                }
             }
             items(details.groups, key = { "q:${it.quality}" }) { group ->
                 QualityRow(group, details.sources) { onPlay(PlayRequest(title.id, entryId = it)) }
@@ -268,7 +305,22 @@ private fun DetailsContent(
             }
             season?.let { s ->
                 items(s.episodes, key = { "e:${s.number}:${it.number}:${it.sources.first().id}" }) { episode ->
-                    EpisodeRow(episode) { onPlay(episodeRequest(title.id, episode)) }
+                    val progress = episode.number?.let { state.episodeProgress[episode.season to it] }
+                    val showInfo: (() -> Unit)? =
+                        if (!title.isLocal && episode.number != null) {
+                            { onEpisodeInfo(episode) }
+                        } else {
+                            null
+                        }
+                    EpisodeRow(
+                        episode,
+                        next = nextEpisode == episode,
+                        progress = progress,
+                        onInfo = showInfo,
+                        onClick = {
+                            onPlay(episodeRequest(title.id, episode, resume = progress?.finished == false))
+                        },
+                    )
                 }
             }
         }
@@ -279,7 +331,7 @@ private fun DetailsContent(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Distribuție", style = MaterialTheme.typography.titleMedium)
                     LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(20.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                         contentPadding = PaddingValues(12.dp),
                     ) {
                         items(cast) { person ->
@@ -289,20 +341,20 @@ private fun DetailsContent(
                                 ) {
                                     onActor(person)
                                 }
-                            }, modifier = Modifier.width(132.dp)) {
+                            }, modifier = Modifier.width(120.dp)) {
                                 Column(
-                                    Modifier.fillMaxWidth().padding(10.dp),
+                                    Modifier.fillMaxWidth().padding(6.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalArrangement = Arrangement.spacedBy(2.dp),
                                 ) {
                                     AsyncImage(
                                         model = Images.profile(person.profilePath),
                                         contentDescription = person.name,
-                                        contentScale = ContentScale.Crop,
+                                        contentScale = ContentScale.Fit,
                                         modifier =
                                             Modifier
-                                                .size(80.dp)
-                                                .clip(CircleShape)
+                                                .size(96.dp, 144.dp)
+                                                .clip(MaterialTheme.shapes.small)
                                                 .background(MaterialTheme.colorScheme.surfaceVariant),
                                     )
                                     Text(
@@ -310,7 +362,6 @@ private fun DetailsContent(
                                         style = MaterialTheme.typography.labelLarge,
                                         textAlign = TextAlign.Center,
                                         modifier = Modifier.fillMaxWidth(),
-                                        minLines = 2,
                                         maxLines = 2,
                                         overflow = TextOverflow.Ellipsis,
                                     )
@@ -320,7 +371,6 @@ private fun DetailsContent(
                                         color = LocalContentColor.current.copy(alpha = 0.9f),
                                         textAlign = TextAlign.Center,
                                         modifier = Modifier.fillMaxWidth(),
-                                        minLines = 2,
                                         maxLines = 2,
                                         overflow = TextOverflow.Ellipsis,
                                     )
@@ -388,13 +438,10 @@ private fun Header(
     val title = details.title
     Column(Modifier.widthIn(max = 680.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         TitleHeading(title.name, logoPath)
-        if (title.originalName != null && title.originalName != title.name) {
-            Text(
-                title.originalName.orEmpty(),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) { actions() }
         val meta =
             listOfNotNull(
                 if (title.mediaType == MediaType.MOVIE) "Film" else "Serial",
@@ -402,13 +449,8 @@ private fun Header(
                 title.dubLabel,
                 title.runtimeMinutes?.let { "$it min" },
                 title.certification,
-                title.imdbRating?.let { rating ->
-                    "IMDb %.1f".format(rating) + (title.imdbVotes?.let { " ($it voturi)" } ?: "")
-                },
-                title.rating?.takeIf { it > 0 }?.let {
-                    "★ TMDB %.1f".format(it) +
-                        (title.voteCount?.let { v -> " ($v voturi)" } ?: "")
-                },
+                title.rating?.takeIf { it > 0 }?.let { "TMDB %.1f".format(it) } ?: "TMDB —",
+                title.imdbRating?.let { "IMDb %.1f".format(it) } ?: "IMDb —",
                 details.genres.takeIf { it.isNotEmpty() }?.joinToString(", "),
             ).joinToString(" · ")
         Text(meta, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -426,7 +468,7 @@ private fun Header(
                 color = MaterialTheme.colorScheme.secondary,
             )
         }
-        LocalizedOverview.choose(title.overviewRo, title.overview)?.let {
+        title.overview?.let {
             Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 6, overflow = TextOverflow.Ellipsis)
         }
         credits?.directors?.takeIf { it.isNotEmpty() }?.let {
@@ -443,11 +485,6 @@ private fun Header(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        FlowRow(
-            Modifier.padding(top = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) { actions() }
     }
 }
 
@@ -500,37 +537,50 @@ private fun QualityRow(
 @Composable
 private fun EpisodeRow(
     episode: MergedEpisode,
+    next: Boolean,
+    progress: EpisodeProgressEntity?,
+    onInfo: (() -> Unit)?,
     onClick: () -> Unit,
 ) {
-    Surface(onClick = onClick, modifier = Modifier.fillMaxWidth(0.85f)) {
-        Row(
-            Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                episode.number?.let {
-                    "E%02d".format(it)
-                } ?: "•",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.width(56.dp),
-            )
-            Column(Modifier.height(44.dp), verticalArrangement = Arrangement.Center) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Surface(onClick = onClick, modifier = Modifier.weight(1f)) {
+            Row(
+                Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(
-                    episode.title ?: episode.number?.let { "Episodul $it" } ?: "Episod",
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    episode.number?.let {
+                        "E%02d".format(it)
+                    } ?: "•",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.width(56.dp),
                 )
-                Text(
-                    SourceGrouping.summary(SourceGrouping.group(episode.sources)) +
-                        if (episode.sources.size > 1) " · ${episode.sources.size} surse" else "",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                )
+                Column(Modifier.height(44.dp), verticalArrangement = Arrangement.Center) {
+                    Text(
+                        episode.title ?: episode.number?.let { "Episodul $it" } ?: "Episod",
+                        style = MaterialTheme.typography.titleSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        listOfNotNull(
+                            "Următorul disponibil".takeIf { next },
+                            when {
+                                progress?.finished == true -> "Văzut"
+                                progress != null -> "Început · ${Resume.format(progress.positionMs)}"
+                                else -> null
+                            },
+                            "${episode.sources.size} " + if (episode.sources.size == 1) "sursă" else "surse",
+                        ).joinToString(" · "),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
             }
         }
+        if (onInfo != null) OutlinedButton(onClick = onInfo) { Text("Detalii episod") }
     }
 }
 
@@ -549,7 +599,7 @@ private fun PlayActions(
         val best = state.recommended
         when {
             best == null -> {
-                OutlinedButton(onClick = {}, modifier = Modifier.focusRequester(playFocus).heightIn(min = 56.dp)) {
+                OutlinedButton(onClick = {}, modifier = Modifier.focusRequester(playFocus)) {
                     Text("Nicio sursă de redare")
                 }
             }
@@ -557,7 +607,7 @@ private fun PlayActions(
             watch != null && Resume.shouldResume(watch.positionMs, watch.durationMs) -> {
                 Button(
                     onClick = { onPlay(PlayRequest(titleId, resume = true)) },
-                    modifier = Modifier.focusRequester(playFocus).heightIn(min = 56.dp),
+                    modifier = Modifier.focusRequester(playFocus),
                 ) { Text("Continuă de la ${Resume.format(watch.positionMs)}") }
                 OutlinedButton(onClick = { onPlay(PlayRequest(titleId)) }) { Text("De la început") }
             }
@@ -565,8 +615,8 @@ private fun PlayActions(
             else -> {
                 Button(onClick = {
                     onPlay(PlayRequest(titleId))
-                }, modifier = Modifier.focusRequester(playFocus).heightIn(min = 56.dp)) {
-                    Text("Redă (${sourceShortLabel(best)})")
+                }, modifier = Modifier.focusRequester(playFocus)) {
+                    Text("Redă")
                 }
             }
         }
@@ -580,7 +630,7 @@ private fun PlayActions(
             val resume = Resume.shouldResume(watch.positionMs, watch.durationMs)
             Button(
                 onClick = { onPlay(episodeRequest(titleId, current, resume)) },
-                modifier = Modifier.focusRequester(playFocus).heightIn(min = 56.dp),
+                modifier = Modifier.focusRequester(playFocus),
             ) {
                 Text(
                     if (resume) {
@@ -600,12 +650,12 @@ private fun PlayActions(
         firstEpisode != null -> {
             Button(
                 onClick = { onPlay(episodeRequest(titleId, firstEpisode)) },
-                modifier = Modifier.focusRequester(playFocus).heightIn(min = 56.dp),
+                modifier = Modifier.focusRequester(playFocus),
             ) { Text("Redă ${episodeCode(firstEpisode)}") }
         }
 
         else -> {
-            OutlinedButton(onClick = {}, modifier = Modifier.focusRequester(playFocus).heightIn(min = 56.dp)) {
+            OutlinedButton(onClick = {}, modifier = Modifier.focusRequester(playFocus)) {
                 Text(if (state.loadingEpisodes) "Se încarcă episoadele…" else "Nicio sursă de redare")
             }
         }

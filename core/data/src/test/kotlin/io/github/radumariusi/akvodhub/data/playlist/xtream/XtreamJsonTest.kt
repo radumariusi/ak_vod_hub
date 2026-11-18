@@ -1,7 +1,9 @@
 package io.github.radumariusi.akvodhub.data.playlist.xtream
 
+import io.github.radumariusi.akvodhub.parser.playlist.JsonObjectStreamException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class XtreamJsonTest {
@@ -32,9 +34,11 @@ class XtreamJsonTest {
     }
 
     @Test
-    fun toleratesEmptyOrObjectResponses() {
+    fun distinguishesEmptyListFromMissingResponse() {
         assertEquals(0, XtreamJson.objects("[]".byteInputStream()).count())
-        assertEquals(0, XtreamJson.objects("".byteInputStream()).count())
+        assertThrows(JsonObjectStreamException::class.java) {
+            XtreamJson.objects("".byteInputStream()).count()
+        }
         assertEquals(0, XtreamJson.objects("{}".byteInputStream()).mapNotNull(XtreamJson::movie).count())
     }
 

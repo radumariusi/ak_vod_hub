@@ -106,6 +106,8 @@ class TitleMatcher(
     private suspend fun linkKeepingLibrary(ids: List<Long>, titleId: Long) {
         dao.carryWatchlist(ids, titleId)
         dao.carryHistory(ids, titleId)
+        dao.carryEpisodeProgress(ids, titleId)
+        dao.carryWatchState(ids, titleId)
         dao.link(ids, titleId)
     }
 
@@ -165,7 +167,7 @@ class TitleMatcher(
                 dao.putCache(
                     toSearch.map { q ->
                         val hit = found[q.key]
-                        MatchCacheEntity(q.key, hit?.first?.id, hit?.second ?: 0.0, now)
+                        MatchCacheEntity(q.key, hit?.item?.id, hit?.score ?: 0.0, now)
                     },
                 )
                 // cheie de cache → ID-ul titlului local (null = nepotrivit)
@@ -175,10 +177,8 @@ class TitleMatcher(
                     titleIds[k] =
                         when {
                             hit != null -> {
-                                val item = hit.first
-                                // Căutat în altă limbă: titlul e tradus, deci luăm detaliile în engleză mai târziu.
-                                val searchedInOtherLanguage = MatchScorer.plan(q).first().language != null
-                                ensureTitle(q.type, item.id) { titleOf(q.type, item, !searchedInOtherLanguage, now) }
+                                val item = hit.item
+                                ensureTitle(q.type, item.id) { titleOf(q.type, item, hit.english, now) }
                             }
 
                             cached[k]?.tmdbId != null -> {
@@ -219,11 +219,13 @@ class TitleMatcher(
         }
     }
 
-    /** Caută în paralel (limitat) fiecare titlu unic; întoarce cheie → (rezultat, scor) pentru cele găsite. */
+    private data class SearchHit(val item: TmdbItem, val score: Double, val english: Boolean)
+
+    /** Caută în paralel (limitat) fiecare titlu unic. */
     private suspend fun search(
         key: String,
         queries: List<MatchQuery>,
-    ): Map<String, Pair<TmdbItem, Double>> {
+    ): Map<String, SearchHit> {
         if (queries.isEmpty()) return emptyMap()
         val permits = Semaphore(PARALLEL)
         return coroutineScope {
@@ -238,12 +240,13 @@ class TitleMatcher(
     private suspend fun searchOne(
         key: String,
         query: MatchQuery,
-    ): Pair<TmdbItem, Double>? {
+    ): SearchHit? {
         for (request in MatchScorer.plan(query)) {
             val results = tmdb.search(key, request).take(MAX_CANDIDATES)
             val best = MatchScorer.best(query, results.map { it.candidate() }) ?: continue
             if (best.score >= MatchScorer.THRESHOLD) {
-                return results.first { it.id == best.candidate.tmdbId } to best.score
+                val item = results.first { it.id == best.candidate.tmdbId }
+                return SearchHit(item, best.score, request.language == null || request.language == "en-US")
             }
         }
         return null
@@ -351,7 +354,7 @@ class TitleMatcher(
         name = item.displayTitle,
         originalName = item.original,
         year = item.year,
-        overview = item.overview?.ifBlank { null },
+        overview = item.overview?.takeIf { complete && it.isNotBlank() },
         posterPath = item.posterPath,
         backdropPath = item.backdropPath,
         rating = item.voteAverage,

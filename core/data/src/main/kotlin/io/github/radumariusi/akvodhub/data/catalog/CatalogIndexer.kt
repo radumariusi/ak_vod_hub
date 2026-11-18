@@ -8,6 +8,7 @@ import io.github.radumariusi.akvodhub.data.db.AkVodDatabase
 import io.github.radumariusi.akvodhub.data.db.PendingEntry
 import io.github.radumariusi.akvodhub.data.db.TitleEntity
 import io.github.radumariusi.akvodhub.parser.VodKind
+import io.github.radumariusi.akvodhub.parser.catalog.ContentVisibility
 import io.github.radumariusi.akvodhub.parser.catalog.DubLabel
 import io.github.radumariusi.akvodhub.parser.catalog.PosterBadges
 import io.github.radumariusi.akvodhub.parser.match.MediaType
@@ -57,7 +58,8 @@ class CatalogIndexer(
                 val day = now / 86_400_000L
                 val hiddenLanguages = contentPrefs.getString("hidden_languages", "").orEmpty()
                 val hiddenCategories = contentPrefs.getString("hidden_categories", "").orEmpty()
-                val visibility = "$hiddenLanguages|$hiddenCategories"
+                val hideAdult = contentPrefs.getBoolean("hide_adult_movies", false)
+                val visibility = "$hiddenLanguages|$hiddenCategories|$hideAdult"
                 if (!force && visibility == prefs.getString("visibility", "") &&
                     dao.fingerprint() == prefs.getString(FINGERPRINT, null) &&
                     searchIndexReady()
@@ -73,16 +75,12 @@ class CatalogIndexer(
                 linkLocalTitles()
                 db.playlistDao().inheritSeriesTitles()
                 db.withTransaction {
+                    updateSourceVisibility(hiddenLanguages, hiddenCategories, hideAdult)
                     dao.updateSummaries()
+                    rebuildSourceOptions()
                     updateDubLabels()
                     updateEpisodeNews()
                     dao.deleteEmptyLocalTitles()
-                    val hidden =
-                        io.github.radumariusi.akvodhub.parser.catalog.ContentVisibility.hiddenTitles(
-                            hiddenLanguages,
-                            hiddenCategories,
-                        )
-                    db.openHelper.writableDatabase.execSQL(hidden.sql, hidden.args.toTypedArray())
                     rebuildSearchIndex()
                 }
                 prefs
@@ -165,6 +163,28 @@ class CatalogIndexer(
         }
     }
 
+    private fun updateSourceVisibility(languages: String, categories: String, hideAdult: Boolean) {
+        val sql = db.openHelper.writableDatabase
+        sql.execSQL("UPDATE raw_entry SET visible = 1 WHERE visible = 0")
+        val hidden = ContentVisibility.hiddenSources(languages, categories)
+        sql.execSQL(hidden.sql, hidden.args.toTypedArray())
+        if (hideAdult) {
+            val adults = ContentVisibility.adultMovieSources()
+            sql.execSQL(adults.sql, adults.args.toTypedArray())
+        }
+        sql.execSQL(
+            "UPDATE raw_entry SET visible = 0 WHERE kind = 'EPISODE' AND seriesId IS NOT NULL AND " +
+                "EXISTS(SELECT 1 FROM raw_entry s WHERE s.sourceId = raw_entry.sourceId AND " +
+                "s.providerKey = 'series:' || raw_entry.seriesId AND s.visible = 0)",
+        )
+    }
+
+    private fun rebuildSourceOptions() {
+        val sql = db.openHelper.writableDatabase
+        sql.execSQL("DELETE FROM title_source_option")
+        sql.execSQL(ContentVisibility.SOURCE_OPTIONS)
+    }
+
     /** Un singur parcurs după cheia titlului; nici liste complete, nici interogări pe poster. */
     private fun updateDubLabels() {
         val sql = db.openHelper.writableDatabase
@@ -178,7 +198,7 @@ class CatalogIndexer(
                 .query(
                     "SELECT t.id, t.originalLanguage, r.languages, t.rating, t.imdbRating, t.addedAt, r.hdr " +
                         "FROM title t " +
-                        "JOIN raw_entry r ON r.titleId = t.id ORDER BY t.id",
+                        "JOIN raw_entry r ON r.titleId = t.id WHERE r.visible = 1 ORDER BY t.id",
                 ).use { cursor ->
                     var titleId = -1L
                     var label: DubLabel? = null
@@ -233,7 +253,7 @@ class CatalogIndexer(
             sql
                 .query(
                     "SELECT titleId, season, episode, MIN(firstSeenAt) FROM raw_entry " +
-                        "WHERE kind = 'EPISODE' AND titleId IS NOT NULL " +
+                        "WHERE kind = 'EPISODE' AND visible = 1 AND titleId IS NOT NULL " +
                         "AND season IS NOT NULL AND episode IS NOT NULL " +
                         "GROUP BY titleId, season, episode ORDER BY titleId",
                 ).use { cursor ->
@@ -266,7 +286,7 @@ class CatalogIndexer(
         sql.execSQL(
             "INSERT INTO title_search(docid, name, alt) SELECT t.id, t.name, " +
                 "IFNULL(t.originalName, '') || ' ' || IFNULL((SELECT group_concat(DISTINCT r.title) " +
-                "FROM raw_entry r WHERE r.titleId = t.id), '') FROM title t WHERE t.sourceCount > 0",
+                "FROM raw_entry r WHERE r.titleId = t.id AND r.visible = 1), '') FROM title t WHERE t.sourceCount > 0",
         )
     }
 
@@ -303,7 +323,7 @@ class CatalogIndexer(
 
     companion object {
         private const val TAG = "CatalogIndexer"
-        private const val FINGERPRINT = "fingerprint_v14"
+        private const val FINGERPRINT = "fingerprint_v15"
         private const val BATCH = 2_000
     }
 }

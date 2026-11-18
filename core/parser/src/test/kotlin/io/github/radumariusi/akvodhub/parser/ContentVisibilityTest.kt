@@ -7,9 +7,9 @@ import org.junit.Test
 
 class ContentVisibilityTest {
     @Test fun boundParametersAndEmptyFilter() {
-        val query = ContentVisibility.hiddenTitles("DE, de,fr", "Kids' films,documentare")
+        val query = ContentVisibility.hiddenSources("DE, de,fr", "Kids' films,documentare")
         assertEquals(listOf("%,de,%", "%,fr,%", "Kids' films", "documentare"), query.args)
         assertFalse(query.sql.contains("Kids"))
-        assertEquals(emptyList<Any>(), ContentVisibility.hiddenTitles("", "").args)
+        assertEquals(emptyList<Any>(), ContentVisibility.hiddenSources("", "").args)
     }
 }

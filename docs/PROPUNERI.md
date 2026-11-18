@@ -131,6 +131,25 @@ Detalii în `docs/PLAN.md` → „Idei suplimentare”.
 
 ---
 
+## Etapa 16: UX și corecții Android TV
+
+| Pas | Schimbare |
+|---|---|
+| 16.1 | Refresh Xtream în flux, validarea listei complete, publicare atomică și diagnostic sanitizat. |
+| 16.2 | Titlul intră în cardul cu focus, hero adaptiv, portrete 2:3, fișă de la antet. Metadate și sigle în engleză. TMDB și IMDb afișate alăturat. |
+| 16.3 | Calitatea și limba se caută pe o singură sursă eligibilă. Limbile ascund variante, categoriile explicite ascund titluri. |
+| 16.4 | Panou Filtre și sortare, filtre după vizionare/listă, sortări noi, combinații salvate separat pentru Filme și Seriale. |
+| 16.5 | Ordine și vizibilitate pentru Acasă, acțiuni de reluare/scoatere și redare directă opțională. |
+| 16.6 | Progres pe episod, evidențiere și revenire la episodul curent, descrieri TMDB la cerere cu cache limitat. |
+| 16.7 | Nivel principal și avansat de comenzi, păstrarea grupurilor de subtitrări și restaurarea focusului. |
+| 16.8 | Setări pe opt categorii, resetarea preferințelor, tastatură la activare, ascunderea filmelor din categorii pentru adulți, ecran de pornire și durata comenzilor. |
+| 16.9 | Paginare după cheie cu ferestre limitate, date sintetice mari și livrare condiționată de CI, semnare și updater. |
+
+Verificarea pe Android 11 TV rămâne necesară. Notele reale depind de metadatele TMDB și setul public IMDb.
+Vezi detalii despre schema Room și limitele cunoscute în [HANDOFF.md](HANDOFF.md).
+
+---
+
 ## Ce ar îngreuna aplicația (de evitat sau doar opțional)
 
 1. **Trailere redate în aplicație / pe fundal** (YouTube, WebView): megabytes în plus și RAM. → Deschidem aplicația YouTube.

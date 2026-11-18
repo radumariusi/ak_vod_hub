@@ -20,9 +20,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.SerializationException
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.File
 import java.io.IOException
 import java.io.InputStream
 
@@ -49,8 +49,7 @@ class ImportException(
 
 /**
  * Importă un playlist în baza de date: citește în flux, păstrează doar filmele și serialele,
- * scrie în loturi și la final șterge ce a dispărut de la furnizor (diferențe față de importul anterior).
- * Dacă importul eșuează la jumătate, nu se șterge nimic.
+ * scrie în loturi și publică modificările numai după citirea completă a răspunsului.
  */
 class PlaylistImporter(
     private val context: Context,
@@ -62,7 +61,6 @@ class PlaylistImporter(
 ) {
     private val dao = db.playlistDao()
     private val mutex = Mutex()
-    private val episodeMutex = Mutex()
 
     suspend fun import(
         sourceId: Long,
@@ -71,52 +69,64 @@ class PlaylistImporter(
         mutex.withLock {
             val source = dao.source(sourceId) ?: throw ImportException("Playlist-ul nu mai există.")
             val start = clock()
+            var operation = "Pregătire"
             try {
-                val writer = BatchWriter(sourceId, run = start)
-                val kinds =
-                    withContext(Dispatchers.IO) {
-                        when (source.type) {
-                            PlaylistType.M3U_URL, PlaylistType.M3U_FILE -> importM3u(source, writer, onProgress)
-                            PlaylistType.XTREAM -> importXtream(source, writer, onProgress)
+                withContext(Dispatchers.IO) {
+                    val catalog =
+                        if (source.type == PlaylistType.XTREAM) {
+                            prepareXtream(source, onProgress)
+                        } else {
+                            null
                         }
+                    try {
+                        operation = if (catalog == null) "Citire M3U" else "Aplicare Xtream"
+                        db.withTransaction {
+                            val current = dao.source(sourceId) ?: throw ImportException("Playlist-ul nu mai există.")
+                            val run = maxOf(start, (current.lastImportAt ?: 0) + 1)
+                            val writer = BatchWriter(sourceId, run)
+                            val kinds =
+                                if (catalog == null) {
+                                    importM3u(source, writer, onProgress)
+                                } else {
+                                    importXtream(sourceId, catalog, writer, onProgress)
+                                }
+                            writer.flush()
+                            if (writer.total == 0) {
+                                throw ImportException("Playlist-ul nu conține filme sau seriale.")
+                            }
+                            operation = "Finalizare"
+                            onProgress(ImportProgress(sourceId, "Se finalizează…", writer.scanned, writer.total))
+                            var removed = dao.deleteStale(sourceId, run, kinds)
+                            if (catalog != null) removed += dao.deleteOrphanEpisodes(sourceId)
+                            val result =
+                                ImportResult(
+                                    movies = writer.count(VodKind.MOVIE),
+                                    series = writer.count(VodKind.SERIES),
+                                    episodes = writer.count(VodKind.EPISODE),
+                                    added = writer.added,
+                                    removed = removed,
+                                    durationMs = clock() - start,
+                                )
+                            dao.updateSource(
+                                current.copy(
+                                    lastImportAt = maxOf(clock(), run),
+                                    lastImportError = null,
+                                    lastAdded = result.added,
+                                    lastRemoved = result.removed,
+                                    lastDurationMs = result.durationMs,
+                                ),
+                            )
+                            result
+                        }
+                    } finally {
+                        catalog?.directory?.deleteRecursively()
                     }
-                writer.flush()
-                if (writer.total == 0) {
-                    throw ImportException("Playlist-ul nu conține filme sau seriale (poate doar Live TV?).")
                 }
-                onProgress(ImportProgress(sourceId, "Se finalizează…", writer.scanned, writer.total))
-                val removed =
-                    db.withTransaction {
-                        var count = dao.deleteStale(sourceId, start, kinds)
-                        if (source.type == PlaylistType.XTREAM) count += dao.deleteOrphanEpisodes(sourceId)
-                        count
-                    }
-                val result =
-                    ImportResult(
-                        movies = writer.count(VodKind.MOVIE),
-                        series = writer.count(VodKind.SERIES),
-                        episodes = writer.count(VodKind.EPISODE),
-                        added = writer.added,
-                        removed = removed,
-                        durationMs = clock() - start,
-                    )
-                dao.source(sourceId)?.let {
-                    dao.updateSource(
-                        it.copy(
-                            lastImportAt = clock(),
-                            lastImportError = null,
-                            lastAdded = result.added,
-                            lastRemoved = result.removed,
-                            lastDurationMs = result.durationMs,
-                        ),
-                    )
-                }
-                result
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                val message = userMessage(e)
-                dao.source(sourceId)?.let { dao.updateSource(it.copy(lastImportError = message)) }
+                val message = userMessage(operation, e)
+                dao.setImportError(sourceId, message)
                 throw ImportException(message)
             }
         }
@@ -126,44 +136,47 @@ class PlaylistImporter(
         sourceId: Long,
         seriesId: Long,
     ): List<RawEntryEntity> =
-        episodeMutex.withLock {
+        mutex.withLock {
             val source = dao.source(sourceId) ?: return@withLock emptyList()
             if (source.type != PlaylistType.XTREAM) return@withLock dao.episodes(sourceId, seriesId)
             val account = account(source)
-            val now = clock()
-            val firstSeen =
-                if (dao.hasEpisodes(sourceId, seriesId)) {
-                    now
-                } else {
-                    dao.seriesFirstSeen(sourceId, seriesId)
-                        ?: now
+            val episodes = xtream.episodes(account, seriesId)
+            db.withTransaction {
+                val seriesAdded = dao.seriesFirstSeen(sourceId, seriesId) ?: return@withTransaction emptyList()
+                val now = clock()
+                val firstSeen =
+                    if (dao.hasEpisodes(sourceId, seriesId)) {
+                        now
+                    } else {
+                        seriesAdded
+                    }
+                val writer = BatchWriter(sourceId, run = now)
+                episodes.forEach { e ->
+                    writer.add(
+                        RawEntryEntity(
+                            sourceId = sourceId,
+                            providerKey = "episode:${e.id}",
+                            kind = VodKind.EPISODE,
+                            name = e.title,
+                            groupTitle = null,
+                            url = null,
+                            logo = null,
+                            streamId = e.id,
+                            seriesId = seriesId,
+                            season = e.season,
+                            episode = e.episode,
+                            containerExt = e.containerExtension,
+                            providerAddedAt = e.added,
+                            firstSeenAt = firstSeen,
+                            seenRun = now,
+                            matchState = MatchState.INHERITED,
+                        ),
+                    )
                 }
-            val writer = BatchWriter(sourceId, run = now)
-            xtream.episodes(account, seriesId).forEach { e ->
-                writer.add(
-                    RawEntryEntity(
-                        sourceId = sourceId,
-                        providerKey = "episode:${e.id}",
-                        kind = VodKind.EPISODE,
-                        name = e.title,
-                        groupTitle = null,
-                        url = null,
-                        logo = null,
-                        streamId = e.id,
-                        seriesId = seriesId,
-                        season = e.season,
-                        episode = e.episode,
-                        containerExt = e.containerExtension,
-                        providerAddedAt = e.added,
-                        firstSeenAt = firstSeen,
-                        seenRun = now,
-                        matchState = MatchState.INHERITED,
-                    ),
-                )
+                writer.flush()
+                dao.inheritSeriesTitle(sourceId, seriesId)
+                dao.episodes(sourceId, seriesId)
             }
-            writer.flush()
-            dao.inheritSeriesTitle(sourceId, seriesId)
-            return@withLock dao.episodes(sourceId, seriesId)
         }
 
     private suspend fun importM3u(
@@ -222,28 +235,59 @@ class PlaylistImporter(
         }
     }
 
-    private suspend fun importXtream(
+    private data class XtreamCatalog(
+        val directory: File,
+        val movies: File,
+        val series: File,
+        val movieGroups: Map<String, String>,
+        val seriesGroups: Map<String, String>,
+    )
+
+    private suspend fun prepareXtream(
         source: PlaylistSourceEntity,
+        onProgress: suspend (ImportProgress) -> Unit,
+    ): XtreamCatalog {
+        val account = account(source)
+        onProgress(ImportProgress(source.id, "Se conectează la server…", 0, 0))
+        xtream.authenticate(account)
+        val movieGroups = xtream.vodCategories(account)
+        val seriesGroups = xtream.seriesCategories(account)
+        val directory = File(context.cacheDir, "xtream-import")
+        directory.deleteRecursively()
+        if (!directory.mkdir()) throw ImportException("Nu pot pregăti fișierele temporare pentru import.")
+        val movies = File(directory, "movies.json")
+        val series = File(directory, "series.json")
+        var complete = false
+        try {
+            onProgress(ImportProgress(source.id, "Se descarcă lista de filme…", 0, 0))
+            xtream.downloadCatalog(account, "get_vod_streams", movies)
+            onProgress(ImportProgress(source.id, "Se descarcă lista de seriale…", 0, 0))
+            xtream.downloadCatalog(account, "get_series", series)
+            complete = true
+            return XtreamCatalog(directory, movies, series, movieGroups, seriesGroups)
+        } finally {
+            if (!complete) directory.deleteRecursively()
+        }
+    }
+
+    private suspend fun importXtream(
+        sourceId: Long,
+        catalog: XtreamCatalog,
         writer: BatchWriter,
         onProgress: suspend (ImportProgress) -> Unit,
     ): List<VodKind> {
-        val account = account(source)
         val now = writer.run
-        onProgress(ImportProgress(source.id, "Se conectează la server…", 0, 0))
-        xtream.authenticate(account)
-
-        val movieGroups = runCatching { xtream.vodCategories(account) }.getOrDefault(emptyMap())
-        onProgress(ImportProgress(source.id, "Filme…", writer.scanned, writer.total))
-        xtream.movies(account) { movies ->
+        onProgress(ImportProgress(sourceId, "Filme…", writer.scanned, writer.total))
+        xtream.movies(catalog.movies) { movies ->
             for (m in movies) {
                 writer.scanned++
                 writer.add(
                     RawEntryEntity(
-                        sourceId = source.id,
+                        sourceId = sourceId,
                         providerKey = "movie:${m.streamId}",
                         kind = VodKind.MOVIE,
                         name = m.name,
-                        groupTitle = m.categoryId?.let(movieGroups::get),
+                        groupTitle = m.categoryId?.let(catalog.movieGroups::get),
                         url = null,
                         logo = m.icon,
                         streamId = m.streamId,
@@ -255,23 +299,22 @@ class PlaylistImporter(
                     ),
                 )
                 if (writer.scanned % PROGRESS_EVERY == 0) {
-                    onProgress(ImportProgress(source.id, "Filme…", writer.scanned, writer.total + writer.pending))
+                    onProgress(ImportProgress(sourceId, "Filme…", writer.scanned, writer.total + writer.pending))
                 }
             }
         }
 
-        val seriesGroups = runCatching { xtream.seriesCategories(account) }.getOrDefault(emptyMap())
-        onProgress(ImportProgress(source.id, "Seriale…", writer.scanned, writer.total + writer.pending))
-        xtream.series(account) { series ->
+        onProgress(ImportProgress(sourceId, "Seriale…", writer.scanned, writer.total + writer.pending))
+        xtream.series(catalog.series) { series ->
             for (s in series) {
                 writer.scanned++
                 writer.add(
                     RawEntryEntity(
-                        sourceId = source.id,
+                        sourceId = sourceId,
                         providerKey = "series:${s.seriesId}",
                         kind = VodKind.SERIES,
                         name = s.name,
-                        groupTitle = s.categoryId?.let(seriesGroups::get),
+                        groupTitle = s.categoryId?.let(catalog.seriesGroups::get),
                         url = null,
                         logo = s.cover,
                         streamId = s.seriesId,
@@ -282,7 +325,7 @@ class PlaylistImporter(
                     ),
                 )
                 if (writer.scanned % PROGRESS_EVERY == 0) {
-                    onProgress(ImportProgress(source.id, "Seriale…", writer.scanned, writer.total + writer.pending))
+                    onProgress(ImportProgress(sourceId, "Seriale…", writer.scanned, writer.total + writer.pending))
                 }
             }
         }
@@ -329,7 +372,7 @@ class PlaylistImporter(
             val batch = buffer.values.toList()
             buffer.clear()
             // La primul import nu există nimic de comparat: sărim peste căutări.
-            val compare = hadEntries ?: dao.hasEntries(sourceId).also { hadEntries = it }
+            val compare = total > 0 || (hadEntries ?: dao.hasEntries(sourceId).also { hadEntries = it })
             db.withTransaction {
                 val existing =
                     if (compare) {
@@ -362,6 +405,7 @@ class PlaylistImporter(
                                 parsed.copy(
                                     id = old.id,
                                     firstSeenAt = old.firstSeenAt,
+                                    visible = old.visible,
                                     titleId = if (sameTitle) old.titleId else null,
                                     matchState = if (sameTitle) old.matchState else entry.matchState,
                                 )
@@ -378,14 +422,13 @@ class PlaylistImporter(
         }
     }
 
-    private fun userMessage(e: Exception): String =
+    private fun userMessage(operation: String, e: Exception): String =
         when (e) {
             is ImportException, is XtreamException -> e.message.orEmpty()
-            is SerializationException -> "Serverul a trimis un răspuns pe care nu-l pot citi."
-            is IOException -> "Eroare de rețea: ${e.message ?: e.javaClass.simpleName}"
-            is IllegalArgumentException -> "Link invalid: ${e.message.orEmpty()}"
-            is SecurityException -> "Nu mai am acces la fișier. Adaugă-l din nou."
-            else -> "Import eșuat: ${e.message ?: e.javaClass.simpleName}"
+            is IOException -> "$operation: eroare I/O (${e.javaClass.simpleName})"
+            is IllegalArgumentException -> "$operation: date de intrare invalide"
+            is SecurityException -> "$operation: acces refuzat"
+            else -> "$operation: import eșuat (${e.javaClass.simpleName})"
         }
 
     private companion object {

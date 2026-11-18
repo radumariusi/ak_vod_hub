@@ -1,7 +1,7 @@
 # Predare proiect (2026-11-17): AK VOD Hub
 
 Document de predare pentru orice agent (ex. Google Jules) care preia temporar proiectul.
-Punct de salvare: tag-ul **`claude-handoff-2026-11-17`** și branch-ul **`claude-snapshot`** (aceeași stare ca `main` la predare).
+Punct de salvare disponibil: branch-ul **`claude-snapshot`**. Tagul istoric **`claude-handoff-2026-11-17`** lipsea la verificarea etapei 16.
 
 ## 1. Ce e aplicația
 
@@ -322,3 +322,43 @@ Playerul păstrează preferințele audio și sincronizarea subtitrărilor. Opți
 preferința globală de subtitrare și șterge doar alegerea manuală de subtitrare a serialului. Alegerea
 unei subtitrări specifice folosește pista sau rezultatul addon asociat opțiunii.
 Retestarea pe Android 11 TV și instalarea peste versiunea existentă sunt în așteptare.
+
+
+### Etapa 16 — UX și corecții
+
+- **16.1** Lista Xtream se descarcă în fișiere temporare din cache, apoi se citește obiect cu obiect. Parserul
+  acceptă BOM UTF-8, un obiect valid sau o listă și verifică separatorii și sfârșitul. ID-urile invalide,
+  structura neașteptată și trunchierea opresc importul. Opțiunile descriptive pot lipsi ori avea tipuri variabile.
+  Marcajele, actualizările loturilor, eliminarea intrărilor vechi și starea playlistului se publică într-o
+  singură tranzacție. Importul complet și cel de episoade sunt serializate. Mesajul expune acțiunea API și tipul
+  erorii, cu detalii fixe. Mesajul vechi nu identifică răspunsul sau operația de pe TV.
+- **16.2** Cardul focalizabil include titlul, cu rezervă pentru scară și cerere de aducere în zona vizibilă.
+  Distribuția folosește portrete 2:3. În fișă, redarea apare imediat sub antet. Siglele au cache separat pentru
+  selecția EN/neutră. Fișa folosește descrierea TMDB în engleză, iar titlurile locale vin din playlist.
+  Afișarea ambelor note indică absența cu „—”; IMDb rămâne dependent de asocierea ID-ului și setul oficial.
+- **16.3** Room 14→15 adaugă `raw_entry.visible` și tabelul `title_source_option`, indexat prin cheia
+  compusă. Indexarea reconstruiește rezumatele din surse eligibile și păstrează ascunderea explicită pe categorie.
+  `MULTI` rămâne etichetă declarată, iar playerul enumeră pistele detectate.
+- **16.4** Room 15→16 adaugă indexuri pentru an și IMDb. Data intrării în playlist folosește indexul
+  existent `playlistAddedAt`. Paginarea separă valorile NULL, cu ID drept criteriu comun la egalitate.
+  Combinațiile și configurațiile curente au chei `browse.<tip>.*` validate la restaurare.
+- **16.5** Acasă folosește `home_order`, `home_hidden` și `continue_direct`. Rândurile dinamice „Pentru
+  că ai văzut” se pot configura pe poziții, iar cataloagele addon individual sau ca grup. Scoaterea din continuare șterge reluarea
+  locală, care este și sursa Watch Next. Istoricul și lista rămân în tabelele lor.
+- **16.6** Room 16→17 adaugă `episode_progress` pentru sezoane și episoade identificate. Migrarea
+  preia pozițiile cunoscute din reluare. Starea nouă vine din redare, iar descrierile EN au 64 de intrări
+  maxime în cache și se cer numai din acțiunea episodului.
+- **16.7** Comenzile principale și avansate reutilizează meniurile pentru piste și surse și păstrează
+  acțiunile de subtitrare. Bara consumă OK și execută toggle pe prima apăsare.
+- **16.8** Setările rămân în opt categorii. Tastatura pornește prin activarea editorului. Filtrul de adulți,
+  implicit oprit, ascunde variantele de film din categorii marcate de playlist. Backup-ul include
+  `hide_adult_movies`, `start_screen`, `controls_seconds` și preferințele de Acasă/catalog. Resetarea
+  Servicii revine la afișarea generală a cataloagelor addon și păstrează cheile și addon-urile instalate.
+- **16.9** Grilele păstrează până la cinci pagini de 48 de carduri, iar un rând paginat de pe Acasă până la
+  patru pagini de 24. Pentru întoarcere se păstrează cheile paginilor deja traversate. Testul SQL cu
+  Python 3 și SQLite verifică pe 111.000 de titluri rezumatele, combinațiile și ascunderea. Verificarea consumului
+  de memorie, a latenței tranzacției la refresh, a focusului/touch și a reluării pe Android 11 TV rămâne necesară.
+
+De verificat pe TV după instalarea din updater: import manual și mesajul exact la eroare; primul și ultimul rând
+pentru toate cele trei dimensiuni din Acasă, grile, Lista mea, actori și recomandări; Înapoi din fișă și din meniurile
+playerului; tastatură doar la OK/atingere; episoade, restart și ascunderea variantelor fără pierderea datelor.

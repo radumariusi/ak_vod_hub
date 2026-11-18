@@ -22,9 +22,9 @@ class CatalogQueryTest {
         val filter = CatalogFilter(production = ProductionFilter.ENGLISH, language = "ro", originalAudioOnly = true)
         val query = CatalogQuery.page(filter, 48)
         assertTrue(query.sql.contains("t.originalLanguage = ?"))
-        assertTrue(query.sql.contains("t.hasOriginalAudio = 1"))
+        assertTrue(query.sql.contains("s.originalAudio = 1"))
         assertFalse(query.sql.contains("t.originCountries LIKE"))
-        assertEquals(listOf<Any>("%,ro,%", "en", 48), query.args)
+        assertEquals(listOf<Any>("ro", "en", 48), query.args)
     }
 
     @Test
@@ -41,7 +41,7 @@ class CatalogQueryTest {
         val filter = CatalogFilter(originalAudioOnly = true)
         val query = CatalogQuery.page(filter, 48)
         assertTrue(filter.hasFilters)
-        assertTrue(query.sql.contains("t.hasOriginalAudio = 1"))
+        assertTrue(query.sql.contains("s.originalAudio = 1"))
         assertFalse(query.sql.contains("raw_entry"))
         assertEquals(listOf<Any>(48), query.args)
         assertFalse(filter.copy(originalAudioOnly = false).hasFilters)
@@ -69,8 +69,46 @@ class CatalogQueryTest {
             )
         val q = CatalogQuery.page(filter, 20)
         assertEquals(q.sql.count { it == '?' }, q.args.size)
-        assertEquals(listOf<Any>("MOVIE", "%,878,%", "%,10765,%", 2010, 2019, "%,UHD,%", "%,ro,%", 20), q.args)
+        assertEquals(listOf<Any>("MOVIE", "%,878,%", "%,10765,%", 2010, 2019, "UHD", "ro", 20), q.args)
+        assertTrue(q.sql.contains("s.titleId = t.id AND s.quality = ? AND s.language = ?"))
+        assertFalse(q.sql.contains("raw_entry"))
         assertTrue(q.sql.contains("ORDER BY t.addedAt DESC"))
+    }
+
+    @Test
+    fun newSortsKeepEqualValuesAndNullsInSeparateCursorSegments() {
+        val sorts =
+            mapOf(
+                CatalogSort.IMDB to "imdbRating",
+                CatalogSort.RELEASE to "year",
+                CatalogSort.PLAYLIST to "playlistAddedAt",
+            )
+        for ((sort, column) in sorts) {
+            val filter = CatalogFilter(sort = sort, library = LibraryFilter.WATCHLIST)
+            val query = CatalogQuery.page(filter, 48, after = CatalogCursor(CatalogPageSection.VALUES, 7, 22))
+            assertTrue(query.sql.contains("t.$column <= ? AND (t.$column < ? OR t.id < ?)"))
+            assertTrue(query.sql.contains("FROM watchlist"))
+            assertEquals(listOf<Any>(7, 7, 22L, 48), query.args)
+            val afterNull = CatalogCursor(CatalogPageSection.NULLS, null, 10)
+            val nulls = CatalogQuery.page(filter, 48, afterNull.section, afterNull)
+            assertTrue(nulls.sql.contains("t.$column IS NULL AND t.id < ?"))
+            assertEquals(listOf<Any>(10L, 48), nulls.args)
+        }
+    }
+
+    @Test
+    fun savedCombinationsPreserveSelectionAndValidateFields() {
+        val filter =
+            CatalogFilter(
+                type = MediaType.TV,
+                sort = CatalogSort.IMDB,
+                language = "de",
+                library = LibraryFilter.WATCHLIST,
+            )
+        val presets = listOf(FilterPreset("Seriale preferate", filter))
+        assertEquals(presets, BrowseFilters.decodePresets(MediaType.TV, BrowseFilters.encodePresets(presets)))
+        assertEquals(CatalogFilter(type = MediaType.MOVIE), BrowseFilters.decode(MediaType.MOVIE, "bad|bad|BAD|x|NA"))
+        assertNull(BrowseFilters.sanitize("unrelated", "value"))
     }
 
     @Test
