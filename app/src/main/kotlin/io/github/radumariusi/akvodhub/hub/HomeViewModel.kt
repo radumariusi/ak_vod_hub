@@ -124,7 +124,7 @@ class HomeViewModel
             }
         }
 
-        suspend fun logo(titleId: Long): String? = repository.logo(titleId)
+        suspend fun logo(titleId: Long): List<String> = repository.logo(titleId)
 
         private var catalogLabels: Map<String, String> = emptyMap()
 

@@ -349,32 +349,37 @@ class HubRepository(
         )
     }
 
-    /** Numai hero stabil/fișă: rezultat (inclusiv absent) salvat 30 zile, maximum 128 titluri. */
-    suspend fun logo(titleId: Long): String? =
+    /** Numai hero stabil/fișă. Cache partajat pe ID TMDB pentru toate ecranele. */
+    suspend fun logo(titleId: Long): List<String> =
         logoMutex.withLock {
-            val title = dao.titleById(titleId) ?: return@withLock null
-            if (title.isLocal) return@withLock null
+            val title = dao.titleById(titleId) ?: return@withLock emptyList()
+            if (title.isLocal) return@withLock emptyList()
             val cache = db.discoverDao()
-            val cacheKey = "logo:en-v2:${title.mediaType}:${title.tmdbId}"
+            val suffix = "${title.mediaType}:${title.tmdbId}"
+            val cacheKey = "logo:en-v3:$suffix"
             val old = cache.cached(cacheKey)
             val now = System.currentTimeMillis()
-            if (old != null && LocalizedOverview.isCached(old.fetchedAt, now)) return@withLock old.data.ifBlank { null }
-            try {
-                val key = settings.apiKey() ?: return@withLock old?.data?.ifBlank { null }
-                val images = tmdb.images(key, title.mediaType, title.tmdbId)
-                val path =
-                    TitleLogo.choose(
-                        images.logos.map { LogoCandidate(it.path, it.language, it.votes) },
+            val oldPaths = TitleLogo.cachedPaths(old?.data.orEmpty())
+            if (old != null && TitleLogo.isCached(old.fetchedAt, now, oldPaths.isNotEmpty())) return@withLock oldPaths
+            val fallback =
+                oldPaths.ifEmpty {
+                    TitleLogo.cachedPaths(
+                        cache.cached("logo:en-v2:$suffix")?.data.orEmpty(),
                     )
+                }
+            try {
+                val key = settings.apiKey() ?: return@withLock fallback
+                val images = tmdb.images(key, title.mediaType, title.tmdbId)
+                val paths = TitleLogo.orderedPaths(images.logos.map { LogoCandidate(it.path, it.language, it.votes) })
                 db.withTransaction {
-                    cache.putCache(DiscoverCacheEntity(cacheKey, path.orEmpty(), now))
+                    cache.putCache(DiscoverCacheEntity(cacheKey, paths.joinToString("\n"), now))
                     cache.trimLogos()
                 }
-                path
+                paths
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                old?.data?.ifBlank { null }
+                fallback
             }
         }
 

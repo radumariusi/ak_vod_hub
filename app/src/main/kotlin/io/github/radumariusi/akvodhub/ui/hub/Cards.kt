@@ -58,7 +58,7 @@ val PosterHeight: Dp
 object Images {
     fun poster(path: String?, size: PosterSize = PosterSize.MEDIUM) = url(path, size.imageSize)
 
-    fun logo(path: String?) = url(path, "w500")
+    fun logo(path: String) = url(path, if (path.endsWith(".svg", ignoreCase = true)) "original" else "w500")
 
     fun hero(path: String?) = url(path, "w780")
 

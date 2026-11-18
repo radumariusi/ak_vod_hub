@@ -65,7 +65,7 @@ internal fun TitleBackdrop(path: String?, modifier: Modifier = Modifier, opacity
 internal fun CatalogHero(
     fallback: TitleCard,
     focused: () -> TitleCard?,
-    logo: suspend (Long) -> String?,
+    logo: suspend (Long) -> List<String>,
     height: Dp,
     onBackdropChanged: ((String?) -> Unit)? = null,
 ) {
@@ -75,8 +75,8 @@ internal fun CatalogHero(
         if (target.id != shown.id) delay(300)
         shown = target
     }
-    var logoPath by remember(shown.id) { mutableStateOf<String?>(null) }
-    LaunchedEffect(shown.id) { logoPath = logo(shown.id) }
+    var logoPaths by remember(shown.id) { mutableStateOf(emptyList<String>()) }
+    LaunchedEffect(shown.id) { logoPaths = logo(shown.id) }
     LaunchedEffect(shown.backdropPath) { onBackdropChanged?.invoke(shown.backdropPath) }
     Box(Modifier.fillMaxWidth().height(height).clipToBounds()) {
         if (onBackdropChanged == null) TitleBackdrop(shown.backdropPath, Modifier.matchParentSize())
@@ -88,7 +88,7 @@ internal fun CatalogHero(
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(5.dp),
         ) {
-            TitleHeading(shown.name, logoPath, height = if (height < 132.dp) 52.dp else 68.dp)
+            TitleHeading(shown.name, logoPaths, height = if (height < 132.dp) 52.dp else 68.dp)
             Text(
                 shown.meta(),
                 style = MaterialTheme.typography.labelLarge,

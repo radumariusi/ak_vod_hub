@@ -33,7 +33,7 @@ data class DetailsState(
     val loadingEpisodes: Boolean = false,
     val credits: Credits? = null,
     val selectedSeason: Int? = null,
-    val logoPath: String? = null,
+    val logoPaths: List<String> = emptyList(),
     val inWatchlist: Boolean = false,
     val watched: Boolean = false,
     val changingLibrary: Boolean = false,
@@ -143,7 +143,7 @@ class DetailsViewModel
                     if (details == null) return@launch
                     launch {
                         val logo = repository.logo(titleId)
-                        mutableState.update { if (it.titleId == titleId) it.copy(logoPath = logo) else it }
+                        mutableState.update { if (it.titleId == titleId) it.copy(logoPaths = logo) else it }
                     }
                     launch {
                         val credits = repository.credits(details.title)

@@ -4,14 +4,19 @@ import io.github.radumariusi.akvodhub.parser.match.MediaType
 import io.github.radumariusi.akvodhub.parser.match.SearchRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.resumeWithException
 
 /**
  * Client TMDB (API v3), cu cheia utilizatorului: acceptă atât „API Key” (32 de caractere) cât și
@@ -146,8 +151,12 @@ class TmdbClient(
 
     suspend fun images(key: String, type: MediaType, tmdbId: Long): TmdbImages {
         val path = if (type == MediaType.TV) "tv/$tmdbId/images" else "movie/$tmdbId/images"
-        val images = url(path).addQueryParameter("include_image_language", "en,null").build()
-        val body = get(key, images, strict = true) ?: return TmdbImages()
+        val images =
+            url(path)
+                .addQueryParameter("language", METADATA_LANGUAGE)
+                .addQueryParameter("include_image_language", "en,null")
+                .build()
+        val body = get(key, images, strict = true, cancellable = true) ?: return TmdbImages()
         return json.decodeFromString<TmdbImages>(body)
     }
 
@@ -158,6 +167,7 @@ class TmdbClient(
         key: String,
         url: HttpUrl,
         strict: Boolean = false,
+        cancellable: Boolean = false,
     ): String? {
         val bearer = key.startsWith("eyJ")
         val finalUrl = if (bearer) url else url.newBuilder().addQueryParameter("api_key", key).build()
@@ -174,34 +184,12 @@ class TmdbClient(
             limiter.acquire()
             val result =
                 try {
-                    withContext(Dispatchers.IO) {
-                        val call = http.newCall(request)
-                        call.timeout().timeout(30, TimeUnit.SECONDS)
-                        call.execute().use { response ->
-                            when {
-                                response.isSuccessful -> {
-                                    Result.Body(response.body.string())
-                                }
-
-                                response.code == 404 -> {
-                                    Result.Body(null)
-                                }
-
-                                response.code == 401 -> {
-                                    throw TmdbAuthException()
-                                }
-
-                                response.code == 429 || response.code >= 500 -> {
-                                    Result.Retry(response.header("Retry-After")?.toLongOrNull())
-                                }
-
-                                // Alte erori 4xx (ex. 422 la o căutare ciudată): tratăm ca „nimic găsit”.
-                                else -> {
-                                    if (strict) throw TmdbHttpException(response.code)
-                                    Result.Body(null)
-                                }
-                            }
-                        }
+                    val call = http.newCall(request)
+                    call.timeout().timeout(30, TimeUnit.SECONDS)
+                    if (cancellable) {
+                        readCancellable(call, strict)
+                    } else {
+                        withContext(Dispatchers.IO) { call.execute().use { readResponse(it, strict) } }
                     }
                 } catch (e: IOException) {
                     if (attempt >= MAX_ATTEMPTS || e is TmdbHttpException) throw e
@@ -225,6 +213,36 @@ class TmdbClient(
             }
         }
     }
+
+    private suspend fun readCancellable(call: Call, strict: Boolean): Result =
+        suspendCancellableCoroutine { continuation ->
+            continuation.invokeOnCancellation { call.cancel() }
+            call.enqueue(
+                object : Callback {
+                    override fun onFailure(call: Call, e: IOException) = continuation.resumeWithException(e)
+
+                    override fun onResponse(call: Call, response: Response) {
+                        continuation.resumeWith(runCatching { response.use { readResponse(it, strict) } })
+                    }
+                },
+            )
+        }
+
+    private fun readResponse(response: Response, strict: Boolean): Result =
+        when {
+            response.isSuccessful -> Result.Body(response.body.string())
+
+            response.code == 404 -> Result.Body(null)
+
+            response.code == 401 -> throw TmdbAuthException()
+
+            response.code == 429 || response.code >= 500 -> Result.Retry(response.header("Retry-After")?.toLongOrNull())
+
+            // Unele căutări răspund cu 422. La detalii și imagini păstrăm eroarea.
+            strict -> throw TmdbHttpException(response.code)
+
+            else -> Result.Body(null)
+        }
 
     /** O eroare 4xx de detalii nu dovedește că titlul lipsește și nu trebuie să-i desfacă legăturile. */
     private class TmdbHttpException(code: Int) : IOException("TMDB a răspuns cu HTTP $code.")

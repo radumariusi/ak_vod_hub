@@ -397,3 +397,18 @@ Profilurile Mic/Normal/Mare folosesc ținte de 12/48/64 MiB pentru bufferul Medi
 activează rezerva de la aceeași poziție când există o altă sursă. Pentru 4K, prima alegere este o rezoluție
 mai mică în aceeași limbă dacă este disponibilă. Pauza și seek-ul resetează detecția. Testarea ritmului
 real pe fluxul raportat rămâne de făcut pe TV. Fără schimbare de schemă sau dependențe.
+
+
+### Sigle în hero și fișă după v0.1.42
+
+Acasă, Filme și Seriale cer sigla pentru primul titlu afișat și după 300 ms de focus stabil la navigare.
+Fișa o cere la deschidere. TMDB primește o cerere `/movie/{id}/images` sau `/tv/{id}/images` numai pentru
+titluri potrivite, cu `language=en-US` și `include_image_language=en,null`. Cererea HTTP a titlului
+părăsit se anulează odată cu efectul hero/fișă. Nu există preîncărcare pentru grilă sau catalog.
+
+Încearcă până la două fișiere în engleză, apoi până la două neutre, în ordinea voturilor pe limbă.
+PNG folosește TMDB w500, SVG folosește originalul și decodorul Coil SVG. Textul rămâne până la
+încărcarea unei imagini. Cache-ul `logo:en-v3` este comun, în `discover_cache`, cu plafonul existent
+de 128 de intrări pentru sigle. Siglele găsite expiră în 30 de zile, absențele confirmate într-o zi.
+Intrările vechi se reverifică la acces, iar căile vechi validate rămân rezervă offline. Nu există
+migrare Room. Verificarea pe Android TV trebuie să includă atât sigle PNG cât și SVG.

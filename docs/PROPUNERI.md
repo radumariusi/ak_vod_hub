@@ -165,6 +165,11 @@ Vezi detalii despre schema Room și limitele cunoscute în [HANDOFF.md](HANDOFF.
 - Playerul are un buffer Normal mai mare și detectează întreruperile repetate, cu preferință pentru o variantă de
   calitate mai mică atunci când sursa curentă este 4K și redarea rămâne instabilă.
 
+## Sigle în hero și fișă după v0.1.42
+
+- Caută pe TMDB la focus stabil sau la deschiderea fișei. Folosește siglele englezești, apoi cele fără limbă declarată.
+- Acceptă PNG și SVG, încearcă alternativele când o imagine eșuează și actualizează cache-ul vechi la acces.
+
 ## Ce ar îngreuna aplicația (de evitat sau doar opțional)
 
 1. **Trailere redate în aplicație / pe fundal** (YouTube, WebView): megabytes în plus și RAM. → Deschidem aplicația YouTube.
