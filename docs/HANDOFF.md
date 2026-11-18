@@ -468,3 +468,23 @@ subtitrări” deschide playerul în pauză și folosește pistele reale. Pagina
 Numai deschiderea paginii cere sezonul selectat de la TMDB. Cache-ul păstrează maximum opt sezoane și
 64 de intrări în fiecare rezultat, cu completare individuală la focus dacă e necesar. Doar episoadele
 playlistului sunt afișate. Fără schema Room nouă sau dependențe.
+
+
+### Retușuri după v0.1.46
+
+Fișa ține sigla în afara listei derulabile și afișează descrierea în antet o singură dată. Metadatele
+și descrierea se pot extinde. Audio și subtitrări afișează în fișă la alegerea unei variante a filmului
+sau episodului declarațiile din playlist și pistele interne deja observate de Media3. Cache-ul
+`source-tracks:` este limitat la 256 de intrări. Nu se deschid fluxuri din panoul informativ.
+
+Serialele combină numerele sezoanelor TMDB cu episoadele vizibile din playlist. Absența se afișează
+numai după verificarea variantelor Xtream pentru importul curent. Limbile declarate se preiau
+din episod sau, dacă lipsesc, din serialul părinte. MULTI și datele insuficiente nu sunt
+dovezi că lipsesc limbile originală, engleză sau română. Rezultatul verificării Xtream se leagă
+de `seenRun` în cache-ul existent, cu maximum 512 intrări. După import, workerul existent
+verifică serialele urmărite și până la 12 seriale populare fără episoade locale, cu o singură variantă
+per titlu în lotul popular. Restul se verifică la deschidere. Schema Room nu se schimbă.
+
+Hero-ul citește fundalul o singură dată în hub. Butonul Filtre este în zona de acțiuni în Filme/Seriale,
+iar rândul de postere începe după același spațiu ca pe Acasă. Bara TV centrează filele și păstrează
+marca la stânga. Film, serial, set de postere și focusul fizic se verifică pe televizor.

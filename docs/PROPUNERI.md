@@ -188,6 +188,12 @@ Vezi detalii despre schema Room și limitele cunoscute în [HANDOFF.md](HANDOFF.
 - Fișă cu acțiuni verticale și ecran dedicat pentru sezoane și episoade, cu metadate la deschidere.
 - Temă comună pentru hub, setări și player. Identitatea și funcțiile rămân cele ale AK VOD Hub.
 
+## Retușuri fișă, sezoane și catalog după v0.1.46
+
+- Siglă fixă, descriere extensibilă și panou de piste în fișă, grupat pe sursă.
+- Sezoane oficiale TMDB combinate cu episoadele din playlist și preîncărcare limitată după import.
+- Fundal hero unic, buton Filtre în zona de acțiuni și meniu TV centrat.
+
 ## Ce ar îngreuna aplicația (de evitat sau doar opțional)
 
 1. **Trailere redate în aplicație / pe fundal** (YouTube, WebView): megabytes în plus și RAM. → Deschidem aplicația YouTube.

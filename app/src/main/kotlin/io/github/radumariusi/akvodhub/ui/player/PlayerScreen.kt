@@ -86,12 +86,10 @@ import kotlinx.coroutines.delay
 fun PlayerScreen(
     viewModel: PlayerViewModel,
     onExit: () -> Unit,
-    openTrackMenu: Boolean = false,
 ) {
     val state by viewModel.state.collectAsState()
     val player = viewModel.player
-    var controls by remember { mutableStateOf(openTrackMenu) }
-    var initialTracks by remember { mutableStateOf(openTrackMenu) }
+    var controls by remember { mutableStateOf(false) }
     var lastInput by remember { mutableIntStateOf(0) }
     var choice by remember { mutableStateOf<Choice?>(null) }
     var technical by remember { mutableStateOf(false) }
@@ -112,34 +110,6 @@ fun PlayerScreen(
     var activeCommand by remember { mutableStateOf<FocusRequester?>(null) }
     var restoreMore by remember { mutableStateOf(false) }
     var menuWasOpen by remember { mutableStateOf(false) }
-    LaunchedEffect(initialTracks, state.loading, state.error) {
-        if (initialTracks && !state.loading && state.error == null) {
-            initialTracks = false
-            val audio = state.audio
-            val options = if (audio.isEmpty()) listOf("Subtitrări", "Redă") else listOf("Audio", "Subtitrări", "Redă")
-            choice =
-                Choice("Audio și subtitrări", options, 0) { index ->
-                    when (options[index]) {
-                        "Audio" -> {
-                            choice =
-                                Choice(
-                                    "Audio · piste detectate",
-                                    audio.map { it.label },
-                                    selected = audio.indexOfFirst { it.selected }.takeIf { it >= 0 },
-                                ) { viewModel.selectTrack(audio[it]) }
-                        }
-
-                        "Subtitrări" -> {
-                            subtitlesOpen = true
-                        }
-
-                        else -> {
-                            viewModel.togglePlay()
-                        }
-                    }
-                }
-        }
-    }
     val menuOpen = choice != null || adjusting || jumping || technical || subtitlesOpen
     LaunchedEffect(menuOpen) {
         if (!menuOpen && menuWasOpen && controls) {

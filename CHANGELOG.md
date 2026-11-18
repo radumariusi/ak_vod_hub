@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-11-19 — Retușuri fișă, sezoane și catalog TV
+
+- Sigla rămâne vizibilă la intrarea în fișă. Descrierea apare o singură dată și se poate extinde.
+- Audio și subtitrări listează pistele declarate și detectate pe sursă, inclusiv per episod.
+- Sezoanele TMDB includ marcaje pentru disponibilitate și audio. După import se pregătește un lot scurt de seriale.
+- Hero folosește un singur fundal, filtrele intră în zona de acțiuni, iar meniul TV se centrează cu marca la stânga.
+
 ## 2026-11-18 — Interfață TV panoramică
 
 - Acasă, Filme și Seriale au hero cu sigla titlului, Redă și Detalii. Meniul și posterele folosesc același stil.
