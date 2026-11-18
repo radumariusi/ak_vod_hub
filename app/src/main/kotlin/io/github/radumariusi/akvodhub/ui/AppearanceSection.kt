@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import io.github.radumariusi.akvodhub.hub.HomeViewModel
 import io.github.radumariusi.akvodhub.parser.catalog.AccentColor
 import io.github.radumariusi.akvodhub.parser.catalog.HomeRows
 import io.github.radumariusi.akvodhub.parser.catalog.PosterSize
@@ -31,7 +32,7 @@ import io.github.radumariusi.akvodhub.ui.touch.Button
 import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
 
 @Composable
-fun AppearanceSection(viewModel: PlaybackSettingsViewModel) {
+fun AppearanceSection(viewModel: PlaybackSettingsViewModel, home: HomeViewModel) {
     val prefs by viewModel.prefs.collectAsState()
     var choice by remember { mutableStateOf<Choice?>(null) }
     var configureRows by remember { mutableStateOf(false) }
@@ -67,8 +68,11 @@ fun AppearanceSection(viewModel: PlaybackSettingsViewModel) {
     }
     choice?.let { ChoiceDialog(it, onDismiss = { choice = null }) }
     if (configureRows) {
-        HomeRowsDialog(HomeRows.order(prefs.homeOrder), prefs.homeHidden, { configureRows = false }) { order, hidden ->
-            viewModel.setHomeRows(order, hidden)
+        val homeState by home.state.collectAsState()
+        val labels = HomeRows.labels + homeState.catalogLabels
+        val order = HomeRows.order(prefs.homeOrder, homeState.catalogLabels.keys).filter { it in labels }
+        HomeRowsDialog(order, prefs.homeHidden, labels, { configureRows = false }) { newOrder, hidden ->
+            viewModel.setHomeRows(newOrder, hidden)
             configureRows = false
         }
     }
@@ -78,6 +82,7 @@ fun AppearanceSection(viewModel: PlaybackSettingsViewModel) {
 private fun HomeRowsDialog(
     initialOrder: List<String>,
     initialHidden: Set<String>,
+    labels: Map<String, String>,
     dismiss: () -> Unit,
     apply: (List<String>, Set<String>) -> Unit,
 ) {
@@ -94,7 +99,7 @@ private fun HomeRowsDialog(
                 itemsIndexed(order, key = { _, key -> key }) { index, key ->
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = { hidden = if (key in hidden) hidden - key else hidden + key }) {
-                            Text("${HomeRows.labels[key]} · " + if (key in hidden) "ascuns" else "vizibil")
+                            Text("${labels[key]} · " + if (key in hidden) "ascuns" else "vizibil", maxLines = 2)
                         }
                         OutlinedButton(onClick = { move(index, index - 1) }, enabled = index > 0) { Text("Sus") }
                         OutlinedButton(

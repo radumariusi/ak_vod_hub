@@ -168,6 +168,10 @@ class PlaybackSettings(
     }
 
     fun resetCategory(category: Int) {
+        if (category == 6) {
+            setAddonHomeRowsVisible(true)
+            return
+        }
         val keys =
             when (category) {
                 0 -> {
@@ -214,6 +218,12 @@ class PlaybackSettings(
         keys.forEach(edit::remove)
         edit.apply()
         mutableState.value = read()
+    }
+
+    fun setAddonHomeRowsVisible(visible: Boolean) {
+        val current = state.value
+        val hidden = if (visible) current.homeHidden - HomeRows.ADDONS else current.homeHidden + HomeRows.ADDONS
+        setHomeRows(HomeRows.keys(current.homeOrder), hidden)
     }
 
     fun setContinueDirect(value: Boolean) {
@@ -380,7 +390,7 @@ class PlaybackSettings(
         CONTENT_KEYS.forEach { key -> values[key]?.let { setContent(key, it) } }
         val edit = prefs.edit()
         for (key in listOf("home_order", "home_hidden")) {
-            values[key]?.let { edit.putString(key, HomeRows.keys(it.take(1500)).joinToString(",")) }
+            values[key]?.let { edit.putString(key, HomeRows.keys(it.take(3600)).joinToString(",")) }
         }
         for (key in listOf("continue_direct", "hide_adult_movies", "show_playlist_statistics")) {
             values[key]?.toBooleanStrictOrNull()?.let { edit.putBoolean(key, it) }

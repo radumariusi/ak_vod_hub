@@ -343,7 +343,7 @@ Retestarea pe Android 11 TV și instalarea peste versiunea existentă sunt în a
   existent `playlistAddedAt`. Paginarea separă valorile NULL, cu ID drept criteriu comun la egalitate.
   Combinațiile și configurațiile curente au chei `browse.<tip>.*` validate la restaurare.
 - **16.5** Acasă folosește `home_order`, `home_hidden` și `continue_direct`. Rândurile dinamice „Pentru
-  că ai văzut” și cataloagele addon se configurează ca grupuri. Scoaterea din continuare șterge reluarea
+  că ai văzut” se pot configura pe poziții, iar cataloagele addon individual sau ca grup. Scoaterea din continuare șterge reluarea
   locală, care este și sursa Watch Next. Istoricul și lista rămân în tabelele lor.
 - **16.6** Room 16→17 adaugă `episode_progress` pentru sezoane și episoade identificate. Migrarea
   preia pozițiile cunoscute din reluare. Starea nouă vine din redare, iar descrierile EN au 64 de intrări
@@ -352,9 +352,11 @@ Retestarea pe Android 11 TV și instalarea peste versiunea existentă sunt în a
   acțiunile de subtitrare. Bara consumă OK și execută toggle pe prima apăsare.
 - **16.8** Setările rămân în opt categorii. Tastatura pornește prin activarea editorului. Filtrul de adulți,
   implicit oprit, ascunde variantele de film din categorii marcate de playlist. Backup-ul include
-  `hide_adult_movies`, `start_screen`, `controls_seconds` și preferințele de Acasă/catalog.
+  `hide_adult_movies`, `start_screen`, `controls_seconds` și preferințele de Acasă/catalog. Resetarea
+  Servicii revine la afișarea generală a cataloagelor addon și păstrează cheile și addon-urile instalate.
 - **16.9** Grilele păstrează până la cinci pagini de 48 de carduri, iar un rând paginat de pe Acasă până la
-  patru pagini de 24. Pentru întoarcere se păstrează cheile paginilor deja traversate. Verificarea consumului
+  patru pagini de 24. Pentru întoarcere se păstrează cheile paginilor deja traversate. Testul SQL cu
+  Python 3 și SQLite verifică pe 111.000 de titluri rezumatele, combinațiile și ascunderea. Verificarea consumului
   de memorie, a latenței tranzacției la refresh, a focusului/touch și a reluării pe Android 11 TV rămâne necesară.
 
 De verificat pe TV după instalarea din updater: import manual și mesajul exact la eroare; primul și ultimul rând

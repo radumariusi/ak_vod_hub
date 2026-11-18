@@ -48,22 +48,16 @@ data class DetailsState(
     val nextEpisode: MergedEpisode?
         get() {
             val seasons = episodes?.seasons ?: return null
-            val available = EpisodeOrder.linear(seasons)
-            val resume = watch?.let { w -> EpisodeOrder.find(seasons, w.season, w.episode) }
-            if (resume != null) return resume
             val last = episodeProgress.values.maxByOrNull { it.updatedAt }
-            val candidates =
-                if (last?.finished == true) {
-                    available.dropWhile {
-                        it.season < last.season ||
-                            (it.season == last.season && (it.number ?: 0) <= last.episode)
-                    }
-                } else {
-                    val current = last?.let { EpisodeOrder.find(seasons, it.season, it.episode) }
-                    listOfNotNull(current) + available
-                }
-            return candidates.firstOrNull { entry ->
-                entry.number?.let { episodeProgress[entry.season to it]?.finished } != true
+            return EpisodeOrder.resumeOrNext(
+                seasons,
+                watch?.season,
+                watch?.episode,
+                last?.season,
+                last?.episode,
+                last?.finished == true,
+            ) { entry ->
+                entry.number?.let { episodeProgress[entry.season to it]?.finished } == true
             }
         }
 }
@@ -240,7 +234,19 @@ class DetailsViewModel
                 if (it.titleId ==
                     titleId
                 ) {
-                    it.copy(watch = watch, episodeProgress = progress, inWatchlist = listed, watched = watched)
+                    val updated =
+                        it.copy(
+                            watch = watch,
+                            episodeProgress = progress,
+                            inWatchlist = listed,
+                            watched = watched,
+                        )
+                    val changedEpisode = it.watch?.season != watch?.season || it.watch?.episode != watch?.episode
+                    if (changedEpisode) {
+                        updated.copy(selectedSeason = updated.nextEpisode?.season ?: it.selectedSeason)
+                    } else {
+                        updated
+                    }
                 } else {
                     it
                 }

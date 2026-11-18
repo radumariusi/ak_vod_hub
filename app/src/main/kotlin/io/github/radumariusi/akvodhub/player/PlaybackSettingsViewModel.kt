@@ -160,6 +160,8 @@ class PlaybackSettingsViewModel
 
         fun setHomeRows(order: List<String>, hidden: Set<String>) = settings.setHomeRows(order, hidden)
 
+        fun setAddonHomeRowsVisible(visible: Boolean) = settings.setAddonHomeRowsVisible(visible)
+
         fun setContinueDirect(value: Boolean) = settings.setContinueDirect(value)
 
         fun setHomeHero(enabled: Boolean) = settings.setHomeHero(enabled)

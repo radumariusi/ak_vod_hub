@@ -50,6 +50,27 @@ object EpisodeOrder {
             ?.episodes
             ?.firstOrNull { it.number == episode }
 
+    fun resumeOrNext(
+        seasons: List<MergedSeason>,
+        resumeSeason: Int?,
+        resumeEpisode: Int?,
+        lastSeason: Int?,
+        lastEpisode: Int?,
+        lastFinished: Boolean,
+        watched: (MergedEpisode) -> Boolean,
+    ): MergedEpisode? {
+        if (resumeEpisode != null) find(seasons, resumeSeason, resumeEpisode)?.let { return it }
+        if (lastEpisode != null && !lastFinished) {
+            find(seasons, lastSeason, lastEpisode)?.takeUnless(watched)?.let { return it }
+        }
+        return linear(seasons).firstOrNull {
+            val afterLast =
+                lastSeason == null || lastEpisode == null || !lastFinished ||
+                    it.season > lastSeason || (it.season == lastSeason && (it.number ?: 0) > lastEpisode)
+            afterLast && !watched(it)
+        }
+    }
+
     /** Episodul de după [season]/[episode], sau null dacă e ultimul (sau nu are număr). */
     fun next(
         seasons: List<MergedSeason>,

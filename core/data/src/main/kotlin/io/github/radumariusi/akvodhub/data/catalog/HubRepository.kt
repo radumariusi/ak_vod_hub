@@ -365,6 +365,7 @@ class HubRepository(
                         videos.results.map {
                             TrailerCandidate(it.key, it.site, it.type, it.official, it.language)
                         },
+                        title.originalLanguage,
                     )
                 db.withTransaction {
                     cache.putCache(DiscoverCacheEntity(cacheKey, id.orEmpty(), now))
@@ -394,7 +395,6 @@ class HubRepository(
                 val path =
                     TitleLogo.choose(
                         images.logos.map { LogoCandidate(it.path, it.language, it.votes) },
-                        title.originalLanguage,
                     )
                 db.withTransaction {
                     cache.putCache(DiscoverCacheEntity(cacheKey, path.orEmpty(), now))

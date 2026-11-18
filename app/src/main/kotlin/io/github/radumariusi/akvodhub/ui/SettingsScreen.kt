@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import io.github.radumariusi.akvodhub.catalog.TmdbViewModel
+import io.github.radumariusi.akvodhub.hub.HomeViewModel
+import io.github.radumariusi.akvodhub.parser.catalog.HomeRows
 import io.github.radumariusi.akvodhub.player.PlaybackSettingsViewModel
 import io.github.radumariusi.akvodhub.playlist.PlaylistsViewModel
 import io.github.radumariusi.akvodhub.remote.PhoneSetupViewModel
@@ -56,6 +58,7 @@ fun SettingsScreen(
     playlistsViewModel: PlaylistsViewModel,
     tmdbViewModel: TmdbViewModel,
     playbackViewModel: PlaybackSettingsViewModel,
+    homeViewModel: HomeViewModel,
     phoneSetupViewModel: PhoneSetupViewModel,
 ) {
     var adding by rememberSaveable { mutableStateOf(false) }
@@ -151,7 +154,7 @@ fun SettingsScreen(
                     }
 
                     1 -> {
-                        AppearanceSection(playbackViewModel)
+                        AppearanceSection(playbackViewModel, homeViewModel)
                         PosterBadgesSection(playbackViewModel)
                     }
 
@@ -194,6 +197,12 @@ fun SettingsScreen(
                     }
 
                     6 -> {
+                        val hideCatalogs = HomeRows.ADDONS in prefs.homeHidden
+                        OutlinedButton(onClick = { playbackViewModel.setAddonHomeRowsVisible(hideCatalogs) }) {
+                            Text("Cataloagele addon pe Acasă · " + if (hideCatalogs) "Ascunse" else "Vizibile")
+                        }
+                        Text("Se aplică imediat.")
+                        Text("Avansate", style = MaterialTheme.typography.titleLarge)
                         StremioSection(playbackViewModel)
                         TmdbSection(
                             status = matchStatus,
@@ -295,18 +304,16 @@ fun SettingsScreen(
                         )
                     }
                 }
-                if (selected != 6) {
-                    OutlinedButton(onClick = {
-                        val category = selected
-                        choice =
-                            Choice(
-                                "Resetează ${categories[category]}",
-                                listOf("Păstrează setările", "Resetează preferințele"),
-                                selected = 0,
-                                footer = "Conturile, cheile și playlist-urile sunt păstrate.",
-                            ) { if (it == 1) playbackViewModel.resetCategory(category) }
-                    }) { Text("Resetează categoria") }
-                }
+                OutlinedButton(onClick = {
+                    val category = selected
+                    choice =
+                        Choice(
+                            "Resetează ${categories[category]}",
+                            listOf("Păstrează setările", "Resetează preferințele"),
+                            selected = 0,
+                            footer = "Conturile, cheile și playlist-urile sunt păstrate.",
+                        ) { if (it == 1) playbackViewModel.resetCategory(category) }
+                }) { Text("Resetează categoria") }
             }
         }
     }

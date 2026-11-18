@@ -47,6 +47,7 @@ data class HomeRow(
 data class HomeState(
     val loading: Boolean = true,
     val rows: List<HomeRow> = emptyList(),
+    val catalogLabels: Map<String, String> = emptyMap(),
 )
 
 /**
@@ -125,7 +126,10 @@ class HomeViewModel
 
         suspend fun logo(titleId: Long): String? = repository.logo(titleId)
 
-        private fun enabled(key: String): Boolean = HomeRows.group(key) !in prefs.value.homeHidden
+        private var catalogLabels: Map<String, String> = emptyMap()
+
+        private fun enabled(key: String): Boolean =
+            key !in prefs.value.homeHidden && HomeRows.group(key) !in prefs.value.homeHidden
 
         fun removeContinue(titleId: Long) {
             viewModelScope.launch { repository.clearWatchState(titleId) }
@@ -224,14 +228,20 @@ class HomeViewModel
             personalJob?.cancel()
             val recommendations = enabled(HomeRows.RECOMMENDATIONS)
             val collections = enabled(HomeRows.COLLECTIONS)
-            val because = enabled(HomeRows.BECAUSE)
-            if (!(recommendations || collections || because)) return
+            val becauseSlots = (0..1).filter { enabled(HomeRows.because(it)) }.toSet()
+            if (!(recommendations || collections || becauseSlots.isNotEmpty())) return
             personalJob =
                 viewModelScope.launch {
                     delay(delayMs)
                     val rows =
                         withContext(Dispatchers.Default) {
-                            runCatching { discover.personalRows(recommendations, collections, because) }.getOrNull()
+                            runCatching {
+                                discover.personalRows(
+                                    recommendations,
+                                    collections,
+                                    becauseSlots,
+                                )
+                            }.getOrNull()
                         }
                     if (rows != null) {
                         personal = rows.map { it.toHomeRow() }
@@ -245,9 +255,12 @@ class HomeViewModel
             if (!enabled(HomeRows.ADDONS)) return
             catalogJob =
                 viewModelScope.launch {
-                    val rows = withContext(Dispatchers.Default) { runCatching { discover.catalogRows() }.getOrNull() }
-                    if (rows != null) {
-                        catalogs = rows.map { it.toHomeRow() }
+                    val hidden = prefs.value.homeHidden
+                    val result =
+                        withContext(Dispatchers.Default) { runCatching { discover.catalogRows(hidden) }.getOrNull() }
+                    if (result != null) {
+                        catalogLabels = result.labels
+                        catalogs = result.rows.map { it.toHomeRow() }
                         publish()
                     }
                 }
@@ -258,8 +271,8 @@ class HomeViewModel
             val rows =
                 (base + personal + catalogs)
                     .filter { enabled(it.key) }
-                    .sortedBy { order[HomeRows.group(it.key)] ?: Int.MAX_VALUE }
-            mutableState.value = HomeState(loading = !loaded, rows = rows)
+                    .sortedBy { order[it.key] ?: order[HomeRows.group(it.key)] ?: Int.MAX_VALUE }
+            mutableState.value = HomeState(loading = !loaded, rows = rows, catalogLabels = catalogLabels)
         }
 
         fun onItemFocused(key: String, index: Int) {
@@ -288,7 +301,14 @@ class HomeViewModel
                 }
         }
 
-        private fun DiscoverRow.toHomeRow() = HomeRow("d:$key", title, items, null, endReached = true)
+        private fun DiscoverRow.toHomeRow() =
+            HomeRow(
+                if (key.startsWith("d:")) key else "d:$key",
+                title,
+                items,
+                null,
+                endReached = true,
+            )
 
         companion object {
             const val NEWS = HomeRows.NEWS

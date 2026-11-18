@@ -264,6 +264,7 @@ fun AppRoot(
                                     playlistsViewModel,
                                     tmdbViewModel,
                                     hub.playback,
+                                    hub.home,
                                     hub.phoneSetup,
                                 )
                             }

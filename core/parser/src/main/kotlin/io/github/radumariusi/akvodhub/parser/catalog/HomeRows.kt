@@ -1,5 +1,7 @@
 package io.github.radumariusi.akvodhub.parser.catalog
 
+import java.security.MessageDigest
+
 object HomeRows {
     const val CONTINUE = "continue"
     const val EPISODES = "new-episodes"
@@ -23,18 +25,33 @@ object HomeRows {
         ) + Genres.home.associate { "genre:${it.key}" to it.label } +
             mapOf(
                 COLLECTIONS to "Continuă colecția",
-                BECAUSE to "Pentru că ai văzut",
+                because(0) to "Pentru că ai văzut · primul rând",
+                because(1) to "Pentru că ai văzut · al doilea rând",
                 ADDONS to "Cataloage din addon-uri",
             )
 
-    fun group(key: String): String =
-        when {
-            key.startsWith("$BECAUSE:") -> BECAUSE
-            key.startsWith("$ADDONS:") -> ADDONS
-            else -> key
-        }
+    fun because(index: Int): String = "$BECAUSE:${index + 1}"
 
-    fun order(value: String): List<String> = keys(value) + labels.keys.filterNot { it in keys(value) }
+    fun catalog(manifest: String, type: String, id: String): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val key = listOf(manifest, type, id).joinToString("\u0000")
+        val hash = digest.digest(key.toByteArray(Charsets.UTF_8)).take(12).joinToString("") { "%02x".format(it) }
+        return "$ADDONS:$hash"
+    }
 
-    fun keys(value: String): List<String> = value.split(',').filter { it in labels }.distinct()
+    fun group(key: String): String = if (catalogKey.matches(key)) ADDONS else key
+
+    fun order(value: String, availableCatalogs: Set<String> = emptySet()): List<String> {
+        val explicit = keys(value)
+        return (explicit + labels.keys + availableCatalogs).distinct()
+    }
+
+    fun keys(value: String): List<String> =
+        value
+            .split(',')
+            .filter { it in labels || catalogKey.matches(it) }
+            .distinct()
+            .take(80)
+
+    private val catalogKey = Regex("""d:catalog:[0-9a-f]{24}""")
 }

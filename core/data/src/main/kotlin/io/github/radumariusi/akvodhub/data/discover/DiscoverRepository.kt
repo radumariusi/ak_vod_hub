@@ -18,6 +18,7 @@ import io.github.radumariusi.akvodhub.data.stremio.StremioManifest
 import io.github.radumariusi.akvodhub.data.stremio.StremioMeta
 import io.github.radumariusi.akvodhub.data.tmdb.TmdbClient
 import io.github.radumariusi.akvodhub.data.tmdb.TmdbSettings
+import io.github.radumariusi.akvodhub.parser.catalog.HomeRows
 import io.github.radumariusi.akvodhub.parser.discover.Candidate
 import io.github.radumariusi.akvodhub.parser.discover.CollectionPart
 import io.github.radumariusi.akvodhub.parser.discover.Collections
@@ -46,6 +47,8 @@ data class DiscoverRow(
     val title: String,
     val items: List<TitleCard>,
 )
+
+data class CatalogHomeRows(val rows: List<DiscoverRow>, val labels: Map<String, String>)
 
 /** Colecția (francize) unui film: toate părțile, cu cele disponibile marcate. */
 data class CollectionInfo(
@@ -150,11 +153,11 @@ class DiscoverRepository(
     suspend fun personalRows(
         forYouEnabled: Boolean,
         collectionsEnabled: Boolean,
-        becauseEnabled: Boolean,
+        becauseSlots: Set<Int>,
     ): List<DiscoverRow> {
         val now = clock()
         val history = dao.recentHistory(MAX_HISTORY)
-        if (history.isEmpty() || !(forYouEnabled || collectionsEnabled || becauseEnabled)) return emptyList()
+        if (history.isEmpty() || !(forYouEnabled || collectionsEnabled || becauseSlots.isNotEmpty())) return emptyList()
         val items = history.map { it.toItem() }
         val inProgress = dao.inProgress().toSet()
         val seen = history.map { it.titleId }.toSet() + inProgress
@@ -274,7 +277,8 @@ class DiscoverRepository(
                 .filter { it.titleId in related && (it.finished || it.progress >= BECAUSE_PROGRESS) }
                 .take(MAX_BECAUSE)
         val used = forYou.take(BECAUSE_SKIP).toMutableSet()
-        for (seed in because.filter { becauseEnabled }) {
+        for ((index, seed) in because.withIndex()) {
+            if (index !in becauseSlots) continue
             val r = related[seed.titleId] ?: continue
             val single =
                 Recommender.profile(
@@ -299,7 +303,7 @@ class DiscoverRepository(
                 used += ranked.take(BECAUSE_SKIP)
                 rows +=
                     DiscoverRow(
-                        "because:${seed.titleId}",
+                        HomeRows.because(index),
                         "Pentru că ai văzut ${seed.name}",
                         ranked.mapNotNull { byId[it]?.card() },
                     )
@@ -314,10 +318,10 @@ class DiscoverRepository(
      * Câte un rând pentru fiecare catalog (filme / seriale) din addon-urile instalate, cu titlurile găsite în
      * playlist, în ordinea din catalog. Cataloagele se descarcă cel mult o dată la [CATALOG_TTL_MS].
      */
-    suspend fun catalogRows(): List<DiscoverRow> =
+    suspend fun catalogRows(hidden: Set<String>): CatalogHomeRows =
         catalogLock.withLock {
             val installed = addons.addons.value.filter { it.resources.isEmpty() || "catalog" in it.resources }
-            if (installed.isEmpty()) return emptyList()
+            if (installed.isEmpty()) return@withLock CatalogHomeRows(emptyList(), emptyMap())
             dao.deleteCacheBefore(clock() - CACHE_CLEANUP_MS)
             val key = settings.apiKey()
             val catalogs =
@@ -334,27 +338,29 @@ class DiscoverRepository(
                         }.awaitAll()
                         .flatten()
                 }
+            val labels = mutableMapOf<String, String>()
+            val visible =
+                catalogs.mapNotNull { (addon, catalog) ->
+                    val rowKey = HomeRows.catalog(addon.manifestUrl, catalog.type, catalog.id)
+                    val type = if (catalog.type == "series") "Seriale" else "Filme"
+                    labels[rowKey] = "${catalog.name} · $type · ${addon.name}"
+                    if (rowKey in hidden) null else Triple(rowKey, addon, catalog)
+                }
             val metas =
                 coroutineScope {
-                    catalogs.map { (addon, catalog) -> async { catalogMetas(addon, catalog) } }.awaitAll()
+                    visible.map { (_, addon, catalog) -> async { catalogMetas(addon, catalog) } }.awaitAll()
                 }
             var lookups = MAX_IMDB_LOOKUPS
             val rows = mutableListOf<DiscoverRow>()
-            for ((index, pair) in catalogs.withIndex()) {
-                val (addon, catalog) = pair
+            for ((index, triple) in visible.withIndex()) {
+                val (rowKey) = triple
                 val list = metas[index] ?: continue
                 val (titles, used) = resolveMetas(list, key, lookups)
                 lookups -= used
                 if (titles.isEmpty()) continue
-                val type = if (catalog.type == "series") "Seriale" else "Filme"
-                rows +=
-                    DiscoverRow(
-                        key = "catalog:${addon.manifestUrl}|${catalog.type}|${catalog.id}",
-                        title = "${catalog.name} · $type · ${addon.name}",
-                        items = titles.map { it.card() },
-                    )
+                rows += DiscoverRow(rowKey, labels.getValue(rowKey), titles.map { it.card() })
             }
-            rows
+            CatalogHomeRows(rows, labels)
         }
 
     private suspend fun manifest(addon: StremioAddon): StremioManifest? {
