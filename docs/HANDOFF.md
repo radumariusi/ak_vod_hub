@@ -380,3 +380,20 @@ Room 17→18 adaugă `providerQuality` și `confirmedQuality`. Numele, categoria
 pot stabili calitatea înainte de redare. Media3 confirmă dimensiunile sursei efectiv pornite, iar catalogul
 păstrează cea mai mare rezoluție observată pentru variante adaptive. Datele confirmate se păstrează la
 refresh pentru aceeași intrare. Sursele fără declarație sau măsurătoare rămân „Calitate nedeclarată”.
+
+
+### Acasă și redare după v0.1.41
+
+Pe Acasă, fundalul are același spațiu de compoziție și aceleași gradiente ca în fișă. Siglele și metadatele
+se schimbă în continuare după focus stabil. Cardurile „Continuă vizionarea” folosesc imaginea 16:9 când
+este disponibilă, episodul, timpul rămas și progresul. Restul posterelor de pe Acasă rămân portret, cu
+notele existente în partea de jos, titlu accesibil și text de rezervă dacă imaginea lipsește.
+
+Înapoi din Acasă deschide confirmarea cu „Rămâi” selectat. Celelalte file revin întâi pe Acasă. În player,
+OK cu comenzile ascunse comută redarea/pauza din prima apăsare. Sus/Jos și touch deschid comenzile.
+
+Profilurile Mic/Normal/Mare folosesc ținte de 12/48/64 MiB pentru bufferul Media3. Normal și Mare cer
+8/10 s după întrerupere, în limitele țintei de memorie. Trei întreruperi de cel puțin o secundă în 60 s
+activează rezerva de la aceeași poziție când există o altă sursă. Pentru 4K, prima alegere este o rezoluție
+mai mică în aceeași limbă dacă este disponibilă. Pauza și seek-ul resetează detecția. Testarea ritmului
+real pe fluxul raportat rămâne de făcut pe TV. Fără schimbare de schemă sau dependențe.

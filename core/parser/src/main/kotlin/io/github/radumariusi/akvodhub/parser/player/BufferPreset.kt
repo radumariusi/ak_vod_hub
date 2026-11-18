@@ -10,8 +10,8 @@ enum class BufferPreset(
     val bytes: Int,
 ) {
     SMALL("Mic", 5_000, 15_000, 1_000, 2_000, 12 * 1024 * 1024),
-    NORMAL("Normal", 15_000, 50_000, 2_500, 5_000, 32 * 1024 * 1024),
-    LARGE("Mare · mai multă memorie", 30_000, 120_000, 2_500, 5_000, 64 * 1024 * 1024),
+    NORMAL("Normal", 15_000, 50_000, 2_500, 8_000, 48 * 1024 * 1024),
+    LARGE("Mare · mai multă memorie", 30_000, 120_000, 2_500, 10_000, 64 * 1024 * 1024),
     ;
 
     companion object {

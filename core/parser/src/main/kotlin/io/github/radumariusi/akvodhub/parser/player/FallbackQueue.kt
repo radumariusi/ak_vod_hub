@@ -32,9 +32,9 @@ class FallbackQueue(
     val hasMore: Boolean get() = nextUntried() != null
 
     /** Sursa curentă nu merge: o marchează și întoarce următoarea de încercat (sau null). */
-    fun fail(reason: String): Long? {
+    fun fail(reason: String, preferred: Long? = null): Long? {
         current?.let { failedIds[it] = reason }
-        current = nextUntried()
+        current = preferred?.takeIf { it in candidates && it !in failedIds } ?: nextUntried()
         return current
     }
 

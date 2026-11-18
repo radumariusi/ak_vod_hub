@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-11-18 — Acasă și redare TV
+
+- Fundal pe tot ecranul pe Acasă, „Continuă vizionarea” pe lat și postere portret fără titlu repetat.
+- Confirmare la ieșire și redare/pauză direct cu OK. Buffer mai generos și trecere la o variantă disponibilă la întreruperi repetate.
+
+
 ## 2026-11-18 — Retușuri după testarea v0.1.40
 
 - Previzualizare comună pentru Acasă, Filme și Seriale cu fundalul și sigla TMDB în engleză. Focus stabil și componente TV aliniate.

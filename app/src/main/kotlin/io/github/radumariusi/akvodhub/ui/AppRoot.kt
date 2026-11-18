@@ -39,8 +39,11 @@ import io.github.radumariusi.akvodhub.remote.PhoneSetupViewModel
 import io.github.radumariusi.akvodhub.tv.NavRequest
 import io.github.radumariusi.akvodhub.ui.hub.ActorScreen
 import io.github.radumariusi.akvodhub.ui.hub.BrowseScreen
+import io.github.radumariusi.akvodhub.ui.hub.Choice
+import io.github.radumariusi.akvodhub.ui.hub.ChoiceDialog
 import io.github.radumariusi.akvodhub.ui.hub.DetailsScreen
 import io.github.radumariusi.akvodhub.ui.hub.HomeScreen
+import io.github.radumariusi.akvodhub.ui.hub.TitleBackdrop
 import io.github.radumariusi.akvodhub.ui.hub.WatchlistScreen
 import io.github.radumariusi.akvodhub.update.UpdateViewModel
 import kotlinx.coroutines.delay
@@ -80,12 +83,15 @@ fun AppRoot(
     tmdbViewModel: TmdbViewModel,
     hub: HubViewModels,
     navRequests: MutableStateFlow<NavRequest?>,
+    onExit: () -> Unit,
 ) {
     var current by rememberSaveable {
         mutableStateOf(
             Destination.entries.firstOrNull { it.name == hub.playback.prefs.value.startScreen } ?: Destination.HOME,
         )
     }
+    var exitPrompt by rememberSaveable { mutableStateOf(false) }
+    var homeBackdrop by remember { mutableStateOf<String?>(null) }
     var openTitle by rememberSaveable { mutableStateOf<Long?>(null) }
     var actors by rememberSaveable { mutableStateOf(arrayListOf<ActorFrame>()) }
 
@@ -185,93 +191,109 @@ fun AppRoot(
             ActorScreen(hub.actor, actor.id, actor.name, onBack = back) { card -> openTitle = card.id }
         }
     } else {
-        BackHandler(enabled = current != Destination.HOME) { current = Destination.HOME }
+        BackHandler {
+            if (current == Destination.HOME) exitPrompt = true else current = Destination.HOME
+        }
+        if (exitPrompt) {
+            ChoiceDialog(
+                Choice("Ieși din AK VOD Hub?", listOf("Rămâi", "Ieși"), selected = 0) {
+                    if (it == 1) onExit()
+                },
+                onDismiss = { exitPrompt = false },
+            )
+        }
         states.SaveableStateProvider("main") {
-            Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    contentPadding = PaddingValues(horizontal = 32.dp, vertical = 12.dp),
-                ) {
-                    items(Destination.entries, key = { it.name }) { destination ->
-                        SelectionTab(
-                            label = destination.label,
-                            active = current == destination,
-                            onClick = { current = destination },
-                        )
-                    }
+            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                if (current == Destination.HOME && playbackPrefs.homeHero) {
+                    TitleBackdrop(homeBackdrop, Modifier.matchParentSize(), opacity = 0.65f)
                 }
-                Box(Modifier.weight(1f).padding(start = 32.dp, top = 8.dp, end = 32.dp, bottom = 8.dp)) {
-                    // Fiecare ecran își păstrează derularea când treci prin meniu sau prin detalii.
-                    states.SaveableStateProvider(current.name) {
-                        when (current) {
-                            Destination.HOME -> {
-                                HomeScreen(
-                                    totals = totals,
-                                    viewModel = hub.home,
-                                    onOpenSettings = { current = Destination.SETTINGS },
-                                    onOpen = open,
-                                    restoreKey = restoreKey,
-                                    onRestored = onRestored,
-                                )
-                            }
+                Column(Modifier.fillMaxSize()) {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        contentPadding = PaddingValues(horizontal = 32.dp, vertical = 12.dp),
+                    ) {
+                        items(Destination.entries, key = { it.name }) { destination ->
+                            SelectionTab(
+                                label = destination.label,
+                                active = current == destination,
+                                onClick = { current = destination },
+                            )
+                        }
+                    }
+                    Box(Modifier.weight(1f).padding(start = 32.dp, top = 8.dp, end = 32.dp, bottom = 8.dp)) {
+                        // Fiecare ecran își păstrează derularea când treci prin meniu sau prin detalii.
+                        states.SaveableStateProvider(current.name) {
+                            when (current) {
+                                Destination.HOME -> {
+                                    HomeScreen(
+                                        totals = totals,
+                                        viewModel = hub.home,
+                                        onOpenSettings = { current = Destination.SETTINGS },
+                                        onBackdropChanged = { homeBackdrop = it },
+                                        onOpen = open,
+                                        restoreKey = restoreKey,
+                                        onRestored = onRestored,
+                                    )
+                                }
 
-                            Destination.MOVIES -> {
-                                BrowseScreen(
-                                    "Filme",
-                                    hub.browse.movies,
-                                    languages,
-                                    false,
-                                    "movies",
-                                    open,
-                                    restoreKey,
-                                    onRestored,
-                                    showHero = playbackPrefs.homeHero,
-                                    loadLogo = hub.home::logo,
-                                )
-                            }
+                                Destination.MOVIES -> {
+                                    BrowseScreen(
+                                        "Filme",
+                                        hub.browse.movies,
+                                        languages,
+                                        false,
+                                        "movies",
+                                        open,
+                                        restoreKey,
+                                        onRestored,
+                                        showHero = playbackPrefs.homeHero,
+                                        loadLogo = hub.home::logo,
+                                    )
+                                }
 
-                            Destination.SERIES -> {
-                                BrowseScreen(
-                                    "Seriale",
-                                    hub.browse.series,
-                                    languages,
-                                    false,
-                                    "series",
-                                    open,
-                                    restoreKey,
-                                    onRestored,
-                                    showHero = playbackPrefs.homeHero,
-                                    loadLogo = hub.home::logo,
-                                )
-                            }
+                                Destination.SERIES -> {
+                                    BrowseScreen(
+                                        "Seriale",
+                                        hub.browse.series,
+                                        languages,
+                                        false,
+                                        "series",
+                                        open,
+                                        restoreKey,
+                                        onRestored,
+                                        showHero = playbackPrefs.homeHero,
+                                        loadLogo = hub.home::logo,
+                                    )
+                                }
 
-                            Destination.WATCHLIST -> {
-                                WatchlistScreen(hub.watchlist, open, restoreKey, onRestored)
-                            }
+                                Destination.WATCHLIST -> {
+                                    WatchlistScreen(hub.watchlist, open, restoreKey, onRestored)
+                                }
 
-                            Destination.SEARCH -> {
-                                BrowseScreen(
-                                    "Căutare",
-                                    hub.browse.search,
-                                    languages,
-                                    true,
-                                    "search",
-                                    open,
-                                    restoreKey,
-                                    onRestored,
-                                )
-                            }
+                                Destination.SEARCH -> {
+                                    BrowseScreen(
+                                        "Căutare",
+                                        hub.browse.search,
+                                        languages,
+                                        true,
+                                        "search",
+                                        open,
+                                        restoreKey,
+                                        onRestored,
+                                    )
+                                }
 
-                            Destination.SETTINGS -> {
-                                SettingsScreen(
-                                    updateViewModel,
-                                    updateState,
-                                    playlistsViewModel,
-                                    tmdbViewModel,
-                                    hub.playback,
-                                    hub.home,
-                                    hub.phoneSetup,
-                                )
+                                Destination.SETTINGS -> {
+                                    SettingsScreen(
+                                        updateViewModel,
+                                        updateState,
+                                        playlistsViewModel,
+                                        tmdbViewModel,
+                                        hub.playback,
+                                        hub.home,
+                                        hub.phoneSetup,
+                                    )
+                                }
                             }
                         }
                     }
