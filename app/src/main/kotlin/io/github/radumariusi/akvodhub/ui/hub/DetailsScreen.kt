@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -52,6 +51,7 @@ import io.github.radumariusi.akvodhub.data.catalog.Credits
 import io.github.radumariusi.akvodhub.data.catalog.Person
 import io.github.radumariusi.akvodhub.data.catalog.SourceDetails
 import io.github.radumariusi.akvodhub.data.catalog.TitleDetails
+import io.github.radumariusi.akvodhub.data.db.EpisodeProgressEntity
 import io.github.radumariusi.akvodhub.data.db.TitleCard
 import io.github.radumariusi.akvodhub.data.db.isLocal
 import io.github.radumariusi.akvodhub.hub.DetailsState
@@ -89,6 +89,25 @@ fun DetailsScreen(
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var activeEpisode by remember(titleId) { mutableStateOf<MergedEpisode?>(null) }
+    var episodeMessage by remember(activeEpisode) { mutableStateOf("Se încarcă…") }
+    LaunchedEffect(activeEpisode) {
+        val requested = activeEpisode ?: return@LaunchedEffect
+        episodeMessage = try {
+            viewModel.episodeOverview(requested) ?: "Descriere indisponibilă."
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            "Descrierea episodului nu a putut fi încărcată."
+        }
+    }
+    activeEpisode?.let {
+        ChoiceDialog(
+            Choice(episodeCode(it), listOf("Închide"), selected = 0, footer = episodeMessage) {},
+            onDismiss = { activeEpisode = null },
+        )
+    }
+
     var loadingTrailer by remember(titleId) { mutableStateOf(false) }
     val trailerJob = remember(titleId) { mutableStateOf<Job?>(null) }
     DisposableEffect(titleId) { onDispose { trailerJob.value?.cancel() } }
@@ -142,6 +161,7 @@ fun DetailsScreen(
                     loadingTrailer = loadingTrailer,
                     onWatched = viewModel::toggleWatched,
                     onSelectSeason = viewModel::selectSeason,
+                    onEpisodeInfo = { activeEpisode = it },
                     onActor = onActor,
                     sourceReason = state.recommended?.let { viewModel.sourceReason(it, details.title.originalLanguage) },
                     onOpen = onOpen,
@@ -169,6 +189,7 @@ private fun DetailsContent(
     loadingTrailer: Boolean,
     onWatched: () -> Unit,
     onSelectSeason: (Int) -> Unit,
+    onEpisodeInfo: (MergedEpisode) -> Unit,
     onActor: (Person) -> Unit,
     onOpen: (TitleCard) -> Unit,
     sourceReason: String?,
@@ -201,6 +222,7 @@ private fun DetailsContent(
 
     val episodes = state.episodes
     val season = episodes?.seasons?.firstOrNull { it.number == state.selectedSeason }
+    val nextEpisode = state.nextEpisode
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 48.dp, vertical = 32.dp),
@@ -208,7 +230,7 @@ private fun DetailsContent(
     ) {
         item("header") {
             Header(details, state.credits, state.logoPath) {
-                val first = episodes?.let { EpisodeOrder.linear(it.seasons).firstOrNull() }
+                val first = nextEpisode ?: episodes?.seasons?.firstOrNull()?.episodes?.firstOrNull()
                 PlayActions(state, title.id, first, playFocus, onPlay)
             }
         }
@@ -271,7 +293,21 @@ private fun DetailsContent(
             }
             season?.let { s ->
                 items(s.episodes, key = { "e:${s.number}:${it.number}:${it.sources.first().id}" }) { episode ->
-                    EpisodeRow(episode) { onPlay(episodeRequest(title.id, episode)) }
+                    val progress = episode.number?.let { state.episodeProgress[episode.season to it] }
+                    val showInfo: (() -> Unit)? = if (!title.isLocal && episode.number != null) {
+                        { onEpisodeInfo(episode) }
+                    } else {
+                        null
+                    }
+                    EpisodeRow(
+                        episode,
+                        next = nextEpisode == episode,
+                        progress = progress,
+                        onInfo = showInfo,
+                        onClick = {
+                            onPlay(episodeRequest(title.id, episode, resume = progress?.finished == false))
+                        },
+                    )
                 }
             }
         }
@@ -483,9 +519,13 @@ private fun QualityRow(
 @Composable
 private fun EpisodeRow(
     episode: MergedEpisode,
+    next: Boolean,
+    progress: EpisodeProgressEntity?,
+    onInfo: (() -> Unit)?,
     onClick: () -> Unit,
 ) {
-    Surface(onClick = onClick, modifier = Modifier.fillMaxWidth(0.85f)) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Surface(onClick = onClick, modifier = Modifier.weight(1f)) {
         Row(
             Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(18.dp),
@@ -506,14 +546,23 @@ private fun EpisodeRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    SourceGrouping.summary(SourceGrouping.group(episode.sources)) +
-                        if (episode.sources.size > 1) " · ${episode.sources.size} surse" else "",
+                    listOfNotNull(
+                        "Următorul disponibil".takeIf { next },
+                        when {
+                            progress?.finished == true -> "Văzut"
+                            progress != null -> "Început · ${Resume.format(progress.positionMs)}"
+                            else -> null
+                        },
+                        "${episode.sources.size} " + if (episode.sources.size == 1) "sursă" else "surse",
+                    ).joinToString(" · "),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                 )
             }
         }
+    }
+    if (onInfo != null) OutlinedButton(onClick = onInfo) { Text("Detalii episod") }
     }
 }
 

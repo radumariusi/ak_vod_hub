@@ -165,7 +165,13 @@ class DetailsViewModel
 
         fun sourceReason(source: SourceInfo, originalLanguage: String?): String = repository.sourceReason(source, originalLanguage)
 
-    suspend fun trailer(titleId: Long): String? = repository.trailer(titleId)
+        suspend fun episodeOverview(episode: MergedEpisode): String? {
+            val title = state.value.details?.title ?: return null
+            val number = episode.number ?: return null
+            return repository.episodeOverview(title, episode.season, number)
+        }
+
+        suspend fun trailer(titleId: Long): String? = repository.trailer(titleId)
 
         fun toggleWatchlist() = changeLibrary { id -> repository.setInWatchlist(id, !mutableState.value.inWatchlist) }
 
