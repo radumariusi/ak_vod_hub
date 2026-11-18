@@ -120,6 +120,7 @@ fun PosterCard(
     modifier: Modifier = Modifier,
     requestFocus: Boolean = false,
     onFocusRequested: () -> Unit = {},
+    supportingText: String? = null,
 ) {
     val badges = LocalPosterBadges.current
     val requester = remember { FocusRequester() }
@@ -224,6 +225,15 @@ fun PosterCard(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 5.dp),
             )
+            supportingText?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.labelSmall,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 3.dp, vertical = 3.dp),
+                )
+            }
         }
     }
 }

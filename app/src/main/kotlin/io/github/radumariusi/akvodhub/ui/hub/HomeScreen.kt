@@ -37,6 +37,7 @@ import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -44,12 +45,17 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
+import io.github.radumariusi.akvodhub.data.db.ContinueItem
 import io.github.radumariusi.akvodhub.data.db.TitleCard
 import io.github.radumariusi.akvodhub.data.playlist.LibraryTotals
 import io.github.radumariusi.akvodhub.hub.HomeRow
 import io.github.radumariusi.akvodhub.hub.HomeViewModel
+import io.github.radumariusi.akvodhub.parser.player.Resume
+import io.github.radumariusi.akvodhub.player.PlayRequest
+import io.github.radumariusi.akvodhub.player.PlayerActivity
 import io.github.radumariusi.akvodhub.ui.formatCount
 import io.github.radumariusi.akvodhub.ui.touch.Button
+import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
 import kotlinx.coroutines.delay
 
 /**
@@ -73,7 +79,9 @@ fun HomeScreen(
 
         state.rows.isEmpty() -> {
             Message(
-                if (state.loading || totals == null) {
+                if (!state.loading && totals?.movies == 0 && totals.series == 0) {
+                    "Playlist-ul nu are încă titluri disponibile."
+                } else if (state.loading || totals == null) {
                     "Se încarcă biblioteca…"
                 } else {
                     "Biblioteca se pregătește: filmele și serialele apar aici după import " +
@@ -100,9 +108,32 @@ private fun HomeRows(
     var initialFocusDone by rememberSaveable { mutableStateOf(false) }
     val focusKey = restoreKey ?: if (!initialFocusDone) cardKey(rows[0], rows[0].items[0]) else null
     val focused = remember { mutableStateOf<TitleCard?>(null) }
+    var choice by remember { mutableStateOf<Choice?>(null) }
+    var returnToCard by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+
+    fun play(item: ContinueItem, resume: Boolean) {
+        context.startActivity(PlayerActivity.intent(context, PlayRequest(item.titleId, season = item.season, episode = item.episode, resume = resume)))
+    }
+
+    fun actions(card: TitleCard, key: String, info: ContinueItem) {
+        returnToCard = key
+        choice = Choice("Continuă vizionarea", listOf("Continuă", "Detalii", "De la început", "Scoate din continuare"), 0) {
+            when (it) {
+                0 -> play(info, resume = true)
+                1 -> onOpen(card, key)
+                2 -> play(info, resume = false)
+                3 -> {
+                    returnToCard = null
+                    viewModel.removeContinue(card.id)
+                }
+            }
+        }
+    }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val heroHeight = (maxHeight - PosterHeight - 108.dp).coerceIn(0.dp, 200.dp)
+        val extra = if (rows.any { it.key == HomeViewModel.CONTINUE }) 64.dp else 0.dp
+        val heroHeight = (maxHeight - PosterHeight - 108.dp - extra).coerceIn(0.dp, 200.dp)
         Column(Modifier.fillMaxSize()) {
         val prefs by viewModel.prefs.collectAsState()
         if (prefs.homeHero && heroHeight >= 104.dp) {
@@ -125,19 +156,33 @@ private fun HomeRows(
                     ) {
                         itemsIndexed(row.items, key = { _, card -> card.id }) { index, card ->
                             val key = cardKey(row, card)
-                            PosterCard(
-                                card = card,
-                                onClick = { onOpen(card, key) },
-                                onFocused = {
-                                    focused.value = card
-                                    viewModel.onItemFocused(row.key, index)
-                                },
-                                requestFocus = key == focusKey,
-                                onFocusRequested = {
-                                    initialFocusDone = true
-                                    onRestored()
-                                },
-                            )
+                            val info = row.continueInfo[card.id]
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                PosterCard(
+                                    card = card,
+                                    onClick = {
+                                        when {
+                                            info == null -> onOpen(card, key)
+                                            prefs.continueDirect -> play(info, resume = true)
+                                            else -> actions(card, key, info)
+                                        }
+                                    },
+                                    onFocused = {
+                                        focused.value = card
+                                        viewModel.onItemFocused(row.key, index)
+                                    },
+                                    requestFocus = key == focusKey || (choice == null && key == returnToCard),
+                                    onFocusRequested = {
+                                        initialFocusDone = true
+                                        returnToCard = null
+                                        onRestored()
+                                    },
+                                    supportingText = info?.progressLabel(),
+                                )
+                                if (info != null && prefs.continueDirect) {
+                                    OutlinedButton(onClick = { actions(card, key, info) }) { Text("Acțiuni") }
+                                }
+                            }
                         }
                     }
                 }
@@ -145,7 +190,15 @@ private fun HomeRows(
         }
     }
     }
+    choice?.let { ChoiceDialog(it, onDismiss = { choice = null }) }
+
 }
+
+private fun ContinueItem.progressLabel(): String? =
+    listOfNotNull(
+        if (season != null && episode != null) "S%02dE%02d".format(season, episode) else null,
+        if (positionMs > 0 && durationMs > positionMs) "${Resume.format(durationMs - positionMs)} rămase" else null,
+    ).joinToString(" · ").ifBlank { null }
 
 private fun cardKey(
     row: HomeRow,

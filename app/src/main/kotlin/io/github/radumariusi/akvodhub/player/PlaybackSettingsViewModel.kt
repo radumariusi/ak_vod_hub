@@ -140,6 +140,10 @@ class PlaybackSettingsViewModel
                     value,
                 )
 
+        fun setHomeRows(order: List<String>, hidden: Set<String>) = settings.setHomeRows(order, hidden)
+
+        fun setContinueDirect(value: Boolean) = settings.setContinueDirect(value)
+
         fun setHomeHero(enabled: Boolean) = settings.setHomeHero(enabled)
 
         fun setPosterSize(size: PosterSize) = settings.setPosterSize(size)

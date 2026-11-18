@@ -3,6 +3,7 @@ package io.github.radumariusi.akvodhub.data.player
 import android.content.Context
 import io.github.radumariusi.akvodhub.parser.catalog.AccentColor
 import io.github.radumariusi.akvodhub.parser.catalog.BrowseFilters
+import io.github.radumariusi.akvodhub.parser.catalog.HomeRows
 import io.github.radumariusi.akvodhub.parser.catalog.OriginalLanguage
 import io.github.radumariusi.akvodhub.parser.catalog.PosterBadge
 import io.github.radumariusi.akvodhub.parser.catalog.PosterBadges
@@ -34,6 +35,9 @@ data class PlaybackPrefs(
     val subtitleScale: Int = 100,
     val subtitleStyle: SubtitleStyle = SubtitleStyle.WHITE_OUTLINE,
     val homeHero: Boolean = true,
+    val homeOrder: String = "",
+    val homeHidden: Set<String> = emptySet(),
+    val continueDirect: Boolean = false,
     val defaultSpeed: Float = 1f,
     val autoNext: Boolean = true,
     val audioLanguage: String = "",
@@ -126,6 +130,19 @@ class PlaybackSettings(
     fun setBrowseFilter(key: String, value: String) {
         val safe = BrowseFilters.sanitize(key, value) ?: return
         prefs.edit().putString(key, safe).apply()
+        mutableState.value = read()
+    }
+
+    fun setHomeRows(order: List<String>, hidden: Set<String>) {
+        prefs.edit()
+            .putString("home_order", HomeRows.keys(order.joinToString(",")).joinToString(","))
+            .putString("home_hidden", HomeRows.keys(hidden.joinToString(",")).joinToString(","))
+            .apply()
+        mutableState.value = read()
+    }
+
+    fun setContinueDirect(value: Boolean) {
+        prefs.edit().putBoolean("continue_direct", value).apply()
         mutableState.value = read()
     }
 
@@ -252,6 +269,9 @@ class PlaybackSettings(
                 }
             }
             putAll(state.value.browseFilters)
+            put("home_order", state.value.homeOrder)
+            put("home_hidden", state.value.homeHidden.joinToString(","))
+            put("continue_direct", state.value.continueDirect.toString())
             put("home_hero", state.value.homeHero.toString())
             put("default_speed", state.value.defaultSpeed.toString())
             put("auto_next", state.value.autoNext.toString())
@@ -280,6 +300,10 @@ class PlaybackSettings(
         values["home_hero"]?.toBooleanStrictOrNull()?.let { setHomeHero(it) }
         CONTENT_KEYS.forEach { key -> values[key]?.let { setContent(key, it) } }
         val edit = prefs.edit()
+        for (key in listOf("home_order", "home_hidden")) {
+            values[key]?.let { edit.putString(key, HomeRows.keys(it.take(1500)).joinToString(",")) }
+        }
+        values["continue_direct"]?.toBooleanStrictOrNull()?.let { edit.putBoolean("continue_direct", it) }
         BrowseFilters.keys.forEach { key ->
             values[key]?.let { BrowseFilters.sanitize(key, it) }?.let { edit.putString(key, it) }
         }
@@ -337,6 +361,9 @@ class PlaybackSettings(
             }
         return PlaybackPrefs(
             browseFilters = BrowseFilters.keys.mapNotNull { key -> prefs.getString(key, null)?.let { key to it } }.toMap(),
+            homeOrder = prefs.getString("home_order", "").orEmpty(),
+            homeHidden = HomeRows.keys(prefs.getString("home_hidden", "").orEmpty()).toSet(),
+            continueDirect = prefs.getBoolean("continue_direct", false),
             homeHero = prefs.getBoolean("home_hero", true),
             defaultSpeed =
                 io.github.radumariusi.akvodhub.parser.player.PlaybackDefaults.speed(

@@ -147,10 +147,10 @@ class DiscoverRepository(
      * Rândurile personalizate de pe Acasă. Gol dacă nu s-a văzut nimic încă. Doar titluri cu surse, fără cele
      * deja văzute sau începute.
      */
-    suspend fun personalRows(): List<DiscoverRow> {
+    suspend fun personalRows(forYouEnabled: Boolean, collectionsEnabled: Boolean, becauseEnabled: Boolean): List<DiscoverRow> {
         val now = clock()
         val history = dao.recentHistory(MAX_HISTORY)
-        if (history.isEmpty()) return emptyList()
+        if (history.isEmpty() || !(forYouEnabled || collectionsEnabled || becauseEnabled)) return emptyList()
         val items = history.map { it.toItem() }
         val inProgress = dao.inProgress().toSet()
         val seen = history.map { it.titleId }.toSet() + inProgress
@@ -240,14 +240,14 @@ class DiscoverRepository(
         val rows = mutableListOf<DiscoverRow>()
         val built = signals.build()
         val forYou = Recommender.rank(profile, pool.values.map { it.candidate() }, built, seen, ROW_SIZE)
-        if (forYou.size >= MIN_ROW) {
+        if (forYouEnabled && forYou.size >= MIN_ROW) {
             rows += DiscoverRow("for-you", "Recomandate pentru tine", forYou.mapNotNull { pool[it]?.card() })
         }
 
         // „Continuă colecția”: partea următoare (disponibilă, nevăzută) din colecțiile începute.
         val done = history.filter { it.finished || it.progress >= DONE_PROGRESS }.map { it.titleId }.toSet()
         val next =
-            collections.mapNotNull { c ->
+            collections.filter { collectionsEnabled }.mapNotNull { c ->
                 val found = available(c.parts.map { it.ref }).associateBy { it.tmdbId }
                 val parts =
                     Collections.ordered(
@@ -266,7 +266,7 @@ class DiscoverRepository(
                 .filter { it.titleId in related && (it.finished || it.progress >= BECAUSE_PROGRESS) }
                 .take(MAX_BECAUSE)
         val used = forYou.take(BECAUSE_SKIP).toMutableSet()
-        for (seed in because) {
+        for (seed in because.filter { becauseEnabled }) {
             val r = related[seed.titleId] ?: continue
             val single =
                 Recommender.profile(
