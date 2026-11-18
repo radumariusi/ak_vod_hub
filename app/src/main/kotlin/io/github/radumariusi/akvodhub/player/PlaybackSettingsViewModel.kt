@@ -68,7 +68,7 @@ class PlaybackSettingsViewModel
         init {
             loadLanguages()
             viewModelScope.launch {
-                prefs.map { it.hiddenLanguages to it.hiddenCategories }.distinctUntilChanged().collect {
+                prefs.map { Triple(it.hiddenLanguages, it.hiddenCategories, it.hideAdultMovies) }.distinctUntilChanged().collect {
                     repository.prepare()
                 }
             }
@@ -139,6 +139,16 @@ class PlaybackSettingsViewModel
                 .setBufferPreset(
                     value,
                 )
+
+        fun setHideAdultMovies(value: Boolean) = settings.setHideAdultMovies(value)
+
+        fun setShowPlaylistStatistics(value: Boolean) = settings.setShowPlaylistStatistics(value)
+
+        fun setStartScreen(value: String) = settings.setStartScreen(value)
+
+        fun setControlsSeconds(value: Int) = settings.setControlsSeconds(value)
+
+        fun resetCategory(category: Int) = settings.resetCategory(category)
 
         fun setHomeRows(order: List<String>, hidden: Set<String>) = settings.setHomeRows(order, hidden)
 

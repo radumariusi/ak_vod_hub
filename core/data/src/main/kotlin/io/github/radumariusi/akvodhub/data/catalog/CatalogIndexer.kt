@@ -58,7 +58,8 @@ class CatalogIndexer(
                 val day = now / 86_400_000L
                 val hiddenLanguages = contentPrefs.getString("hidden_languages", "").orEmpty()
                 val hiddenCategories = contentPrefs.getString("hidden_categories", "").orEmpty()
-                val visibility = "$hiddenLanguages|$hiddenCategories"
+                val hideAdult = contentPrefs.getBoolean("hide_adult_movies", false)
+                val visibility = "$hiddenLanguages|$hiddenCategories|$hideAdult"
                 if (!force && visibility == prefs.getString("visibility", "") &&
                     dao.fingerprint() == prefs.getString(FINGERPRINT, null) &&
                     searchIndexReady()
@@ -74,7 +75,7 @@ class CatalogIndexer(
                 linkLocalTitles()
                 db.playlistDao().inheritSeriesTitles()
                 db.withTransaction {
-                    updateSourceVisibility(hiddenLanguages, hiddenCategories)
+                    updateSourceVisibility(hiddenLanguages, hiddenCategories, hideAdult)
                     dao.updateSummaries()
                     rebuildSourceOptions()
                     updateDubLabels()
@@ -162,11 +163,15 @@ class CatalogIndexer(
         }
     }
 
-    private fun updateSourceVisibility(languages: String, categories: String) {
+    private fun updateSourceVisibility(languages: String, categories: String, hideAdult: Boolean) {
         val sql = db.openHelper.writableDatabase
         sql.execSQL("UPDATE raw_entry SET visible = 1 WHERE visible = 0")
         val hidden = ContentVisibility.hiddenSources(languages, categories)
         sql.execSQL(hidden.sql, hidden.args.toTypedArray())
+        if (hideAdult) {
+            val adults = ContentVisibility.adultMovieSources()
+            sql.execSQL(adults.sql, adults.args.toTypedArray())
+        }
         sql.execSQL(
             "UPDATE raw_entry SET visible = 0 WHERE kind = 'EPISODE' AND seriesId IS NOT NULL AND " +
                 "EXISTS(SELECT 1 FROM raw_entry s WHERE s.sourceId = raw_entry.sourceId AND " +

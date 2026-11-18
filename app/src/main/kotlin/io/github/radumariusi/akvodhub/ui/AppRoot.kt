@@ -81,7 +81,9 @@ fun AppRoot(
     hub: HubViewModels,
     navRequests: MutableStateFlow<NavRequest?>,
 ) {
-    var current by rememberSaveable { mutableStateOf(Destination.HOME) }
+    var current by rememberSaveable {
+        mutableStateOf(Destination.entries.firstOrNull { it.name == hub.playback.prefs.value.startScreen } ?: Destination.HOME)
+    }
     var openTitle by rememberSaveable { mutableStateOf<Long?>(null) }
     var actors by rememberSaveable { mutableStateOf(arrayListOf<ActorFrame>()) }
 

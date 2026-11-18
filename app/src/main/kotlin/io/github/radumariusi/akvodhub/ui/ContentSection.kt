@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.dp
+import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import io.github.radumariusi.akvodhub.parser.catalog.PosterBadge
 import io.github.radumariusi.akvodhub.player.PlaybackSettingsViewModel
@@ -24,6 +25,11 @@ fun ContentSection(viewModel: PlaybackSettingsViewModel) {
             Text("Preferă limba originală: " + if (prefs.preferOriginalLanguage) "da" else "nu")
         }
         Text("Original înaintea profilului, apoi MULTI. Sursa aleasă manual are prioritate.")
+        OutlinedButton(onClick = { viewModel.setHideAdultMovies(!prefs.hideAdultMovies) }) {
+            Text("Filme din categorii pentru adulți · " + if (prefs.hideAdultMovies) "Ascunse" else "Afișate")
+        }
+        Text("Se aplică la reindexare, după etichetele categoriilor din playlist (Adulți, XXX, 18+).")
+        Text("Avansate", style = MaterialTheme.typography.titleLarge)
         ContentText("Limbi ascunse (coduri)", prefs.hiddenLanguages, "hidden_languages", viewModel)
         ContentText(
             "Categorii ascunse (nume exacte, separate prin virgulă)",
@@ -32,7 +38,7 @@ fun ContentSection(viewModel: PlaybackSettingsViewModel) {
             viewModel,
         )
         Text(
-            "Ascunde titlul întreg dacă o sursă declară o limbă sau categorie blocată. Nu șterge sursele sau istoricul. Lista goală arată tot.",
+            "La reindexare, limbile ascund variantele respective. Categoriile ascund titlurile integral.",
         )
         OutlinedButton(onClick = { viewModel.togglePosterBadge(PosterBadge.DUB) }) {
             Text("Etichete DUB: " + if (PosterBadge.DUB in prefs.posterBadges) "da" else "nu")

@@ -38,6 +38,8 @@ import io.github.radumariusi.akvodhub.catalog.TmdbViewModel
 import io.github.radumariusi.akvodhub.player.PlaybackSettingsViewModel
 import io.github.radumariusi.akvodhub.playlist.PlaylistsViewModel
 import io.github.radumariusi.akvodhub.remote.PhoneSetupViewModel
+import io.github.radumariusi.akvodhub.ui.hub.Choice
+import io.github.radumariusi.akvodhub.ui.hub.ChoiceDialog
 import io.github.radumariusi.akvodhub.ui.touch.Button
 import io.github.radumariusi.akvodhub.ui.touch.ListItem
 import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
@@ -63,6 +65,8 @@ fun SettingsScreen(
     val matchStatus by tmdbViewModel.status.collectAsState()
     val keyState by tmdbViewModel.keyState.collectAsState()
     val imdb by tmdbViewModel.imdb.collectAsState()
+    val prefs by playbackViewModel.prefs.collectAsState()
+    var choice by remember { mutableStateOf<Choice?>(null) }
 
     val categories =
         listOf("Conținut", "Aspect", "Redare", "Audio", "Subtitrări", "Surse și playlist-uri", "Servicii", "Sistem")
@@ -164,13 +168,6 @@ fun SettingsScreen(
                     }
 
                     5 -> {
-                        val statistics by playbackViewModel.statistics.collectAsState()
-                        LaunchedEffect(Unit) { playbackViewModel.loadStatistics() }
-                        Text("Statistici bibliotecă", style = MaterialTheme.typography.titleLarge)
-                        Text(statistics)
-                        Text(
-                            "Titluri unice după grupare; numărul surselor audio poate include aceeași sursă în mai multe limbi.",
-                        )
                         PlaylistsSection(
                             playlists = playlists,
                             onAdd = {
@@ -180,6 +177,18 @@ fun SettingsScreen(
                             onRefresh = playlistsViewModel::refresh,
                             onDelete = playlistsViewModel::delete,
                         )
+                        OutlinedButton(onClick = { playbackViewModel.setShowPlaylistStatistics(!prefs.showPlaylistStatistics) }) {
+                            Text(if (prefs.showPlaylistStatistics) "Ascunde statisticile" else "Arată statisticile")
+                        }
+                        if (prefs.showPlaylistStatistics) {
+                        val statistics by playbackViewModel.statistics.collectAsState()
+                        LaunchedEffect(Unit) { playbackViewModel.loadStatistics() }
+                        Text("Statistici bibliotecă", style = MaterialTheme.typography.titleLarge)
+                        Text(statistics)
+                        Text(
+                            "Titluri unice după grupare; numărul surselor audio poate include aceeași sursă în mai multe limbi.",
+                        )
+                        }
                     }
 
                     6 -> {
@@ -233,7 +242,15 @@ fun SettingsScreen(
                     }
 
                     7 -> {
-                        ImageCacheSection()
+                        val destinations = Destination.entries
+                        val startScreen = destinations.firstOrNull { it.name == prefs.startScreen } ?: Destination.HOME
+                        OutlinedButton(onClick = {
+                            choice = Choice("Ecran de pornire", destinations.map { it.label }, startScreen.ordinal) {
+                                playbackViewModel.setStartScreen(destinations[it].name)
+                            }
+                        }) { Text("Ecran de pornire · ${startScreen.label}") }
+                        Text("Se aplică la următoarea pornire a aplicației.")
+
                         Text("Backup și restaurare", style = MaterialTheme.typography.titleLarge)
                         Text(
                             "Include playlist-uri, conturi, chei, addon-uri și preferințe; fără catalog, istoric sau Lista mea. Fișierele M3U locale nu se mută.",
@@ -265,6 +282,8 @@ fun SettingsScreen(
                             }
                         }
 
+                        Text("Avansate", style = MaterialTheme.typography.titleLarge)
+                        ImageCacheSection()
                         Text("Despre", style = MaterialTheme.typography.titleLarge)
                         Text(
                             "AK VOD Hub, software liber sub licența GPL-3.0. Cod sursă: github.com/radumariusi/ak_vod_hub",
@@ -273,7 +292,20 @@ fun SettingsScreen(
                         )
                     }
                 }
+                if (selected != 6) {
+                    OutlinedButton(onClick = {
+                        val category = selected
+                        choice = Choice(
+                            "Resetează ${categories[category]}",
+                            listOf("Păstrează setările", "Resetează preferințele"),
+                            selected = 0,
+                            footer = "Conturile, cheile și playlist-urile sunt păstrate.",
+                        ) { if (it == 1) playbackViewModel.resetCategory(category) }
+                    }) { Text("Resetează categoria") }
+                }
+
             }
         }
     }
+    choice?.let { ChoiceDialog(it, onDismiss = { choice = null }) }
 }

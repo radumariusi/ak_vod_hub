@@ -149,9 +149,9 @@ fun PlayerScreen(
             delay(500)
         }
     }
-    LaunchedEffect(controls, lastInput, isPlaying, choice, adjusting, jumping, technical) {
-        if (controls && isPlaying && choice == null && !adjusting && !jumping && !technical) {
-            delay(HIDE_AFTER_MS)
+    LaunchedEffect(controls, lastInput, isPlaying, menuOpen, prefs.controlsSeconds) {
+        if (controls && isPlaying && !menuOpen) {
+            delay(prefs.controlsSeconds * 1_000L)
             controls = false
         }
     }
@@ -867,7 +867,6 @@ private fun sourceChoice(
     state.sources.indexOfFirst { it.current }.takeIf { it >= 0 },
 ) { i -> viewModel.selectSource(state.sources[i].entryId) }
 
-private const val HIDE_AFTER_MS = 5_000L
 private const val MAX_FAILURES_SHOWN = 6
 
 private fun Key.isPlayerOk() = this == Key.DirectionCenter || this == Key.Enter || this == Key.NumPadEnter

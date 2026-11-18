@@ -39,11 +39,8 @@ fun AppearanceSection(viewModel: PlaybackSettingsViewModel) {
         OutlinedButton(onClick = { viewModel.setHomeHero(!prefs.homeHero) }) {
             Text("Hero pe Acasă: " + if (prefs.homeHero) "da" else "nu")
         }
-        Text("Fundalul și descrierea titlului selectat, deasupra rândurilor de pe Acasă.")
+        Text("Aspectul și rândurile de pe Acasă se aplică imediat.")
         OutlinedButton(onClick = { configureRows = true }) { Text("Rânduri pe Acasă") }
-        OutlinedButton(onClick = { viewModel.setContinueDirect(!prefs.continueDirect) }) {
-            Text("OK în Continuă vizionarea · " + if (prefs.continueDirect) "Redă direct" else "Deschide acțiunile")
-        }
         Text("Aspect", style = MaterialTheme.typography.titleLarge)
         Text("Posterele mici lasă loc pentru mai multe titluri pe ecran.", style = MaterialTheme.typography.bodyMedium)
         OutlinedButton(onClick = {

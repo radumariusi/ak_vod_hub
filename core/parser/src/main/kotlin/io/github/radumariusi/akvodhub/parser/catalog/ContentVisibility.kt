@@ -10,6 +10,28 @@ object ContentVisibility {
             .distinct()
             .take(30)
 
+    /** Etichete din categoriile playlistului, fără clasificare după titlu ori certificare TMDB. */
+    fun adultMovieSources(): SqlQuery {
+        val group = "' ' || lower(trim(groupTitle)) || ' '"
+        val markers = listOf(
+            "*[^a-z0-9]xxx[^a-z0-9]*",
+            "*[^0-9]18+[^a-z0-9]*",
+            "*[^a-z]adult movies[^a-z]*",
+            "*[^a-z]adult vod[^a-z]*",
+            "*[^a-z]for adults[^a-z]*",
+            "*[^a-z]adulti[^a-z]*",
+            "*[^a-z]adulți[^a-z]*",
+            "*[^a-z]adulţi[^a-z]*",
+            " adult ",
+            " adults ",
+        )
+        return SqlQuery(
+            "UPDATE raw_entry SET visible = 0 WHERE kind = 'MOVIE' AND visible = 1 AND (" +
+                markers.joinToString(" OR ") { "($group) GLOB ?" } + ")",
+            markers,
+        )
+    }
+
     fun hiddenSources(languages: String, categories: String): SqlQuery {
         val terms = mutableListOf<String>()
         val args = mutableListOf<Any>()

@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import io.github.radumariusi.akvodhub.data.player.PlaybackSettings
 import io.github.radumariusi.akvodhub.parser.match.SourceGrouping
 import io.github.radumariusi.akvodhub.parser.player.SourceProfile
 import io.github.radumariusi.akvodhub.parser.player.SourceRule
@@ -65,18 +66,6 @@ fun PlaybackSection(viewModel: PlaybackSettingsViewModel) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        OutlinedButton(onClick = { viewModel.setMatchFrameRate(!prefs.matchFrameRate) }) {
-            Text("Potrivește frecvența ecranului: " + if (prefs.matchFrameRate) "da" else "nu")
-        }
-        Text("Păstrează rezoluția; unele TV-uri clipesc la schimbarea frecvenței.")
-        OutlinedButton(onClick = {
-            val options = io.github.radumariusi.akvodhub.parser.player.BufferPreset.entries
-            choice =
-                Choice("Buffer", options.map { it.label }, options.indexOf(prefs.bufferPreset)) {
-                    viewModel.setBufferPreset(options[it])
-                }
-        }) { Text("Buffer: ${prefs.bufferPreset.label}") }
-        Text("Bufferul se aplică la redeschiderea playerului; mare folosește mai multă memorie.")
         OutlinedButton(onClick = {
             val options = io.github.radumariusi.akvodhub.parser.player.PlaybackDefaults.speeds
             choice =
@@ -89,6 +78,29 @@ fun PlaybackSection(viewModel: PlaybackSettingsViewModel) {
             Text("Episodul următor automat: " + if (prefs.autoNext) "da" else "nu")
         }
         Text("Pornește după numărătoarea de zece secunde; timerul de somn are prioritate.")
+        OutlinedButton(onClick = { viewModel.setContinueDirect(!prefs.continueDirect) }) {
+            Text("OK în Continuă vizionarea · " + if (prefs.continueDirect) "Redă direct" else "Deschide acțiunile")
+        }
+        OutlinedButton(onClick = {
+            val options = PlaybackSettings.CONTROLS_SECONDS
+            choice = Choice("Durata comenzilor", options.map { "$it secunde" }, options.indexOf(prefs.controlsSeconds)) {
+                viewModel.setControlsSeconds(options[it])
+            }
+        }) { Text("Durata comenzilor · ${prefs.controlsSeconds} secunde") }
+        Text("Ambele preferințe se aplică imediat.")
+        Text("Avansate", style = MaterialTheme.typography.titleLarge)
+        OutlinedButton(onClick = { viewModel.setMatchFrameRate(!prefs.matchFrameRate) }) {
+            Text("Potrivește frecvența ecranului: " + if (prefs.matchFrameRate) "da" else "nu")
+        }
+        Text("Păstrează rezoluția; unele TV-uri clipesc la schimbarea frecvenței.")
+        OutlinedButton(onClick = {
+            val options = io.github.radumariusi.akvodhub.parser.player.BufferPreset.entries
+            choice =
+                Choice("Buffer", options.map { it.label }, options.indexOf(prefs.bufferPreset)) {
+                    viewModel.setBufferPreset(options[it])
+                }
+        }) { Text("Buffer: ${prefs.bufferPreset.label}") }
+        Text("Bufferul se aplică la redeschiderea playerului; mare folosește mai multă memorie.")
         rules.forEachIndexed { index, rule ->
             FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(if (index == 0) "Prima:" else "Altfel:", style = MaterialTheme.typography.bodyLarge)
