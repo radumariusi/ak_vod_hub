@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -26,6 +27,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.Image
@@ -37,6 +40,7 @@ import coil3.size.Scale
 import io.github.radumariusi.akvodhub.data.db.TitleCard
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.roundToInt
 
 @Composable
@@ -90,30 +94,35 @@ internal fun CatalogHero(
 
     fun cached(id: Long): Image? = imageLoader.memoryCache?.get(MemoryCache.Key(logoKey(id)))?.image
 
-    suspend fun load(id: Long): Image? {
-        cached(id)?.let { return it }
-        val density = context.resources.displayMetrics.density
-        for (path in logo(id)) {
-            val request =
-                logoRequest(context, path)
-                    .memoryCacheKey(logoKey(id))
-                    .size((360 * density).roundToInt(), (76 * density).roundToInt())
-                    .scale(Scale.FIT)
-                    .build()
-            val result = imageLoader.execute(request)
-            if (result is SuccessResult) return result.image
+    suspend fun load(id: Long): Image? =
+        cached(id) ?: withTimeoutOrNull(6_000L) {
+            val density = context.resources.displayMetrics.density
+            for (path in logo(id)) {
+                val request =
+                    logoRequest(context, path, rasterSize = "w300")
+                        .memoryCacheKey(logoKey(id))
+                        .size((360 * density).roundToInt(), (76 * density).roundToInt())
+                        .scale(Scale.FIT)
+                        .build()
+                val result = withTimeoutOrNull(1_600L) { imageLoader.execute(request) }
+                if (result is SuccessResult) return@withTimeoutOrNull result.image
+            }
+            null
         }
-        return null
-    }
 
+    val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateFlow
+        .collectAsState()
+    val foreground = lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
     val cachedLogo = cached(target.id)
     var presentation by remember { mutableStateOf(HeroPresentation(target, cachedLogo)) }
     var settled by remember(target.id) { mutableStateOf(cachedLogo != null) }
-    LaunchedEffect(target.id) {
+    LaunchedEffect(target.id, foreground) {
+        if (!foreground) return@LaunchedEffect
         val readyLogo = cached(target.id)
         if (readyLogo != null) {
             presentation = HeroPresentation(latestTarget, readyLogo)
         } else {
+            settled = false
             val showText =
                 launch {
                     delay(300)
@@ -128,8 +137,8 @@ internal fun CatalogHero(
         settled = true
     }
     val latestNeighbors by rememberUpdatedState(neighborTitleIds)
-    LaunchedEffect(target.id, settled) {
-        if (settled) {
+    LaunchedEffect(target.id, settled, foreground) {
+        if (settled && foreground) {
             delay(350)
             val neighbors = latestNeighbors().distinct().filterNot { it == target.id }
             for (neighbor in neighbors) load(neighbor)

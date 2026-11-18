@@ -51,9 +51,8 @@ import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
@@ -112,7 +111,6 @@ class HubRepository(
 ) {
     private val dao = db.catalogDao()
     private val playlistDao = db.playlistDao()
-    private val logoMutex = Mutex()
     private val creditsCache = ConcurrentHashMap<Long, Credits>()
 
     /** Episoadele Xtream cerute de la server în sesiunea curentă (o dată pe serial și playlist). */
@@ -351,39 +349,37 @@ class HubRepository(
         )
     }
 
-    /** Numai hero stabil/fișă. Cache partajat pe ID TMDB pentru toate ecranele. */
-    suspend fun logo(titleId: Long): List<String> =
-        logoMutex.withLock {
-            val title = dao.titleById(titleId) ?: return@withLock emptyList()
-            if (title.isLocal) return@withLock emptyList()
-            val cache = db.discoverDao()
-            val suffix = "${title.mediaType}:${title.tmdbId}"
-            val cacheKey = "logo:en-v3:$suffix"
-            val old = cache.cached(cacheKey)
-            val now = System.currentTimeMillis()
-            val oldPaths = TitleLogo.cachedPaths(old?.data.orEmpty())
-            if (old != null && TitleLogo.isCached(old.fetchedAt, now, oldPaths.isNotEmpty())) return@withLock oldPaths
-            val fallback =
-                oldPaths.ifEmpty {
-                    TitleLogo.cachedPaths(
-                        cache.cached("logo:en-v2:$suffix")?.data.orEmpty(),
-                    )
-                }
-            try {
-                val key = settings.apiKey() ?: return@withLock fallback
-                val images = tmdb.images(key, title.mediaType, title.tmdbId)
-                val paths = TitleLogo.orderedPaths(images.logos.map { LogoCandidate(it.path, it.language, it.votes) })
-                db.withTransaction {
-                    cache.putCache(DiscoverCacheEntity(cacheKey, paths.joinToString("\n"), now))
-                    cache.trimLogos()
-                }
-                paths
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                fallback
+    /** Cache comun pe ID TMDB. Titlurile diferite pot citi cache-ul fără să aștepte rețeaua altui titlu. */
+    suspend fun logo(titleId: Long): List<String> {
+        val title = dao.titleById(titleId) ?: return emptyList()
+        if (title.isLocal) return emptyList()
+        val cache = db.discoverDao()
+        val suffix = "${title.mediaType}:${title.tmdbId}"
+        val cacheKey = "logo:en-v3:$suffix"
+        val old = cache.cached(cacheKey)
+        val now = System.currentTimeMillis()
+        val oldPaths = TitleLogo.cachedPaths(old?.data.orEmpty())
+        if (old != null && TitleLogo.isCached(old.fetchedAt, now, oldPaths.isNotEmpty())) return oldPaths
+        val fallback =
+            oldPaths.ifEmpty {
+                TitleLogo.cachedPaths(cache.cached("logo:en-v2:$suffix")?.data.orEmpty())
             }
+        return try {
+            val key = settings.apiKey() ?: return fallback
+            val images =
+                withTimeoutOrNull(2_500L) { tmdb.images(key, title.mediaType, title.tmdbId) } ?: return fallback
+            val paths = TitleLogo.orderedPaths(images.logos.map { LogoCandidate(it.path, it.language, it.votes) })
+            db.withTransaction {
+                cache.putCache(DiscoverCacheEntity(cacheKey, paths.joinToString("\n"), now))
+                cache.trimLogos()
+            }
+            paths
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            fallback
         }
+    }
 
     /** Variantele vizibile deja publicate pentru serialul deschis. */
     suspend fun episodes(titleId: Long): SeriesEpisodes =
