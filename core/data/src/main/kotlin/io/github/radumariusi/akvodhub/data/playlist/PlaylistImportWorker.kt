@@ -34,19 +34,21 @@ class PlaylistImportWorker(
         val single = inputData.getLong(KEY_SOURCE_ID, -1L)
         val ids = if (single >= 0) listOf(single) else dao.sources().map { it.id }
         var imported = false
+        var failed = false
         for (id in ids) {
             try {
                 importer.import(id) { progress -> setProgress(progress.toData()) }
                 imported = true
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: Exception) {
+            } catch (e: ImportException) {
+                failed = true
                 Log.w(TAG, "Import eșuat pentru playlist-ul $id: ${e.message}")
             }
         }
         // Potrivirea TMDB rulează separat, ca importul să nu dureze mai mult.
         if (imported) onImported()
-        return Result.success()
+        return if (failed) Result.failure() else Result.success()
     }
 
     companion object {

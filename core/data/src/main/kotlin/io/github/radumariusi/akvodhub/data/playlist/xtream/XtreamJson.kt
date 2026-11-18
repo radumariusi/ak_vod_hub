@@ -1,14 +1,12 @@
 package io.github.radumariusi.akvodhub.data.playlist.xtream
 
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.json.DecodeSequenceMode
+import io.github.radumariusi.akvodhub.parser.playlist.JsonObjectStream
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.decodeToSequence
 import java.io.InputStream
 
 /**
@@ -21,22 +19,13 @@ import java.io.InputStream
 object XtreamJson {
     private val json = Json { ignoreUnknownKeys = true }
 
-    @OptIn(ExperimentalSerializationApi::class)
     fun objects(input: InputStream): Sequence<JsonObject> =
-        json
-            .decodeToSequence<JsonElement>(input, DecodeSequenceMode.AUTO_DETECT)
-            .flatMap { element ->
-                when (element) {
-                    is JsonObject -> sequenceOf(element)
-                    is JsonArray -> element.asSequence().filterIsInstance<JsonObject>()
-                    else -> emptySequence()
-                }
-            }
+        JsonObjectStream.objects(input.bufferedReader(Charsets.UTF_8)).map { parse(it) as JsonObject }
 
-    fun parse(text: String): JsonElement = json.parseToJsonElement(text)
+    fun parse(text: String): JsonElement = json.parseToJsonElement(text.removePrefix("\uFEFF"))
 
     fun movie(o: JsonObject): XtreamMovie? {
-        val id = o.long("stream_id") ?: return null
+        val id = o.long("stream_id")?.takeIf { it > 0 } ?: return null
         return XtreamMovie(
             streamId = id,
             name = o.str("name")?.trim().orEmpty(),
@@ -49,7 +38,7 @@ object XtreamJson {
     }
 
     fun series(o: JsonObject): XtreamSeries? {
-        val id = o.long("series_id") ?: return null
+        val id = o.long("series_id")?.takeIf { it > 0 } ?: return null
         return XtreamSeries(
             seriesId = id,
             name = o.str("name")?.trim().orEmpty(),
@@ -108,6 +97,12 @@ object XtreamJson {
 
     internal fun JsonObject.long(key: String): Long? {
         val s = str(key)?.trim() ?: return null
-        return s.toLongOrNull() ?: s.toDoubleOrNull()?.toLong()
+        return s.toLongOrNull() ?: try {
+            s.toBigDecimal().longValueExact()
+        } catch (_: NumberFormatException) {
+            null
+        } catch (_: ArithmeticException) {
+            null
+        }
     }
 }

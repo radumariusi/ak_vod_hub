@@ -25,6 +25,9 @@ interface PlaylistDao {
     @Update
     suspend fun updateSource(source: PlaylistSourceEntity)
 
+    @Query("UPDATE playlist_source SET lastImportError = :message WHERE id = :id")
+    suspend fun setImportError(id: Long, message: String)
+
     @Query("DELETE FROM playlist_source WHERE id = :id")
     suspend fun deleteSource(id: Long)
 

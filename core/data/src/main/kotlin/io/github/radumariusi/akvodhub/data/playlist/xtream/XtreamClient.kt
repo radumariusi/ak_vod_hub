@@ -1,14 +1,24 @@
 package io.github.radumariusi.akvodhub.data.playlist.xtream
 
 import io.github.radumariusi.akvodhub.data.playlist.xtream.XtreamJson.str
+import io.github.radumariusi.akvodhub.parser.playlist.JsonObjectStreamException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import okhttp3.Call
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.Response
+import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.util.concurrent.TimeUnit
@@ -21,44 +31,75 @@ class XtreamClient(
     private val client: OkHttpClient,
 ) {
     /** Verifică contul. Aruncă [XtreamException] cu un mesaj pentru utilizator dacă nu e valid. */
-    suspend fun authenticate(account: XtreamAccount) {
-        val root = XtreamJson.parse(getText(account, null)) as? JsonObject
-        val user = root?.get("user_info") as? JsonObject ?: throw XtreamException("Serverul nu pare a fi Xtream.")
-        if (user.str("auth") != "1") throw XtreamException("Utilizator sau parolă greșite.")
-        val status = user.str("status")
-        if (status != null && !status.equals("Active", ignoreCase = true)) {
-            throw XtreamException("Contul nu e activ (stare: $status).")
+    suspend fun authenticate(account: XtreamAccount) =
+        jsonOperation("Autentificare") {
+            val root = XtreamJson.parse(getText(account, null)) as? JsonObject
+            val user = root?.get("user_info") as? JsonObject ?: throw XtreamException("structură neașteptată")
+            if (user.str("auth") != "1") throw XtreamException("utilizator sau parolă greșite")
+            val status = user.str("status")
+            if (status != null && !status.equals("Active", ignoreCase = true)) {
+                throw XtreamException("contul nu este activ")
+            }
+        }
+
+    suspend fun vodCategories(account: XtreamAccount): Map<String, String> = categories(account, "get_vod_categories")
+
+    suspend fun seriesCategories(account: XtreamAccount): Map<String, String> = categories(account, "get_series_categories")
+
+    private suspend fun categories(account: XtreamAccount, action: String): Map<String, String> =
+        jsonOperation(action) {
+            val root = XtreamJson.parse(getText(account, action))
+            if (root !is JsonArray) throw XtreamException("listă de categorii așteptată")
+            XtreamJson.categories(root)
+        }
+
+    /** Descarcă în cache înaintea tranzacției de publicare, fără a ține răspunsul complet în memorie. */
+    suspend fun downloadCatalog(account: XtreamAccount, action: String, file: File) {
+        jsonOperation(action) {
+            request(account, action) { input ->
+                file.outputStream().buffered().use { output ->
+                    val context = currentCoroutineContext()
+                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    while (true) {
+                        context.ensureActive()
+                        val count = input.read(buffer)
+                        if (count == -1) break
+                        output.write(buffer, 0, count)
+                    }
+                }
+            }
         }
     }
 
-    suspend fun vodCategories(account: XtreamAccount): Map<String, String> =
-        XtreamJson.categories(XtreamJson.parse(getText(account, "get_vod_categories")))
+    suspend fun <T> movies(file: File, block: suspend (Sequence<XtreamMovie>) -> T): T =
+        readCatalog(file, "get_vod_streams", XtreamJson::movie, block)
 
-    suspend fun seriesCategories(account: XtreamAccount): Map<String, String> =
-        XtreamJson.categories(XtreamJson.parse(getText(account, "get_series_categories")))
+    suspend fun <T> series(file: File, block: suspend (Sequence<XtreamSeries>) -> T): T =
+        readCatalog(file, "get_series", XtreamJson::series, block)
 
-    /** Filmele, citite în flux (pe firul de I/O). */
-    suspend fun <T> movies(
-        account: XtreamAccount,
-        block: suspend (Sequence<XtreamMovie>) -> T,
+    private suspend fun <E, T> readCatalog(
+        file: File,
+        action: String,
+        parse: (JsonObject) -> E?,
+        block: suspend (Sequence<E>) -> T,
     ): T =
-        stream(
-            account,
-            "get_vod_streams",
-        ) { input -> block(XtreamJson.objects(input).mapNotNull(XtreamJson::movie)) }
-
-    /** Serialele (fără episoade), citite în flux. */
-    suspend fun <T> series(
-        account: XtreamAccount,
-        block: suspend (Sequence<XtreamSeries>) -> T,
-    ): T = stream(account, "get_series") { input -> block(XtreamJson.objects(input).mapNotNull(XtreamJson::series)) }
+        jsonOperation(action) {
+            val context = currentCoroutineContext()
+            file.inputStream().use { input ->
+                block(
+                    XtreamJson.objects(input).mapIndexed { index, row ->
+                        context.ensureActive()
+                        parse(row) ?: throw XtreamException("identificator absent sau invalid la intrarea ${index + 1}")
+                    },
+                )
+            }
+        }
 
     /** Episoadele unui serial. Se cer la nevoie (un apel pe serial), nu la importul complet. */
-    suspend fun episodes(
-        account: XtreamAccount,
-        seriesId: Long,
-    ): List<XtreamEpisode> =
-        XtreamJson.episodes(XtreamJson.parse(getText(account, "get_series_info", "series_id" to seriesId.toString())))
+    suspend fun episodes(account: XtreamAccount, seriesId: Long): List<XtreamEpisode> =
+        jsonOperation("get_series_info") {
+            XtreamJson.episodes(XtreamJson.parse(getText(account, "get_series_info", "series_id" to seriesId.toString())))
+        }
 
     private fun apiUrl(
         account: XtreamAccount,
@@ -78,47 +119,52 @@ class XtreamClient(
             }.build()
     }
 
-    private suspend fun getText(
+    private suspend fun getText(account: XtreamAccount, action: String?, vararg extra: Pair<String, String>): String =
+        request(account, action, *extra) { input -> input.bufferedReader(Charsets.UTF_8).readText() }
+
+    private suspend fun <T> request(
         account: XtreamAccount,
         action: String?,
         vararg extra: Pair<String, String>,
-    ): String =
-        withContext(Dispatchers.IO) {
-            execute(
-                apiUrl(account, action, *extra),
-                episodeRequest = action == "get_series_info",
-            ).use { it.body.string() }
-        }
-
-    private suspend fun <T> stream(
-        account: XtreamAccount,
-        action: String,
-        block: suspend (InputStream) -> T,
+        read: suspend (InputStream) -> T,
     ): T =
         withContext(Dispatchers.IO) {
-            execute(apiUrl(account, action)).use { response -> response.body.byteStream().use { block(it) } }
+            coroutineScope {
+                val call = client.newCall(Request.Builder().url(apiUrl(account, action, *extra)).build())
+                if (action == "get_series_info") call.timeout().timeout(30, TimeUnit.SECONDS)
+                val cancellation = launch(start = CoroutineStart.UNDISPATCHED) { cancelCallOnExit(call) }
+                try {
+                    call.execute().use { response ->
+                        if (!response.isSuccessful) throw XtreamException("HTTP ${response.code}")
+                        response.body.byteStream().use { read(it) }
+                    }
+                } finally {
+                    cancellation.cancel()
+                }
+            }
         }
 
-    private fun execute(url: HttpUrl, episodeRequest: Boolean = false): Response {
-        val response =
-            try {
-                val call = client.newCall(Request.Builder().url(url).build())
-                if (episodeRequest) call.timeout().timeout(30, TimeUnit.SECONDS)
-                call.execute()
-            } catch (e: IOException) {
-                throw XtreamException("Serverul nu răspunde: ${e.message ?: e.javaClass.simpleName}")
-            }
-        if (!response.isSuccessful) {
-            response.close()
-            throw XtreamException(
-                if (response.code == 401 || response.code == 403) {
-                    "Acces refuzat de server (${response.code}). Verifică utilizatorul și parola."
-                } else {
-                    "Serverul a răspuns cu eroarea ${response.code}."
-                },
-            )
+    private suspend fun cancelCallOnExit(call: Call) {
+        try {
+            awaitCancellation()
+        } finally {
+            call.cancel()
         }
-        return response
+    }
+
+    private suspend fun <T> jsonOperation(action: String, block: suspend () -> T): T {
+        try {
+            return block()
+        } catch (e: XtreamException) {
+            throw XtreamException("$action: ${e.message}")
+        } catch (e: JsonObjectStreamException) {
+            throw XtreamException("$action: JSON incomplet sau invalid (${e.reason})")
+        } catch (_: SerializationException) {
+            throw XtreamException("$action: structură JSON invalidă")
+        } catch (e: IOException) {
+            currentCoroutineContext().ensureActive()
+            throw XtreamException("$action: eroare I/O (${e.javaClass.simpleName})")
+        }
     }
 
     companion object {
