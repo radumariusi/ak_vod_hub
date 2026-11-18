@@ -489,3 +489,13 @@ per titlu în lotul popular. Restul se verifică la deschidere. Schema Room nu s
 Hero-ul citește fundalul o singură dată în hub. Butonul Filtre este în zona de acțiuni în Filme/Seriale,
 iar rândul de postere începe după același spațiu ca pe Acasă. Bara TV centrează filele și păstrează
 marca la stânga. Film, serial, set de postere și focusul fizic se verifică pe televizor.
+
+
+### Pornirea ecranului Acasă după v0.1.47
+
+Acasă citește întâi catalogul salvat, fără să aștepte `CatalogIndexer.refresh()` și blocarea lui de către
+workerul de potrivire. Rândurile locale apar progresiv. Continuă vizionarea, Lista mea și primele pagini
+de filme și seriale se citesc înaintea rândurilor de noutăți și genuri. Ordinea de afișare și
+vizibilitatea rămân cele configurate. Reindexarea locală pornește după prima rundă de citire și este
+disponibilă și offline. O notificare în timpul citirii programează o rundă nouă, fără să anuleze runda
+în curs. Paginarea rămâne limitată. Timpul la pornire pe catalogul real se verifică pe TV.
