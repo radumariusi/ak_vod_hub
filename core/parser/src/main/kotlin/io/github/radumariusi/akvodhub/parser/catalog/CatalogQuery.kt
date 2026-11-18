@@ -120,13 +120,18 @@ object CatalogQuery {
             where += "t.year <= ?"
             args += it
         }
-        filter.quality?.let {
-            where += "t.qualities LIKE ?"
-            args += "%,${it.name},%"
-        }
-        filter.language?.let {
-            where += "t.audioLanguages LIKE ?"
-            args += "%,${it.lowercase()},%"
+        if (filter.quality != null || filter.language != null || filter.originalAudioOnly) {
+            val sameSource = mutableListOf("s.titleId = t.id")
+            filter.quality?.let {
+                sameSource += "s.quality = ?"
+                args += it.name
+            }
+            filter.language?.let {
+                sameSource += "s.language = ?"
+                args += it.lowercase()
+            }
+            if (filter.originalAudioOnly) sameSource += "s.originalAudio = 1"
+            where += "EXISTS (SELECT 1 FROM title_source_option s WHERE ${sameSource.joinToString(" AND ")})"
         }
         if (filter.production == ProductionFilter.US) {
             where += "t.originCountries LIKE ?"
@@ -135,7 +140,6 @@ object CatalogQuery {
             where += "t.originalLanguage = ?"
             args += "en"
         }
-        if (filter.originalAudioOnly) where += "t.hasOriginalAudio = 1"
         val fts = ftsQuery(filter.text)
         if (fts != null) {
             where += "t.id IN (SELECT docid FROM title_search WHERE title_search MATCH ?)"

@@ -135,6 +135,16 @@ class HubRepository(
             originalLanguage.takeIf { playback.state.value.preferOriginalLanguage },
         )
 
+    fun sourceReason(source: SourceInfo, originalLanguage: String?): String {
+        val original = originalLanguage?.lowercase()
+        return when {
+            playback.state.value.preferOriginalLanguage && original in source.languages ->
+                "limba originală declarată în playlist"
+            else -> profile.rules.firstOrNull { it.matches(source) }?.let { "regula ${it.label()} din profil" }
+                ?: "ordinea calității și a limbilor preferate"
+        }
+    }
+
     /** Agregări SQL la deschiderea panoului; doar grupurile de limbi se parcurg în flux. */
     suspend fun statistics(): String =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -152,7 +162,7 @@ class HubRepository(
                             "Potrivite TMDB: ${c.getLong(3)} din ${c.getLong(4)} titluri vizibile"
                     }
             val languages = mutableMapOf<String, Long>()
-            sql.query("SELECT languages, COUNT(*) FROM raw_entry GROUP BY languages").use { c ->
+            sql.query("SELECT languages, COUNT(*) FROM raw_entry WHERE visible = 1 GROUP BY languages").use { c ->
                 while (c.moveToNext()) {
                     val codes =
                         c
@@ -165,7 +175,7 @@ class HubRepository(
                     codes.forEach { code -> languages[code] = (languages[code] ?: 0L) + c.getLong(1) }
                 }
             }
-            totals + "\nSurse pe limbi (inclusiv cele ascunse; MULTI separat):\n" +
+            totals + "\nSurse vizibile pe limbi (etichete din playlist):\n" +
                 languages.entries
                     .sortedByDescending { it.value }
                     .take(
@@ -300,7 +310,6 @@ class HubRepository(
     suspend fun languages(): List<String> =
         dao
             .languageCombinations()
-            .flatMap { it.split(',') }
             .map { it.trim().lowercase() }
             .filter { it.isNotEmpty() }
             .distinct()
@@ -410,7 +419,10 @@ class HubRepository(
         titleId: Long,
         refresh: Boolean,
     ): SeriesEpisodes {
-        if (refresh) loadXtreamEpisodes(titleId)
+        if (refresh) {
+            loadXtreamEpisodes(titleId)
+            indexer.refresh()
+        }
         val entries = dao.episodes(titleId)
         val sources = describe(entries)
         val seasons =
@@ -433,6 +445,7 @@ class HubRepository(
                         try {
                             importer.loadXtreamEpisodes(s.sourceId, s.streamId!!)
                         } catch (e: CancellationException) {
+                            episodesLoaded.remove(s.id)
                             throw e
                         } catch (e: Exception) {
                             // Serverul nu răspunde: rămân episoadele știute; reîncercăm la următoarea deschidere.

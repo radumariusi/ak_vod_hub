@@ -1,6 +1,6 @@
 package io.github.radumariusi.akvodhub.parser.catalog
 
-/** Ascunde titlul întreg dacă oricare dintre surse declară o limbă/categorie blocată. */
+/** Aplică ascunderea limbii pe variante și ascunderea explicită a categoriilor pe titluri. */
 object ContentVisibility {
     fun tokens(value: String, lowercase: Boolean = true): List<String> =
         value
@@ -10,20 +10,22 @@ object ContentVisibility {
             .distinct()
             .take(30)
 
-    fun hiddenTitles(languages: String, categories: String): SqlQuery {
+    fun hiddenSources(languages: String, categories: String): SqlQuery {
         val terms = mutableListOf<String>()
         val args = mutableListOf<Any>()
         tokens(languages).filter { it.matches(Regex("[a-z]{2,3}")) }.forEach {
-            terms += "(',' || r.languages || ',') LIKE ?"
+            terms += "(',' || languages || ',') LIKE ?"
             args += "%,$it,%"
         }
-        tokens(categories, lowercase = false).forEach {
-            terms += "trim(r.groupTitle) = ?"
-            args += it
+        val blockedCategories = tokens(categories, lowercase = false)
+        if (blockedCategories.isNotEmpty()) {
+            val placeholders = blockedCategories.joinToString(",") { "?" }
+            terms += "titleId IN (SELECT titleId FROM raw_entry WHERE trim(groupTitle) IN ($placeholders))"
+            args.addAll(blockedCategories)
         }
         return SqlQuery(
-            "UPDATE title SET sourceCount = 0 WHERE id IN (SELECT r.titleId FROM raw_entry r WHERE " +
-                (terms.joinToString(" OR ").ifEmpty { "0" }) + ")",
+            "UPDATE raw_entry SET visible = 0 WHERE visible = 1 AND (" +
+                terms.joinToString(" OR ").ifEmpty { "0" } + ")",
             args,
         )
     }

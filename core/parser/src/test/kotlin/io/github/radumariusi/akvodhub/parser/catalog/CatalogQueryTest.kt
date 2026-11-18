@@ -22,9 +22,9 @@ class CatalogQueryTest {
         val filter = CatalogFilter(production = ProductionFilter.ENGLISH, language = "ro", originalAudioOnly = true)
         val query = CatalogQuery.page(filter, 48)
         assertTrue(query.sql.contains("t.originalLanguage = ?"))
-        assertTrue(query.sql.contains("t.hasOriginalAudio = 1"))
+        assertTrue(query.sql.contains("s.originalAudio = 1"))
         assertFalse(query.sql.contains("t.originCountries LIKE"))
-        assertEquals(listOf<Any>("%,ro,%", "en", 48), query.args)
+        assertEquals(listOf<Any>("ro", "en", 48), query.args)
     }
 
     @Test
@@ -41,7 +41,7 @@ class CatalogQueryTest {
         val filter = CatalogFilter(originalAudioOnly = true)
         val query = CatalogQuery.page(filter, 48)
         assertTrue(filter.hasFilters)
-        assertTrue(query.sql.contains("t.hasOriginalAudio = 1"))
+        assertTrue(query.sql.contains("s.originalAudio = 1"))
         assertFalse(query.sql.contains("raw_entry"))
         assertEquals(listOf<Any>(48), query.args)
         assertFalse(filter.copy(originalAudioOnly = false).hasFilters)
@@ -69,7 +69,9 @@ class CatalogQueryTest {
             )
         val q = CatalogQuery.page(filter, 20)
         assertEquals(q.sql.count { it == '?' }, q.args.size)
-        assertEquals(listOf<Any>("MOVIE", "%,878,%", "%,10765,%", 2010, 2019, "%,UHD,%", "%,ro,%", 20), q.args)
+        assertEquals(listOf<Any>("MOVIE", "%,878,%", "%,10765,%", 2010, 2019, "UHD", "ro", 20), q.args)
+        assertTrue(q.sql.contains("s.titleId = t.id AND s.quality = ? AND s.language = ?"))
+        assertFalse(q.sql.contains("raw_entry"))
         assertTrue(q.sql.contains("ORDER BY t.addedAt DESC"))
     }
 

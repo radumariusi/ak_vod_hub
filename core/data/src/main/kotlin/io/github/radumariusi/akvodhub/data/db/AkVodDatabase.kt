@@ -20,8 +20,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ImdbRatingStage::class,
         PersonCreditEntity::class,
         WatchlistEntity::class,
+        TitleSourceOption::class,
     ],
-    version = 14,
+    version = 15,
     exportSchema = false,
 )
 abstract class AkVodDatabase : RoomDatabase() {
@@ -49,11 +50,24 @@ abstract class AkVodDatabase : RoomDatabase() {
                     MIGRATION_11_12,
                     MIGRATION_12_13,
                     MIGRATION_13_14,
+                    MIGRATION_14_15,
                 ).addCallback(
                     object : RoomDatabase.Callback() {
                         override fun onOpen(db: SupportSQLiteDatabase) = createSearchTable(db)
                     },
                 ).build()
+
+        val MIGRATION_14_15 =
+            object : Migration(14, 15) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE raw_entry ADD COLUMN visible INTEGER NOT NULL DEFAULT 1")
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS title_source_option (titleId INTEGER NOT NULL, " +
+                            "quality TEXT NOT NULL, language TEXT NOT NULL, originalAudio INTEGER NOT NULL, " +
+                            "PRIMARY KEY(titleId, quality, language, originalAudio))",
+                    )
+                }
+            }
 
         /** Etapa 12.7: rezumate locale ale noutăților, completate în fundal de indexer. */
         val MIGRATION_13_14 =

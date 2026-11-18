@@ -166,10 +166,10 @@ interface CatalogDao {
     // ------------------------------------------------------------ surse și statistici
 
     /** Toate sursele unui titlu, din toate playlist-urile (fără episoade). */
-    @Query("SELECT * FROM raw_entry WHERE titleId = :titleId AND kind <> 'EPISODE'")
+    @Query("SELECT * FROM raw_entry WHERE titleId = :titleId AND visible = 1 AND kind <> 'EPISODE'")
     suspend fun sources(titleId: Long): List<RawEntryEntity>
 
-    @Query("SELECT * FROM raw_entry WHERE titleId = :titleId AND kind = 'EPISODE' ORDER BY season, episode")
+    @Query("SELECT * FROM raw_entry WHERE titleId = :titleId AND visible = 1 AND kind = 'EPISODE' ORDER BY season, episode")
     suspend fun episodes(titleId: Long): List<RawEntryEntity>
 
     @Query("SELECT matchState AS state, COUNT(*) AS count FROM raw_entry WHERE matchState <> 3 GROUP BY matchState")
@@ -208,7 +208,7 @@ interface CatalogDao {
     )
     suspend fun continueItems(limit: Int): List<ContinueItem>
 
-    @Query("SELECT * FROM raw_entry WHERE id = :id")
+    @Query("SELECT * FROM raw_entry WHERE id = :id AND visible = 1")
     suspend fun entry(id: Long): RawEntryEntity?
 
     @Query("SELECT EXISTS(SELECT 1 FROM watchlist WHERE titleId = :titleId)")
@@ -253,8 +253,8 @@ interface CatalogDao {
 
     /** Combinațiile de limbi din playlist-uri, cele mai frecvente primele (pentru filtrul „Limbă”). */
     @Query(
-        "SELECT languages FROM raw_entry WHERE languages IS NOT NULL AND titleId IS NOT NULL " +
-            "GROUP BY languages ORDER BY COUNT(*) DESC LIMIT 80",
+        "SELECT language FROM title_source_option WHERE language <> '' " +
+            "GROUP BY language ORDER BY COUNT(*) DESC LIMIT 80",
     )
     suspend fun languageCombinations(): List<String>
 
@@ -284,23 +284,23 @@ interface CatalogDao {
     /** Rezumatele surselor pentru fiecare titlu (vezi [TitleEntity]). `bestQuality` = `VideoQuality.ordinal`. */
     @Query(
         "UPDATE title SET " +
-            "playlistAddedAt = (SELECT MIN(r.firstSeenAt) FROM raw_entry r WHERE r.titleId = title.id), " +
-            "sourceCount = (SELECT COUNT(*) FROM raw_entry r WHERE r.titleId = title.id), " +
+            "playlistAddedAt = (SELECT MIN(r.firstSeenAt) FROM raw_entry r WHERE r.titleId = title.id AND r.visible = 1), " +
+            "sourceCount = (SELECT COUNT(*) FROM raw_entry r WHERE r.titleId = title.id AND r.visible = 1), " +
             "addedAt = (SELECT MAX(CASE WHEN r.providerAddedAt IS NULL THEN r.firstSeenAt " +
             "WHEN r.providerAddedAt < 100000000000 THEN r.providerAddedAt * 1000 ELSE r.providerAddedAt END) " +
-            "FROM raw_entry r WHERE r.titleId = title.id), " +
+            "FROM raw_entry r WHERE r.titleId = title.id AND r.visible = 1), " +
             "bestQuality = (SELECT MAX(CASE r.quality WHEN 'UHD' THEN 3 WHEN 'FHD' THEN 2 WHEN 'HD' THEN 1 " +
-            "WHEN 'SD' THEN 0 END) FROM raw_entry r WHERE r.titleId = title.id), " +
+            "WHEN 'SD' THEN 0 END) FROM raw_entry r WHERE r.titleId = title.id AND r.visible = 1), " +
             "qualities = (SELECT ',' || group_concat(DISTINCT r.quality) || ',' FROM raw_entry r " +
-            "WHERE r.titleId = title.id), " +
+            "WHERE r.titleId = title.id AND r.visible = 1), " +
             "audioLanguages = (SELECT ',' || group_concat(DISTINCT r.languages) || ',' FROM raw_entry r " +
-            "WHERE r.titleId = title.id)",
+            "WHERE r.titleId = title.id AND r.visible = 1)",
     )
     suspend fun updateSummaries()
 
     /** Titlurile locale rămase fără surse (potrivite între timp pe TMDB sau scoase din playlist). */
     @Query(
-        "DELETE FROM title WHERE tmdbId < 0 AND sourceCount = 0 " +
+        "DELETE FROM title WHERE tmdbId < 0 AND sourceCount = 0 AND NOT EXISTS(SELECT 1 FROM raw_entry r WHERE r.titleId = title.id) " +
             "AND id NOT IN (SELECT titleId FROM watchlist) AND id NOT IN (SELECT titleId FROM watch_history)",
     )
     suspend fun deleteEmptyLocalTitles(): Int

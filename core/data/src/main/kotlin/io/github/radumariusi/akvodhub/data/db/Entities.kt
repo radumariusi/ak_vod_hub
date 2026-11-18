@@ -75,6 +75,7 @@ data class RawEntryEntity(
     val providerAddedAt: Long? = null,
     val firstSeenAt: Long,
     val seenRun: Long,
+    @ColumnInfo(defaultValue = "1") val visible: Boolean = true,
     /** Titlul curat scos de parser din [name] (ex. „The Matrix” din „EN| The Matrix (1999) 4K”). */
     val title: String? = null,
     val year: Int? = null,
@@ -353,4 +354,13 @@ data class PersonCreditEntity(
 data class WatchlistEntity(
     @PrimaryKey val titleId: Long,
     val addedAt: Long,
+)
+
+
+@Entity(tableName = "title_source_option", primaryKeys = ["titleId", "quality", "language", "originalAudio"])
+data class TitleSourceOption(
+    val titleId: Long,
+    val quality: String,
+    val language: String,
+    val originalAudio: Boolean,
 )
