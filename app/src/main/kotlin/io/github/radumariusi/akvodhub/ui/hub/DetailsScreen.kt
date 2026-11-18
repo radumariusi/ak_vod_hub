@@ -56,7 +56,6 @@ import io.github.radumariusi.akvodhub.data.db.TitleCard
 import io.github.radumariusi.akvodhub.data.db.isLocal
 import io.github.radumariusi.akvodhub.hub.DetailsState
 import io.github.radumariusi.akvodhub.hub.DetailsViewModel
-import io.github.radumariusi.akvodhub.parser.catalog.LocalizedOverview
 import io.github.radumariusi.akvodhub.parser.catalog.MergedEpisode
 import io.github.radumariusi.akvodhub.parser.match.MediaType
 import io.github.radumariusi.akvodhub.parser.match.QualityGroup
@@ -144,6 +143,7 @@ fun DetailsScreen(
                     onWatched = viewModel::toggleWatched,
                     onSelectSeason = viewModel::selectSeason,
                     onActor = onActor,
+                    sourceReason = state.recommended?.let { viewModel.sourceReason(it, details.title.originalLanguage) },
                     onOpen = onOpen,
                 )
             }
@@ -171,6 +171,7 @@ private fun DetailsContent(
     onSelectSeason: (Int) -> Unit,
     onActor: (Person) -> Unit,
     onOpen: (TitleCard) -> Unit,
+    sourceReason: String?,
 ) {
     val title = details.title
     val background = MaterialTheme.colorScheme.background
@@ -239,6 +240,9 @@ private fun DetailsContent(
         if (title.mediaType == MediaType.MOVIE && details.groups.isNotEmpty()) {
             item("sources-title") {
                 Text("Surse (${details.sources.size})", style = MaterialTheme.typography.titleMedium)
+                sourceReason?.let {
+                    Text("Sursa recomandată după $it", style = MaterialTheme.typography.bodySmall)
+                }
             }
             items(details.groups, key = { "q:${it.quality}" }) { group ->
                 QualityRow(group, details.sources) { onPlay(PlayRequest(title.id, entryId = it)) }
@@ -379,13 +383,10 @@ private fun Header(
     val title = details.title
     Column(Modifier.widthIn(max = 680.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         TitleHeading(title.name, logoPath)
-        if (title.originalName != null && title.originalName != title.name) {
-            Text(
-                title.originalName.orEmpty(),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) { actions() }
         val meta =
             listOfNotNull(
                 if (title.mediaType == MediaType.MOVIE) "Film" else "Serial",
@@ -393,13 +394,8 @@ private fun Header(
                 title.dubLabel,
                 title.runtimeMinutes?.let { "$it min" },
                 title.certification,
-                title.imdbRating?.let { rating ->
-                    "IMDb %.1f".format(rating) + (title.imdbVotes?.let { " ($it voturi)" } ?: "")
-                },
-                title.rating?.takeIf { it > 0 }?.let {
-                    "★ TMDB %.1f".format(it) +
-                        (title.voteCount?.let { v -> " ($v voturi)" } ?: "")
-                },
+                title.rating?.takeIf { it > 0 }?.let { "TMDB %.1f".format(it) } ?: "TMDB —",
+                title.imdbRating?.let { "IMDb %.1f".format(it) } ?: "IMDb —",
                 details.genres.takeIf { it.isNotEmpty() }?.joinToString(", "),
             ).joinToString(" · ")
         Text(meta, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -417,7 +413,7 @@ private fun Header(
                 color = MaterialTheme.colorScheme.secondary,
             )
         }
-        LocalizedOverview.choose(title.overviewRo, title.overview)?.let {
+        title.overview?.let {
             Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 6, overflow = TextOverflow.Ellipsis)
         }
         credits?.directors?.takeIf { it.isNotEmpty() }?.let {
@@ -434,11 +430,7 @@ private fun Header(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        FlowRow(
-            Modifier.padding(top = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) { actions() }
+
     }
 }
 
@@ -540,7 +532,7 @@ private fun PlayActions(
         val best = state.recommended
         when {
             best == null -> {
-                OutlinedButton(onClick = {}, modifier = Modifier.focusRequester(playFocus).heightIn(min = 56.dp)) {
+                OutlinedButton(onClick = {}, modifier = Modifier.focusRequester(playFocus)) {
                     Text("Nicio sursă de redare")
                 }
             }
@@ -548,7 +540,7 @@ private fun PlayActions(
             watch != null && Resume.shouldResume(watch.positionMs, watch.durationMs) -> {
                 Button(
                     onClick = { onPlay(PlayRequest(titleId, resume = true)) },
-                    modifier = Modifier.focusRequester(playFocus).heightIn(min = 56.dp),
+                    modifier = Modifier.focusRequester(playFocus),
                 ) { Text("Continuă de la ${Resume.format(watch.positionMs)}") }
                 OutlinedButton(onClick = { onPlay(PlayRequest(titleId)) }) { Text("De la început") }
             }
@@ -556,8 +548,8 @@ private fun PlayActions(
             else -> {
                 Button(onClick = {
                     onPlay(PlayRequest(titleId))
-                }, modifier = Modifier.focusRequester(playFocus).heightIn(min = 56.dp)) {
-                    Text("Redă (${sourceShortLabel(best)})")
+                }, modifier = Modifier.focusRequester(playFocus)) {
+                    Text("Redă")
                 }
             }
         }
@@ -571,7 +563,7 @@ private fun PlayActions(
             val resume = Resume.shouldResume(watch.positionMs, watch.durationMs)
             Button(
                 onClick = { onPlay(episodeRequest(titleId, current, resume)) },
-                modifier = Modifier.focusRequester(playFocus).heightIn(min = 56.dp),
+                modifier = Modifier.focusRequester(playFocus),
             ) {
                 Text(
                     if (resume) {
@@ -591,12 +583,12 @@ private fun PlayActions(
         firstEpisode != null -> {
             Button(
                 onClick = { onPlay(episodeRequest(titleId, firstEpisode)) },
-                modifier = Modifier.focusRequester(playFocus).heightIn(min = 56.dp),
+                modifier = Modifier.focusRequester(playFocus),
             ) { Text("Redă ${episodeCode(firstEpisode)}") }
         }
 
         else -> {
-            OutlinedButton(onClick = {}, modifier = Modifier.focusRequester(playFocus).heightIn(min = 56.dp)) {
+            OutlinedButton(onClick = {}, modifier = Modifier.focusRequester(playFocus)) {
                 Text(if (state.loadingEpisodes) "Se încarcă episoadele…" else "Nicio sursă de redare")
             }
         }

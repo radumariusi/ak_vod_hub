@@ -106,7 +106,6 @@ class HubRepository(
 ) {
     private val dao = db.catalogDao()
     private val playlistDao = db.playlistDao()
-    private val overviewMutex = Mutex()
     private val logoMutex = Mutex()
     private val trailerMutex = Mutex()
     private val creditsCache = ConcurrentHashMap<Long, Credits>()
@@ -350,7 +349,6 @@ class HubRepository(
                         videos.results.map {
                             TrailerCandidate(it.key, it.site, it.type, it.official, it.language)
                         },
-                        title.originalLanguage,
                     )
                 db.withTransaction {
                     cache.putCache(DiscoverCacheEntity(cacheKey, id.orEmpty(), now))
@@ -370,7 +368,7 @@ class HubRepository(
             val title = dao.titleById(titleId) ?: return@withLock null
             if (title.isLocal) return@withLock null
             val cache = db.discoverDao()
-            val cacheKey = "logo:${title.mediaType}:${title.tmdbId}"
+            val cacheKey = "logo:en:${title.mediaType}:${title.tmdbId}"
             val old = cache.cached(cacheKey)
             val now = System.currentTimeMillis()
             if (old != null && LocalizedOverview.isCached(old.fetchedAt, now)) return@withLock old.data.ifBlank { null }
@@ -392,26 +390,6 @@ class HubRepository(
             } catch (_: Exception) {
                 old?.data?.ifBlank { null }
             }
-        }
-
-    /** Numai fișa deschisă cere traducerea. Erorile păstrează descrierea existentă și permit reîncercarea. */
-    suspend fun romanianOverview(titleId: Long): TitleEntity? =
-        overviewMutex.withLock {
-            val title = dao.titleById(titleId) ?: return@withLock null
-            if (title.isLocal || LocalizedOverview.isCached(title.overviewRoFetchedAt, System.currentTimeMillis())) {
-                return@withLock title
-            }
-            val key = settings.apiKey() ?: return@withLock title
-            val overview =
-                try {
-                    tmdb.romanianOverview(key, title.mediaType, title.tmdbId)
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    return@withLock title
-                }
-            dao.setRomanianOverview(titleId, LocalizedOverview.clean(overview), System.currentTimeMillis())
-            dao.titleById(titleId)
         }
 
     /**

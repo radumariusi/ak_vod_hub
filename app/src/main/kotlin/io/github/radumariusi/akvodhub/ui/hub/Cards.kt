@@ -102,9 +102,9 @@ fun qualityLabel(ordinal: Int?): String? =
 fun TitleCard.meta(): String =
     listOfNotNull(
         year?.toString(),
-        rating?.takeIf { it > 0 }?.let { "★ %.1f".format(it) },
+        rating?.takeIf { it > 0 }?.let { "TMDB %.1f".format(it) } ?: "TMDB —",
         qualityLabel(bestQuality),
-        imdbRating?.let { "IMDb %.1f".format(it) },
+        imdbRating?.let { "IMDb %.1f".format(it) } ?: "IMDb —",
         dubLabel,
     ).joinToString(" · ")
 
@@ -175,8 +175,8 @@ fun PosterCard(
                     modifier = Modifier.align(Alignment.TopStart).padding(4.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
-                    if (PosterBadge.TMDB in badges) card.tmdbBadge?.let { PosterBadgeText(it) }
-                    if (PosterBadge.IMDB in badges) card.imdbBadge?.let { PosterBadgeText(it) }
+                    if (PosterBadge.TMDB in badges) PosterBadgeText(card.tmdbBadge ?: "★ —")
+                    if (PosterBadge.IMDB in badges) PosterBadgeText(card.imdbBadge ?: "IMDb —")
                 }
                 Column(
                     modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),

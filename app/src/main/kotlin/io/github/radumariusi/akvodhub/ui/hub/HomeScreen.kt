@@ -5,6 +5,7 @@ package io.github.radumariusi.akvodhub.ui.hub
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -37,6 +38,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
@@ -99,9 +101,13 @@ private fun HomeRows(
     val focusKey = restoreKey ?: if (!initialFocusDone) cardKey(rows[0], rows[0].items[0]) else null
     val focused = remember { mutableStateOf<TitleCard?>(null) }
 
-    Column(Modifier.fillMaxSize()) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val heroHeight = (maxHeight - PosterHeight - 108.dp).coerceIn(0.dp, 200.dp)
+        Column(Modifier.fillMaxSize()) {
         val prefs by viewModel.prefs.collectAsState()
-        if (prefs.homeHero) Hero(focused, fallback = rows[0].items[0], logo = viewModel::logo)
+        if (prefs.homeHero && heroHeight >= 104.dp) {
+            Hero(focused, fallback = rows[0].items[0], logo = viewModel::logo, height = heroHeight)
+        }
         LazyColumn(
             state = rememberLazyListState(),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -138,6 +144,7 @@ private fun HomeRows(
             }
         }
     }
+    }
 }
 
 private fun cardKey(
@@ -151,6 +158,7 @@ private fun Hero(
     focused: MutableState<TitleCard?>,
     fallback: TitleCard,
     logo: suspend (Long) -> String?,
+    height: Dp,
 ) {
     val target = focused.value ?: fallback
     var shown by remember { mutableStateOf(target) }
@@ -161,7 +169,7 @@ private fun Hero(
     var logoPath by remember(shown.id) { mutableStateOf<String?>(null) }
     LaunchedEffect(shown.id) { logoPath = logo(shown.id) }
     val background = MaterialTheme.colorScheme.background
-    Box(Modifier.fillMaxWidth().height(200.dp)) {
+    Box(Modifier.fillMaxWidth().height(height)) {
         val backdrop = Images.hero(shown.backdropPath)
         if (backdrop != null) {
             AsyncImage(
@@ -195,12 +203,12 @@ private fun Hero(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            shown.overview?.let {
+            shown.overview?.takeIf { height >= 130.dp }?.let {
                 Text(
                     it,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 4,
+                    maxLines = ((height.value.toInt() - 105) / 20).coerceIn(1, 4),
                     overflow = TextOverflow.Ellipsis,
                 )
             }
