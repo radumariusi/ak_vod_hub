@@ -15,7 +15,7 @@ import io.github.radumariusi.akvodhub.parser.player.PlaybackActivityState
 import kotlinx.coroutines.CancellationException
 import java.util.concurrent.TimeUnit
 
-/** Numai serialele urmărite: progres după ID, fără catalog complet sau cereri pe postere. */
+/** Reîmprospătează serialele urmărite și pregătește un lot limitat de seriale populare. */
 class PlaylistNewsWorker(
     context: Context,
     params: WorkerParameters,
@@ -44,6 +44,17 @@ class PlaylistNewsWorker(
                     // Păstrăm episoadele locale; următorul refresh încearcă din nou acest serial.
                 }
                 after = series.id
+            }
+        }
+        // Un lot scurt pentru seriale populare fără episoade locale. Restul se încarcă la cerere.
+        for (series in dao.seriesToWarm(12)) {
+            if (PlaybackActivityState.active || System.currentTimeMillis() - started >= 120_000L) break
+            try {
+                importer.loadXtreamEpisodes(series.sourceId, checkNotNull(series.streamId), onlyIfStale = true)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // Lista anterioară rămâne disponibilă.
             }
         }
         if (PlaybackActivityState.active) enqueue(applicationContext, after, 60_000) else indexer.refresh()

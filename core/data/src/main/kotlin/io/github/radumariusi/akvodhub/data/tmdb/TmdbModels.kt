@@ -196,6 +196,14 @@ data class TmdbEpisode(
 )
 
 @Serializable
+data class TmdbSeasonRef(
+    @SerialName("season_number") val number: Int,
+)
+
+@Serializable
+data class TmdbSeriesSeasons(val seasons: List<TmdbSeasonRef> = emptyList())
+
+@Serializable
 data class TmdbSeason(val episodes: List<TmdbEpisode> = emptyList())
 
 @Serializable

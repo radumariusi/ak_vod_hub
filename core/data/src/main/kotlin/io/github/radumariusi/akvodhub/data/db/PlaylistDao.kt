@@ -106,6 +106,18 @@ interface PlaylistDao {
     suspend fun followedSeries(afterId: Long, limit: Int): List<RawEntryEntity>
 
     @Query(
+        "SELECT r.* FROM title t JOIN raw_entry r ON r.id = (" +
+            "SELECT x.id FROM raw_entry x JOIN playlist_source p ON p.id = x.sourceId " +
+            "WHERE x.titleId = t.id AND x.visible = 1 AND x.kind = 'SERIES' " +
+            "AND x.streamId IS NOT NULL AND p.type = 'XTREAM' " +
+            "AND NOT EXISTS(SELECT 1 FROM raw_entry e " +
+            "WHERE e.titleId = t.id AND e.kind = 'EPISODE' AND e.visible = 1) " +
+            "ORDER BY x.id LIMIT 1) WHERE t.mediaType = 'TV' AND t.sourceCount > 0 " +
+            "ORDER BY t.popularity DESC LIMIT :limit",
+    )
+    suspend fun seriesToWarm(limit: Int): List<RawEntryEntity>
+
+    @Query(
         "SELECT * FROM raw_entry WHERE sourceId = :sourceId AND providerKey = 'series:' || :seriesId LIMIT 1",
     )
     suspend fun xtreamSeries(sourceId: Long, seriesId: Long): RawEntryEntity?

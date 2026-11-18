@@ -55,22 +55,23 @@ object XtreamJson {
 
     /** `get_series_info`: `episodes` e de obicei `{"1": [...], "2": [...]}`, uneori o listă de liste. */
     fun episodes(info: JsonElement): List<XtreamEpisode> {
-        val episodes = (info as? JsonObject)?.get("episodes") ?: return emptyList()
-        val groups: List<Pair<Int?, JsonElement>> =
+        val episodes = (info as? JsonObject)?.get("episodes") ?: throw XtreamException("Lipsește lista de episoade.")
+        val groups =
             when (episodes) {
                 is JsonObject -> episodes.entries.map { (season, list) -> season.toIntOrNull() to list }
                 is JsonArray -> episodes.map { null to it }
-                else -> emptyList()
+                else -> throw XtreamException("Lista de episoade are format invalid.")
             }
-        return groups.flatMap { (seasonKey, list) ->
+        return groups.flatMap { (seasonKey, group) ->
             val items =
-                when (list) {
-                    is JsonArray -> list.filterIsInstance<JsonObject>()
-                    is JsonObject -> list.values.filterIsInstance<JsonObject>()
-                    else -> emptyList()
+                when (group) {
+                    is JsonArray -> group
+                    is JsonObject -> if ("id" in group) listOf(group) else group.values
+                    else -> throw XtreamException("Grup de episoade invalid.")
                 }
-            items.mapNotNull { e ->
-                val id = e.long("id") ?: return@mapNotNull null
+            items.map { raw ->
+                val e = raw as? JsonObject ?: throw XtreamException("Episod cu format invalid.")
+                val id = e.long("id") ?: throw XtreamException("Episod fără ID valid.")
                 XtreamEpisode(
                     id = id,
                     title = e.str("title")?.trim().orEmpty(),

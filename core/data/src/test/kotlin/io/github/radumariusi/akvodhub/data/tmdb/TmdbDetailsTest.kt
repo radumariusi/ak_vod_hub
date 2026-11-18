@@ -183,4 +183,26 @@ class TmdbDetailsTest {
             assertEquals("/3/tv/6/season/3", requests.single().encodedPath)
             assertEquals("en-US", requests.single().queryParameter("language"))
         }
+
+    @Test
+    fun seriesManifestKeepsSeasonNumbersWithoutDownloadingEpisodes() =
+        runBlocking {
+            val http =
+                OkHttpClient
+                    .Builder()
+                    .addInterceptor { chain ->
+                        assertEquals("/3/tv/6", chain.request().url.encodedPath)
+                        Response
+                            .Builder()
+                            .request(chain.request())
+                            .protocol(Protocol.HTTP_1_1)
+                            .code(200)
+                            .message("OK")
+                            .body(
+                                """{"seasons":[{"season_number":0},{"season_number":1},{"season_number":3}]}"""
+                                    .toResponseBody(),
+                            ).build()
+                    }.build()
+            assertEquals(listOf(0, 1, 3), TmdbClient(http).seriesSeasons("example", 6))
+        }
 }

@@ -2,6 +2,7 @@ package io.github.radumariusi.akvodhub.ui.hub
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -49,13 +50,19 @@ import io.github.radumariusi.akvodhub.hub.DetailsState
 import io.github.radumariusi.akvodhub.parser.catalog.EpisodeMerge
 import io.github.radumariusi.akvodhub.parser.catalog.MergedEpisode
 import io.github.radumariusi.akvodhub.parser.catalog.MergedSeason
+import io.github.radumariusi.akvodhub.parser.catalog.SeasonAvailability
 import io.github.radumariusi.akvodhub.parser.player.Resume
 import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
 import io.github.radumariusi.akvodhub.ui.touch.Surface
 import kotlinx.coroutines.delay
 
 @Composable
-internal fun EpisodeSeasonPicker(seasons: List<MergedSeason>, selected: Int?, onSelect: (Int) -> Unit) {
+internal fun EpisodeSeasonPicker(
+    seasons: List<MergedSeason>,
+    selected: Int?,
+    label: (MergedSeason) -> String,
+    onSelect: (Int) -> Unit,
+) {
     var open by remember { mutableStateOf(false) }
     Row(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -70,7 +77,7 @@ internal fun EpisodeSeasonPicker(seasons: List<MergedSeason>, selected: Int?, on
         ChoiceDialog(
             Choice(
                 "Alege sezonul",
-                seasons.map { seasonLabel(it.number) },
+                seasons.map(label),
                 seasons.indexOfFirst { it.number == selected }.coerceAtLeast(0),
             ) { onSelect(seasons[it].number) },
             onDismiss = { open = false },
@@ -237,7 +244,24 @@ internal fun SeriesEpisodeScreen(
     onPlay: (MergedEpisode, Boolean) -> Unit,
     onBack: () -> Unit,
 ) {
-    val seasons = state.episodes?.seasons.orEmpty()
+    val local = state.episodes?.seasons.orEmpty()
+    val seasons =
+        remember(local, state.officialSeasons) {
+            val byNumber = local.associateBy { it.number }
+            (byNumber.keys + state.officialSeasons).sorted().map { byNumber[it] ?: MergedSeason(it, emptyList()) }
+        }
+
+    fun availability(season: MergedSeason): String? =
+        when (SeasonAvailability.of(season, title.originalLanguage, state.episodeAvailabilityChecked)) {
+            SeasonAvailability.MISSING -> "Lipsește din playlistul vizibil"
+            SeasonAvailability.UNKNOWN -> if (state.loadingEpisodes) "Se verifică…" else "Disponibilitate neverificată"
+            SeasonAvailability.OTHER_AUDIO -> "Doar alte limbi declarate"
+            SeasonAvailability.UNDECLARED_AUDIO -> "Audio neconfirmat"
+            SeasonAvailability.AVAILABLE -> null
+        }
+
+    fun seasonDescription(season: MergedSeason): String =
+        listOfNotNull(seasonLabel(season.number), availability(season)).joinToString(" · ")
     val selected = seasons.firstOrNull { it.number == state.selectedSeason } ?: seasons.firstOrNull()
     val listFocus = remember { FocusRequester() }
     val seasonFocus = remember { FocusRequester() }
@@ -261,7 +285,7 @@ internal fun SeriesEpisodeScreen(
         if (maxWidth < 570.dp) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onBack) { Text("Înapoi la fișă") }
-                EpisodeSeasonPicker(seasons, selected.number, onSelectSeason)
+                EpisodeSeasonPicker(seasons, selected.number, ::seasonDescription, onSelectSeason)
                 SeasonEpisodes(
                     title,
                     selected,
@@ -270,6 +294,7 @@ internal fun SeriesEpisodeScreen(
                     loadMetadata,
                     loadSeason,
                     onPlay,
+                    availability(selected),
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -288,7 +313,7 @@ internal fun SeriesEpisodeScreen(
                     Text(
                         listOfNotNull(
                             title.year?.toString(),
-                            "${seasons.size} sezoane disponibile",
+                            "${seasons.size} sezoane cunoscute",
                         ).joinToString(" · "),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -311,18 +336,26 @@ internal fun SeriesEpisodeScreen(
                                         if (active) Modifier.focusRequester(seasonFocus) else Modifier,
                                     ),
                             ) {
-                                Row(
-                                    Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Text(
-                                        seasonLabel(season.number),
-                                        modifier = Modifier.weight(1f),
-                                        style = MaterialTheme.typography.labelLarge,
-                                        color = seasonColor,
-                                    )
-                                    Text(season.episodes.size.toString(), style = MaterialTheme.typography.labelMedium)
+                                Column(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp)) {
+                                    Row(
+                                        Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Text(
+                                            seasonLabel(season.number),
+                                            modifier = Modifier.weight(1f),
+                                            style = MaterialTheme.typography.labelLarge,
+                                            color = seasonColor,
+                                        )
+                                        if (season.episodes.isNotEmpty()) {
+                                            Text(
+                                                season.episodes.size.toString(),
+                                                style = MaterialTheme.typography.labelMedium,
+                                            )
+                                        }
+                                    }
+                                    availability(season)?.let { Text(it, style = MaterialTheme.typography.labelSmall) }
                                 }
                             }
                         }
@@ -336,6 +369,7 @@ internal fun SeriesEpisodeScreen(
                     loadMetadata,
                     loadSeason,
                     onPlay,
+                    availability(selected),
                     modifier =
                         Modifier
                             .weight(0.72f)
@@ -359,9 +393,24 @@ private fun SeasonEpisodes(
     loadMetadata: suspend (MergedEpisode) -> TmdbEpisode?,
     loadSeason: suspend (Int) -> Map<Int, TmdbEpisode>,
     onPlay: (MergedEpisode, Boolean) -> Unit,
+    availability: String?,
     modifier: Modifier,
 ) {
     key(season.number) {
+        if (season.episodes.isEmpty()) {
+            LaunchedEffect(Unit) {
+                withFrameNanos { }
+                runCatching { listFocus.requestFocus() }
+            }
+            Column(modifier.fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(seasonLabel(season.number), style = MaterialTheme.typography.headlineSmall)
+                Text(
+                    availability ?: "Nu sunt episoade disponibile.",
+                    modifier = Modifier.focusRequester(listFocus).focusable(),
+                )
+            }
+            return@key
+        }
         val next = state.nextEpisode
         val initial = remember { (next?.let(season.episodes::indexOf) ?: -1).coerceAtLeast(0) }
         val entry = season.episodes.getOrElse(initial) { season.episodes.first() }
@@ -382,6 +431,7 @@ private fun SeasonEpisodes(
                 listOfNotNull(seasonLabel(season.number), title.certification).joinToString(" · "),
                 style = MaterialTheme.typography.headlineSmall,
             )
+            availability?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             LazyColumn(
                 state = scroll,
                 contentPadding = PaddingValues(bottom = 14.dp),

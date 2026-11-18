@@ -149,6 +149,12 @@ class TmdbClient(
         return json.decodeFromString<TmdbEpisode>(body)
     }
 
+    suspend fun seriesSeasons(key: String, tmdbId: Long): List<Int>? {
+        val path = url("tv/$tmdbId").addQueryParameter("language", METADATA_LANGUAGE)
+        val body = get(key, path.build(), strict = true, cancellable = true) ?: return null
+        return json.decodeFromString<TmdbSeriesSeasons>(body).seasons.map { it.number }
+    }
+
     suspend fun season(key: String, tmdbId: Long, season: Int): List<TmdbEpisode> {
         val path = url("tv/$tmdbId/season/$season").addQueryParameter("language", METADATA_LANGUAGE)
         val body = get(key, path.build(), strict = true, cancellable = true) ?: return emptyList()
