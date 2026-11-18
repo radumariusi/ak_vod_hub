@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -128,10 +129,10 @@ fun BrowseScreen(
         val columns =
             with(LocalDensity.current) {
                 val available = (maxWidth.roundToPx() - 2 * 6.dp.roundToPx()).coerceAtLeast(0)
-                with(gridCells) { calculateCrossAxisCellSizes(available, 0).size }
+                with(gridCells) { calculateCrossAxisCellSizes(available, 14.dp.roundToPx()).size }
             }
         val heroHeight = catalogHeroHeight(maxHeight)
-        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(if (showHero) 0.dp else 6.dp)) {
             val fallback = state.items.firstOrNull()
             if (showHero && fallback != null) {
                 CatalogHero(
@@ -148,6 +149,14 @@ fun BrowseScreen(
                         context.startActivity(PlayerActivity.intent(context, PlayRequest(card.id, resume = true)))
                     },
                     onDetails = { card -> onOpen(card, "browse:$screenKey:${card.id}") },
+                    extraActions = {
+                        OutlinedButton(
+                            onClick = { showFilters = true },
+                            modifier = Modifier.focusRequester(filtersFocus),
+                        ) {
+                            Text("Filtre")
+                        }
+                    },
                 )
             }
             if (search) Text(title, style = MaterialTheme.typography.headlineMedium)
@@ -164,21 +173,19 @@ fun BrowseScreen(
                     VoiceSearchButton { browser.setFilter(filter.copy(text = it)) }
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (!search) Text(title, style = MaterialTheme.typography.titleLarge)
-                OutlinedButton(
-                    onClick = { showFilters = true },
-                    modifier = Modifier.focusRequester(filtersFocus),
-                ) { Text("Filtre și sortare") }
-                Text(filter.summary(), maxLines = 2, style = MaterialTheme.typography.bodySmall)
-            }
-            if (filter.type == MediaType.TV &&
-                (filter.quality != null || filter.language != null || filter.originalAudioOnly)
-            ) {
-                Text(
-                    "Potrivire pe o sursă declarată. Episoadele pot avea alte variante.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
+            if (showHero && fallback != null) {
+                Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 4.dp))
+            } else {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (!search) Text(title, style = MaterialTheme.typography.titleMedium)
+                    OutlinedButton(onClick = { showFilters = true }, modifier = Modifier.focusRequester(filtersFocus)) {
+                        Text("Filtre și sortare")
+                    }
+                    Text(filter.summary(), maxLines = 2, style = MaterialTheme.typography.bodySmall)
+                }
             }
 
             when {
@@ -186,6 +193,7 @@ fun BrowseScreen(
                     LazyVerticalGrid(
                         state = grid,
                         columns = gridCells,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         contentPadding = PaddingValues(start = 6.dp, end = 6.dp, top = 10.dp, bottom = 32.dp),
                         modifier = Modifier.weight(1f),
@@ -270,6 +278,11 @@ private fun FilterPanel(
                 modifier = Modifier.heightIn(max = 310.dp).weight(1f, fill = false),
             )
             if (!search && !naming) {
+                if (draft.type == MediaType.TV &&
+                    (draft.quality != null || draft.language != null || draft.originalAudioOnly)
+                ) {
+                    Text("Potrivire pe o sursă declarată. Episoadele pot avea alte variante.")
+                }
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),

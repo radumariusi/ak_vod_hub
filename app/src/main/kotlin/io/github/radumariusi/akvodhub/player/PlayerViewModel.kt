@@ -15,6 +15,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.radumariusi.akvodhub.data.catalog.HubRepository
 import io.github.radumariusi.akvodhub.data.catalog.SourceDetails
+import io.github.radumariusi.akvodhub.data.catalog.SourceTracks
 import io.github.radumariusi.akvodhub.data.db.EpisodeProgressEntity
 import io.github.radumariusi.akvodhub.data.db.TitleEntity
 import io.github.radumariusi.akvodhub.data.db.WatchStateEntity
@@ -66,7 +67,6 @@ data class PlayRequest(
     val season: Int? = null,
     val episode: Int? = null,
     val resume: Boolean = false,
-    val openTrackMenu: Boolean = false,
 )
 
 /** O sursă în meniul „Sursă” al playerului. */
@@ -183,6 +183,7 @@ class PlayerViewModel
         private var watchdog: Job? = null
         private var rebufferHistory = RebufferHistory()
         private var adaptiveSteps = 0
+        private var lastSourceTracks: Pair<Long, SourceTracks>? = null
         private var countdownJob: Job? = null
         private var sleepJob: Job? = null
         private var sleepTimer = SleepTimer()
@@ -292,13 +293,23 @@ class PlayerViewModel
                         sourceFailed("audio nesuportat de acest TV")
                         return
                     }
-                    mutableState.update {
-                        it.copy(
-                            audio = TrackOptions.list(tracks, C.TRACK_TYPE_AUDIO),
-                            subtitles = TrackOptions.list(tracks, C.TRACK_TYPE_TEXT),
-                        )
-                    }
+                    val audio = TrackOptions.list(tracks, C.TRACK_TYPE_AUDIO)
+                    val subtitles = TrackOptions.list(tracks, C.TRACK_TYPE_TEXT)
+                    mutableState.update { it.copy(audio = audio, subtitles = subtitles) }
                     if (!tracks.isEmpty) {
+                        val entryId = queue?.current
+                        if (entryId != null) {
+                            val snapshot =
+                                SourceTracks(
+                                    audio.take(40).map { it.label.take(120) },
+                                    subtitles.take(40).map { it.label.take(120) },
+                                )
+                            val observation = entryId to snapshot
+                            if (lastSourceTracks != observation) {
+                                lastSourceTracks = observation
+                                viewModelScope.launch { repository.rememberSourceTracks(entryId, snapshot) }
+                            }
+                        }
                         embeddedTextLanguages =
                             TrackOptions.languages(tracks, C.TRACK_TYPE_TEXT).map(SubtitleLanguages::toIso1)
                         autoPickSubtitle()
@@ -388,7 +399,7 @@ class PlayerViewModel
                             0L
                         }
                     }
-                playEpisode(episode, request.entryId, resumeAt, autoplay = !request.openTrackMenu)
+                playEpisode(episode, request.entryId, resumeAt)
             } else {
                 this.details = details.sources
                 val all = details.groups.flatMap { g -> g.languages.flatMap { it.sources } }
@@ -397,7 +408,7 @@ class PlayerViewModel
                     return
                 }
                 val resumeAt = if (request.resume) watch?.positionMs ?: 0L else 0L
-                play(all, request.entryId, resumeAt, autoplay = !request.openTrackMenu)
+                play(all, request.entryId, resumeAt)
             }
         }
 
@@ -405,7 +416,6 @@ class PlayerViewModel
             episode: MergedEpisode,
             chosen: Long?,
             positionMs: Long,
-            autoplay: Boolean = true,
         ) {
             this.episode = episode
             val next = EpisodeOrder.next(seasons, episode.season, episode.number)
@@ -413,21 +423,20 @@ class PlayerViewModel
                 it.copy(subtitle = episodeLabel(episode), next = next?.let(::episodeLabel), countdown = null)
             }
             searchAddonSubtitles(episode.season, episode.number)
-            play(episode.sources, chosen, positionMs, autoplay)
+            play(episode.sources, chosen, positionMs)
         }
 
         private fun play(
             list: List<SourceInfo>,
             chosen: Long?,
             positionMs: Long,
-            autoplay: Boolean,
         ) {
             countdownJob?.cancel()
             sources = list.associateBy { it.id }
             val ordered = repository.playOrder(list, title?.originalLanguage).map { it.id }
             queue = FallbackQueue(ordered, chosen?.takeIf { it in sources })
             mutableState.update { it.copy(error = null, failures = emptyList(), countdown = null) }
-            playCurrent(positionMs, autoplay)
+            playCurrent(positionMs)
         }
 
         private fun playCurrent(positionMs: Long, autoplay: Boolean = true) {

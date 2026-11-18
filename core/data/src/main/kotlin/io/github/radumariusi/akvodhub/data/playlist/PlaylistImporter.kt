@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.room.withTransaction
 import io.github.radumariusi.akvodhub.data.db.AkVodDatabase
+import io.github.radumariusi.akvodhub.data.db.DiscoverCacheEntity
 import io.github.radumariusi.akvodhub.data.db.MatchState
 import io.github.radumariusi.akvodhub.data.db.PlaylistSourceEntity
 import io.github.radumariusi.akvodhub.data.db.PlaylistType
@@ -141,10 +142,13 @@ class PlaylistImporter(
     suspend fun loadXtreamEpisodes(
         sourceId: Long,
         seriesId: Long,
+        onlyIfStale: Boolean = false,
     ): List<RawEntryEntity> =
         episodeLocks[((sourceId * 31 + seriesId).hashCode() and Int.MAX_VALUE) % episodeLocks.size].withLock {
             val source = dao.source(sourceId) ?: return@withLock emptyList()
             if (source.type != PlaylistType.XTREAM) return@withLock dao.episodes(sourceId, seriesId)
+            val parent = dao.xtreamSeries(sourceId, seriesId) ?: return@withLock emptyList()
+            if (onlyIfStale && episodeSnapshotCurrent(parent)) return@withLock dao.episodes(sourceId, seriesId)
             val account = account(source)
             val episodes = episodeRequests.withPermit { xtream.episodes(account, seriesId) }
             db.withTransaction {
@@ -183,9 +187,19 @@ class PlaylistImporter(
                 writer.flush()
                 dao.inheritSeriesTitle(sourceId, seriesId)
                 applyEpisodeVisibility(sourceId, seriesId, series.visible)
+                val cache = db.discoverDao()
+                cache.putCache(
+                    DiscoverCacheEntity("episodes-check:$sourceId:$seriesId", parent.seenRun.toString(), now),
+                )
+                cache.trimEpisodeChecks()
                 dao.episodes(sourceId, seriesId)
             }
         }
+
+    suspend fun episodeSnapshotCurrent(parent: RawEntryEntity): Boolean {
+        val run = db.discoverDao().cached("episodes-check:${parent.sourceId}:${parent.streamId}") ?: return false
+        return run.data == parent.seenRun.toString()
+    }
 
     private fun applyEpisodeVisibility(sourceId: Long, seriesId: Long, visible: Boolean) {
         val sql = db.openHelper.writableDatabase

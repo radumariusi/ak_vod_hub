@@ -45,7 +45,7 @@ class PlayerActivity : ComponentActivity() {
                 onDispose { frameRate.enabled = false }
             }
             AkVodHubTheme(prefs.accentColor) {
-                PlayerScreen(viewModel, onExit = { finish() }, openTrackMenu = launchRequest.openTrackMenu)
+                PlayerScreen(viewModel, onExit = { finish() })
             }
         }
     }
@@ -78,7 +78,6 @@ class PlayerActivity : ComponentActivity() {
         private const val SEASON = "season"
         private const val EPISODE = "episode"
         private const val RESUME = "resume"
-        private const val TRACK_MENU = "openTrackMenu"
 
         fun intent(
             context: Context,
@@ -90,7 +89,6 @@ class PlayerActivity : ComponentActivity() {
                 .putExtra(SEASON, request.season ?: Int.MIN_VALUE)
                 .putExtra(EPISODE, request.episode ?: Int.MIN_VALUE)
                 .putExtra(RESUME, request.resume)
-                .putExtra(TRACK_MENU, request.openTrackMenu)
 
         private fun request(intent: Intent) =
             PlayRequest(
@@ -99,7 +97,6 @@ class PlayerActivity : ComponentActivity() {
                 season = intent.getIntExtra(SEASON, Int.MIN_VALUE).takeIf { it != Int.MIN_VALUE },
                 episode = intent.getIntExtra(EPISODE, Int.MIN_VALUE).takeIf { it != Int.MIN_VALUE },
                 resume = intent.getBooleanExtra(RESUME, false),
-                openTrackMenu = intent.getBooleanExtra(TRACK_MENU, false),
             )
     }
 }

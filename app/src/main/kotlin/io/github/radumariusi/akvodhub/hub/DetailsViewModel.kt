@@ -32,6 +32,8 @@ data class DetailsState(
     val episodes: SeriesEpisodes? = null,
     /** Episoadele se cer încă de la server (Xtream). */
     val loadingEpisodes: Boolean = false,
+    val officialSeasons: List<Int> = emptyList(),
+    val episodeAvailabilityChecked: Boolean = false,
     val credits: Credits? = null,
     val selectedSeason: Int? = null,
     val logoPaths: List<String> = emptyList(),
@@ -92,6 +94,16 @@ class DetailsViewModel
                             id
                         ) {
                             showEpisodes(episodes, loadingMore = mutableState.value.loadingEpisodes)
+                            val checked = repository.episodeAvailabilityChecked(id)
+                            mutableState.update {
+                                if (it.titleId ==
+                                    id
+                                ) {
+                                    it.copy(episodeAvailabilityChecked = checked)
+                                } else {
+                                    it
+                                }
+                            }
                         }
                     }
                 }
@@ -155,12 +167,36 @@ class DetailsViewModel
                         mutableState.update { if (it.titleId == titleId) it.copy(discovery = discovery) else it }
                     }
                     if (details.title.mediaType == MediaType.TV) {
+                        launch {
+                            val seasons = repository.seriesSeasonNumbers(details.title)
+                            mutableState.update { state ->
+                                if (state.titleId != titleId) {
+                                    state
+                                } else {
+                                    state.copy(
+                                        officialSeasons = seasons,
+                                        selectedSeason =
+                                            state.selectedSeason ?: seasons.firstOrNull { it > 0 }
+                                                ?: seasons.firstOrNull(),
+                                    )
+                                }
+                            }
+                        }
                         // Întâi ce știm deja (instant), apoi lista completă de la server.
                         showEpisodes(repository.episodes(titleId), loadingMore = true)
                         repository.refreshEpisodes(titleId).collect {
                             showEpisodes(repository.episodes(titleId), loadingMore = true)
                         }
-                        mutableState.update { it.copy(loadingEpisodes = false) }
+                        val checked = repository.episodeAvailabilityChecked(titleId)
+                        mutableState.update {
+                            if (it.titleId ==
+                                titleId
+                            ) {
+                                it.copy(loadingEpisodes = false, episodeAvailabilityChecked = checked)
+                            } else {
+                                it
+                            }
+                        }
                     }
                 }
         }
@@ -172,7 +208,7 @@ class DetailsViewModel
             mutableState.update { s ->
                 val seasons = episodes.seasons.map { it.number }
                 val selected =
-                    s.selectedSeason?.takeIf { it in seasons }
+                    s.selectedSeason?.takeIf { it in seasons || it in s.officialSeasons }
                         ?: s
                             .copy(episodes = episodes)
                             .nextEpisode
@@ -180,6 +216,8 @@ class DetailsViewModel
                             ?.takeIf { it in seasons }
                         ?: seasons.firstOrNull { it > 0 }
                         ?: seasons.firstOrNull()
+                        ?: s.officialSeasons.firstOrNull { it > 0 }
+                        ?: s.officialSeasons.firstOrNull()
                 s.copy(episodes = episodes, loadingEpisodes = loadingMore, selectedSeason = selected)
             }
         }
@@ -200,6 +238,8 @@ class DetailsViewModel
             val title = state.value.details?.title ?: return emptyMap()
             return repository.seasonMetadata(title, season)
         }
+
+        suspend fun sourceTracks(entryId: Long) = repository.sourceTracks(entryId)
 
         fun toggleWatchlist() = changeLibrary { id -> repository.setInWatchlist(id, !mutableState.value.inWatchlist) }
 

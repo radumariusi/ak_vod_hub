@@ -87,6 +87,18 @@ class XtreamJsonTest {
     }
 
     @Test
+    fun invalidEpisodeResponseCannotConfirmAnEmptySeason() {
+        val empty = XtreamJson.parse("""{"episodes":{}}""")
+        val flat = XtreamJson.parse("""{"episodes":[{"id":"41","season":"2","episode_num":3}]}""")
+        assertEquals(emptyList<XtreamEpisode>(), XtreamJson.episodes(empty))
+        assertEquals(2, XtreamJson.episodes(flat).single().season)
+        assertThrows(XtreamException::class.java) { XtreamJson.episodes(XtreamJson.parse("""{"error":"blocked"}""")) }
+        assertThrows(
+            XtreamException::class.java,
+        ) { XtreamJson.episodes(XtreamJson.parse("""{"episodes":{"1":[{}]}}""")) }
+    }
+
+    @Test
     fun readsCategories() {
         val categories =
             XtreamJson.categories(

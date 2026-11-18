@@ -53,8 +53,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -76,6 +76,9 @@ data class SourceDetails(
     val entry: RawEntryEntity,
     val playlist: String,
 )
+
+@Serializable
+data class SourceTracks(val audio: List<String>, val subtitles: List<String>)
 
 data class TitleDetails(
     val title: TitleEntity,
@@ -112,9 +115,6 @@ class HubRepository(
     private val dao = db.catalogDao()
     private val playlistDao = db.playlistDao()
     private val creditsCache = ConcurrentHashMap<Long, Credits>()
-
-    /** Episoadele Xtream cerute de la server în sesiunea curentă (o dată pe serial și playlist). */
-    private val episodesLoaded: MutableSet<Long> = Collections.newSetFromMap(ConcurrentHashMap())
 
     val catalogVersion: StateFlow<Long> get() = indexer.version
 
@@ -388,11 +388,27 @@ class HubRepository(
         }
     }
 
+    suspend fun sourceTracks(entryId: Long): SourceTracks? {
+        val row = db.discoverDao().cached("source-tracks:$entryId") ?: return null
+        if (!LocalizedOverview.isCached(row.fetchedAt, System.currentTimeMillis())) return null
+        return runCatching { Json.decodeFromString<SourceTracks>(row.data) }.getOrNull()
+    }
+
+    suspend fun rememberSourceTracks(entryId: Long, tracks: SourceTracks) {
+        val now = System.currentTimeMillis()
+        val cache = db.discoverDao()
+        db.withTransaction {
+            cache.putCache(DiscoverCacheEntity("source-tracks:$entryId", Json.encodeToString(tracks), now))
+            cache.trimSourceTracks()
+        }
+    }
+
     /** Variantele vizibile deja publicate pentru serialul deschis. */
     suspend fun episodes(titleId: Long): SeriesEpisodes =
         withContext(Dispatchers.Default) {
             val entries = dao.episodes(titleId)
             val sources = describe(entries)
+            val parents = episodeParents(titleId).associateBy { it.sourceId to it.streamId }
             val seasons =
                 EpisodeMerge.merge(
                     entries.map {
@@ -400,7 +416,17 @@ class HubRepository(
                             it.season,
                             it.episode,
                             it.name,
-                            it.toSourceInfo(),
+                            it.toSourceInfo().let { source ->
+                                val parent = parents[it.sourceId to it.seriesId]?.toSourceInfo()
+                                if (parent == null) {
+                                    source
+                                } else {
+                                    source.copy(
+                                        languages = source.languages.ifEmpty { parent.languages },
+                                        subtitles = source.subtitles.ifEmpty { parent.subtitles },
+                                    )
+                                }
+                            },
                             episodeNameOnly =
                                 it.streamId != null,
                         )
@@ -414,24 +440,51 @@ class HubRepository(
     fun refreshEpisodes(titleId: Long) =
         channelFlow {
             val scheduled = AtomicBoolean(false)
-            val series = dao.sources(titleId).filter { it.kind == VodKind.SERIES && it.streamId != null }
-            for (source in series) {
+            for (source in episodeParents(titleId)) {
                 launch {
-                    if (!episodesLoaded.add(source.id)) return@launch
+                    if (importer.episodeSnapshotCurrent(source)) return@launch
                     try {
-                        importer.loadXtreamEpisodes(source.sourceId, checkNotNull(source.streamId))
+                        importer.loadXtreamEpisodes(source.sourceId, checkNotNull(source.streamId), onlyIfStale = true)
                         if (scheduled.compareAndSet(false, true)) matchScheduler.enqueueAfterPlaybackPause()
                         send(Unit)
                     } catch (e: CancellationException) {
-                        episodesLoaded.remove(source.id)
                         throw e
                     } catch (_: Exception) {
                         // Păstrăm episoadele locale și permitem o nouă încercare la deschiderea fișei.
-                        episodesLoaded.remove(source.id)
                     }
                 }
             }
         }.conflate()
+
+    private suspend fun episodeParents(titleId: Long): List<RawEntryEntity> =
+        dao.sources(titleId).filter { it.kind == VodKind.SERIES && it.streamId != null }
+
+    suspend fun episodeAvailabilityChecked(titleId: Long): Boolean =
+        !dao.hasUnassignedSeason(titleId) && episodeParents(titleId).all { importer.episodeSnapshotCurrent(it) }
+
+    suspend fun seriesSeasonNumbers(title: TitleEntity): List<Int> {
+        if (title.isLocal) return emptyList()
+        val cache = db.discoverDao()
+        val cacheKey = "series-seasons:${title.tmdbId}"
+        val old = cache.cached(cacheKey)
+        val cached = old?.data?.let { runCatching { Json.decodeFromString<List<Int>>(it) }.getOrNull() }
+        val now = System.currentTimeMillis()
+        if (old != null && cached != null && LocalizedOverview.isCached(old.fetchedAt, now)) return cached
+        val key = settings.apiKey() ?: return cached.orEmpty()
+        return try {
+            val seasons = withTimeoutOrNull(4_000L) { tmdb.seriesSeasons(key, title.tmdbId) } ?: return cached.orEmpty()
+            val numbers = seasons.filter { it >= 0 }.distinct().sorted()
+            db.withTransaction {
+                cache.putCache(DiscoverCacheEntity(cacheKey, Json.encodeToString(numbers), now))
+                cache.trimSeriesSeasons()
+            }
+            numbers
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            cached.orEmpty()
+        }
+    }
 
     suspend fun episodeMetadata(title: TitleEntity, season: Int, episode: Int): TmdbEpisode? {
         if (title.isLocal || season < 0 || episode <= 0) return null
