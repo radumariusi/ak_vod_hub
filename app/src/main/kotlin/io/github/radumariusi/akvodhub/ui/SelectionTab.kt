@@ -22,11 +22,11 @@ import androidx.tv.material3.Text
 import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
 
 @Composable
-internal fun SelectionTab(label: String, active: Boolean, onClick: () -> Unit) {
+internal fun SelectionTab(label: String, active: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     OutlinedButton(
         onClick = onClick,
         modifier =
-            Modifier.semantics {
+            modifier.semantics {
                 selected = active
                 role = Role.Tab
             },

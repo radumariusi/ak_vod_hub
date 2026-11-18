@@ -449,3 +449,7 @@ o singură dată de la poziția curentă. Panoul tehnic afișează numărul înt
 În lipsa regulilor personalizate, alegerea automată (inclusiv la reluare) pune 4K EN, RO sau MULTI înaintea
 celorlalte surse cu aceleași etichete, apoi încearcă restul. Limba originală, dacă e activată, și alegerea manuală
 își păstrează prioritatea. Reluarea păstrează poziția. Fără migrare Room sau dependențe noi.
+
+Sus din conținut intră în fila activă a meniului principal, inclusiv când aceasta trebuie derulată în cadru.
+Stânga la ieșirea din panoul de opțiuni readuce focusul pe categoria deschisă. Navigarea internă în liste
+și mutarea cursorului în editor rămân în grija componentelor.

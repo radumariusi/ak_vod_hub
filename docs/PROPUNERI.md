@@ -180,6 +180,7 @@ Vezi detalii despre schema Room și limitele cunoscute în [HANDOFF.md](HANDOFF.
 - Cereri limitate în timp pentru lista și imaginea siglei. Vecinii încep devreme și păstrează cererea când primesc focus. Filme și Seriale folosesc posterele de pe Acasă.
 - Recuperarea Media3 se aplică la 4K și rezoluții mai mici, cu reducerea bitrate-ului sau trecerea la o rezervă disponibilă.
 - Setări → Redare afișează ordinea automată 4K EN, RO sau MULTI și regulile de surse configurate.
+- Focusul revine la fila activă sau la categoria deschisă din Setări la ieșirea direcțională din conținut.
 
 ## Ce ar îngreuna aplicația (de evitat sau doar opțional)
 
