@@ -143,7 +143,6 @@ class HomeViewModel
                     catalogJob?.cancel()
                     loadingMore.values.forEach(Job::cancel)
                     loadingMore.clear()
-                    windows.clear()
                     val rows = mutableListOf<HomeRow>()
                     if (enabled(CONTINUE)) continueRow()?.let { rows += it }
                     if (enabled(HomeRows.WATCHLIST)) newRow(HomeRows.WATCHLIST, "Lista mea")?.let { rows += it }
@@ -152,6 +151,7 @@ class HomeViewModel
                     for ((key, title, filter) in specs) {
                         if (enabled(key)) newRow(key, title, filter)?.let { rows += it }
                     }
+                    windows.keys.retainAll(rows.map { it.key }.toSet())
                     base = rows
                     loaded = true
                     publish()
@@ -198,12 +198,12 @@ class HomeViewModel
         }
 
         private suspend fun newRow(key: String, label: String, filter: CatalogFilter? = null): HomeRow? {
-            val window = PageWindow<HomeCursor, TitleCard>(maxPages = 4)
-            window.move { fetch(key, filter, it) }
+            val window = windows[key] ?: PageWindow<HomeCursor, TitleCard>(maxPages = 4)
+            window.refresh { fetch(key, filter, it) }
             val cards = window.items
             if (cards.isEmpty()) return null
             windows[key] = window
-            return HomeRow(key, label, cards, filter, endReached = !window.hasLater)
+            return HomeRow(key, label, cards, filter, endReached = !window.hasLater, hasEarlier = window.hasEarlier)
         }
 
         private suspend fun fetch(

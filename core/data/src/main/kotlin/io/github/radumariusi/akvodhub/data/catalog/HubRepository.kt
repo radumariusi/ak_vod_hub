@@ -35,25 +35,27 @@ import io.github.radumariusi.akvodhub.parser.catalog.PersonalLibrary
 import io.github.radumariusi.akvodhub.parser.catalog.PlaylistNews
 import io.github.radumariusi.akvodhub.parser.catalog.PosterBadges
 import io.github.radumariusi.akvodhub.parser.catalog.TitleLogo
-import io.github.radumariusi.akvodhub.parser.catalog.Trailer
-import io.github.radumariusi.akvodhub.parser.catalog.TrailerCandidate
 import io.github.radumariusi.akvodhub.parser.match.QualityGroup
 import io.github.radumariusi.akvodhub.parser.match.SourceGrouping
 import io.github.radumariusi.akvodhub.parser.match.SourceInfo
 import io.github.radumariusi.akvodhub.parser.player.SourceProfile
 import io.github.radumariusi.akvodhub.parser.stremio.StremioIds
+import io.github.radumariusi.akvodhub.parser.title.VideoQuality
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** Un actor (sau regizor) de pe pagina de detalii. */
 data class Person(
@@ -104,11 +106,11 @@ class HubRepository(
     private val tmdb: TmdbClient,
     private val settings: TmdbSettings,
     private val playback: PlaybackSettings,
+    private val matchScheduler: MatchScheduler,
 ) {
     private val dao = db.catalogDao()
     private val playlistDao = db.playlistDao()
     private val logoMutex = Mutex()
-    private val trailerMutex = Mutex()
     private val creditsCache = ConcurrentHashMap<Long, Credits>()
 
     /** Episoadele Xtream cerute de la server în sesiunea curentă (o dată pe serial și playlist). */
@@ -347,45 +349,13 @@ class HubRepository(
         )
     }
 
-    /** Numai apăsarea butonului cere trailerul; cache inclusiv pentru rezultate absente. */
-    suspend fun trailer(titleId: Long): String? =
-        trailerMutex.withLock {
-            val title = dao.titleById(titleId) ?: return@withLock null
-            if (title.isLocal) return@withLock null
-            val cache = db.discoverDao()
-            val cacheKey = "trailer:${title.mediaType}:${title.tmdbId}"
-            val old = cache.cached(cacheKey)
-            val now = System.currentTimeMillis()
-            if (old != null && LocalizedOverview.isCached(old.fetchedAt, now)) return@withLock old.data.ifBlank { null }
-            try {
-                val key = settings.apiKey() ?: throw java.io.IOException("Cheia TMDB lipsește.")
-                val videos = tmdb.videos(key, title.mediaType, title.tmdbId)
-                val id =
-                    Trailer.choose(
-                        videos.results.map {
-                            TrailerCandidate(it.key, it.site, it.type, it.official, it.language)
-                        },
-                        title.originalLanguage,
-                    )
-                db.withTransaction {
-                    cache.putCache(DiscoverCacheEntity(cacheKey, id.orEmpty(), now))
-                    cache.trimTrailers()
-                }
-                id
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                if (old != null) old.data.ifBlank { null } else throw e
-            }
-        }
-
     /** Numai hero stabil/fișă: rezultat (inclusiv absent) salvat 30 zile, maximum 128 titluri. */
     suspend fun logo(titleId: Long): String? =
         logoMutex.withLock {
             val title = dao.titleById(titleId) ?: return@withLock null
             if (title.isLocal) return@withLock null
             val cache = db.discoverDao()
-            val cacheKey = "logo:en:${title.mediaType}:${title.tmdbId}"
+            val cacheKey = "logo:en-v2:${title.mediaType}:${title.tmdbId}"
             val old = cache.cached(cacheKey)
             val now = System.currentTimeMillis()
             if (old != null && LocalizedOverview.isCached(old.fetchedAt, now)) return@withLock old.data.ifBlank { null }
@@ -408,50 +378,50 @@ class HubRepository(
             }
         }
 
-    /**
-     * Episoadele unui serial din toate sursele, unite pe sezon + episod. La Xtream, lista de episoade se cere
-     * de la server la prima deschidere în sesiune ([refresh] = true), apoi vine din baza locală.
-     */
-    suspend fun episodes(
-        titleId: Long,
-        refresh: Boolean,
-    ): SeriesEpisodes {
-        if (refresh) {
-            loadXtreamEpisodes(titleId)
-            indexer.refresh()
+    /** Variantele vizibile deja publicate pentru serialul deschis. */
+    suspend fun episodes(titleId: Long): SeriesEpisodes =
+        withContext(Dispatchers.Default) {
+            val entries = dao.episodes(titleId)
+            val sources = describe(entries)
+            val seasons =
+                EpisodeMerge.merge(
+                    entries.map {
+                        EpisodeEntry(
+                            it.season,
+                            it.episode,
+                            it.name,
+                            it.toSourceInfo(),
+                            episodeNameOnly =
+                                it.streamId != null,
+                        )
+                    },
+                    preferredLanguages,
+                )
+            SeriesEpisodes(seasons, sources)
         }
-        val entries = dao.episodes(titleId)
-        val sources = describe(entries)
-        val seasons =
-            EpisodeMerge.merge(
-                entries.map { EpisodeEntry(it.season, it.episode, it.name, it.toSourceInfo()) },
-                preferredLanguages,
-            )
-        return SeriesEpisodes(seasons, sources)
-    }
 
-    /** Cere episoadele serialelor Xtream legate de titlu (în paralel, câte un apel pe playlist). */
-    private suspend fun loadXtreamEpisodes(titleId: Long) {
-        val series = dao.sources(titleId).filter { it.kind == VodKind.SERIES && it.streamId != null }
-        if (series.isEmpty()) return
-        coroutineScope {
-            series
-                .filter { episodesLoaded.add(it.id) }
-                .map { s ->
-                    async {
-                        try {
-                            importer.loadXtreamEpisodes(s.sourceId, s.streamId!!)
-                        } catch (e: CancellationException) {
-                            episodesLoaded.remove(s.id)
-                            throw e
-                        } catch (e: Exception) {
-                            // Serverul nu răspunde: rămân episoadele știute; reîncercăm la următoarea deschidere.
-                            episodesLoaded.remove(s.id)
-                        }
+    /** Publică fiecare lot în fișă imediat ce ajunge. Indexarea rămâne în workerul existent. */
+    fun refreshEpisodes(titleId: Long) =
+        channelFlow {
+            val scheduled = AtomicBoolean(false)
+            val series = dao.sources(titleId).filter { it.kind == VodKind.SERIES && it.streamId != null }
+            for (source in series) {
+                launch {
+                    if (!episodesLoaded.add(source.id)) return@launch
+                    try {
+                        importer.loadXtreamEpisodes(source.sourceId, checkNotNull(source.streamId))
+                        if (scheduled.compareAndSet(false, true)) matchScheduler.enqueueAfterPlaybackPause()
+                        send(Unit)
+                    } catch (e: CancellationException) {
+                        episodesLoaded.remove(source.id)
+                        throw e
+                    } catch (_: Exception) {
+                        // Păstrăm episoadele locale și permitem o nouă încercare la deschiderea fișei.
+                        episodesLoaded.remove(source.id)
                     }
-                }.awaitAll()
-        }
-    }
+                }
+            }
+        }.conflate()
 
     suspend fun episodeOverview(title: TitleEntity, season: Int, episode: Int): String? {
         if (title.isLocal || season < 0 || episode <= 0) return null
@@ -522,6 +492,12 @@ class HubRepository(
     }
 
     /** Linkul de redare al unei surse (la Xtream se construiește din cont, ca parola să nu stea în fiecare intrare). */
+    suspend fun confirmQuality(entryId: Long, quality: VideoQuality) {
+        if (dao.confirmQuality(entryId, quality, quality.ordinal) > 0) {
+            matchScheduler.enqueueAfterPlaybackPause()
+        }
+    }
+
     suspend fun streamUrl(entryId: Long): String? {
         val entry = dao.entry(entryId) ?: return null
         entry.url?.let { return it }

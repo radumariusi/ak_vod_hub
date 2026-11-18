@@ -10,6 +10,7 @@ data class EpisodeEntry(
     /** Numele din playlist, ex. „Breaking Bad S01E02 Cat's in the Bag”. */
     val name: String,
     val source: SourceInfo,
+    val episodeNameOnly: Boolean = false,
 )
 
 /** Un episod unit din toate sursele (playlist-uri, calități, limbi), cu sursele în ordinea celor mai bune. */
@@ -34,7 +35,12 @@ data class MergedSeason(
  */
 object EpisodeMerge {
     private val episodeTag = Regex("""(?i)^.*?\bS\d{1,2}\s*E\d{1,4}\b[\s\-–:|.]*""")
-    private val episodeOnlyTag = Regex("""(?i)^.*?\b(?:episode|episodul|ep)\.?\s*\d{1,4}\b[\s\-–:|.]*""")
+    private val episodeOnlyTag =
+        Regex("""(?i)^.*?\b(?:episode|episodio|episódio|episodul|episod|ep)\.?\s*\d{1,4}\b[\s\-–:|.]*""")
+
+    private val genericPrefix =
+        Regex("""(?i)^(?:episode|episodio|episódio|episodul|episod|ep)\.?\s*\d{1,4}\b[\s\-–:|.]*""")
+    private val genericLabel = Regex("""(?i)^(?:episode|episodio|episódio|episodul|episod|ep)[. ]*\d{1,4}[. ]*$""")
 
     fun merge(
         entries: List<EpisodeEntry>,
@@ -66,16 +72,24 @@ object EpisodeMerge {
     ) = MergedEpisode(
         season = season,
         number = number,
-        title = list.firstNotNullOfOrNull { episodeTitle(it.name) },
+        title = list.firstNotNullOfOrNull { episodeTitle(it.name) ?: providerTitle(it) },
         sources = SourceGrouping.ordered(list.map { it.source }, preferredLanguages),
     )
+
+    private fun providerTitle(entry: EpisodeEntry): String? {
+        if (!entry.episodeNameOnly) return null
+        val title = entry.name.trim()
+        if (title.isEmpty() || genericLabel.matches(title)) return null
+        if (episodeTag.containsMatchIn(title) || genericPrefix.containsMatchIn(title)) return null
+        return title
+    }
 
     /** Ce urmează după `S01E02` în numele din playlist; null dacă nu e nimic util. */
     fun episodeTitle(name: String): String? {
         val match = episodeTag.find(name) ?: episodeOnlyTag.find(name) ?: return null
-        return name
-            .substring(match.range.last + 1)
-            .trim()
-            .takeIf { it.length >= 2 }
+        val remainder = name.substring(match.range.last + 1).trim()
+        val prefix = genericPrefix.find(remainder)
+        val title = if (prefix == null) remainder else remainder.substring(prefix.range.last + 1)
+        return title.trim().takeIf { it.length >= 2 && !genericLabel.matches(it) }
     }
 }

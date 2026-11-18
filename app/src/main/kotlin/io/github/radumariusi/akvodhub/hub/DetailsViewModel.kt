@@ -86,8 +86,12 @@ class DetailsViewModel
                         if (state.titleId == id) state.copy(details = details, recommended = recommended) else state
                     }
                     if (details?.title?.mediaType == MediaType.TV) {
-                        val episodes = repository.episodes(id, refresh = false)
-                        if (mutableState.value.titleId == id) showEpisodes(episodes, loadingMore = false)
+                        val episodes = repository.episodes(id)
+                        if (mutableState.value.titleId ==
+                            id
+                        ) {
+                            showEpisodes(episodes, loadingMore = mutableState.value.loadingEpisodes)
+                        }
                     }
                 }
             }
@@ -151,8 +155,11 @@ class DetailsViewModel
                     }
                     if (details.title.mediaType == MediaType.TV) {
                         // Întâi ce știm deja (instant), apoi lista completă de la server.
-                        showEpisodes(repository.episodes(titleId, refresh = false), loadingMore = true)
-                        showEpisodes(repository.episodes(titleId, refresh = true), loadingMore = false)
+                        showEpisodes(repository.episodes(titleId), loadingMore = true)
+                        repository.refreshEpisodes(titleId).collect {
+                            showEpisodes(repository.episodes(titleId), loadingMore = true)
+                        }
+                        mutableState.update { it.copy(loadingEpisodes = false) }
                     }
                 }
         }
@@ -187,8 +194,6 @@ class DetailsViewModel
             val number = episode.number ?: return null
             return repository.episodeOverview(title, episode.season, number)
         }
-
-        suspend fun trailer(titleId: Long): String? = repository.trailer(titleId)
 
         fun toggleWatchlist() = changeLibrary { id -> repository.setInWatchlist(id, !mutableState.value.inWatchlist) }
 

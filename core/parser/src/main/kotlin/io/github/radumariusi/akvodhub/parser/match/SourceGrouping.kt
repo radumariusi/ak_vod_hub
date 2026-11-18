@@ -75,7 +75,7 @@ object SourceGrouping {
             VideoQuality.FHD -> "1080p"
             VideoQuality.HD -> "720p"
             VideoQuality.SD -> "SD"
-            null -> "Calitate necunoscută"
+            null -> "Calitate nedeclarată"
         }
 
     fun languageLabel(language: String?): String =

@@ -80,6 +80,8 @@ data class RawEntryEntity(
     val title: String? = null,
     val year: Int? = null,
     val quality: VideoQuality? = null,
+    val providerQuality: VideoQuality? = null,
+    val confirmedQuality: VideoQuality? = null,
     val hdr: HdrFormat? = null,
     val codec: VideoCodec? = null,
     /** Limbile audio, coduri ISO 639-1 separate prin virgulă (ex. `en,de`; `mul` = mai multe). */
@@ -102,7 +104,8 @@ data class RawEntryEntity(
             seriesId == other.seriesId &&
             containerExt == other.containerExt &&
             tmdbId == other.tmdbId &&
-            providerAddedAt == other.providerAddedAt
+            providerAddedAt == other.providerAddedAt &&
+            providerQuality == other.providerQuality
 
     /** Aceeași intrare, cu câmpurile parsate din nume și categorie. Sezonul/episodul dat de furnizor are prioritate. */
     fun parsed(): RawEntryEntity {
@@ -112,7 +115,7 @@ data class RawEntryEntity(
             year = p.year,
             season = season ?: p.season,
             episode = episode ?: p.episode,
-            quality = p.quality,
+            quality = confirmedQuality ?: providerQuality ?: p.quality,
             hdr = p.hdr,
             codec = p.codec,
             languages = p.languages.joinToString(",").ifEmpty { null },

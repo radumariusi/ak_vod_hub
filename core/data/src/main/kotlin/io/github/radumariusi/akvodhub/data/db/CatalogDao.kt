@@ -10,6 +10,7 @@ import androidx.room.Update
 import androidx.sqlite.db.SupportSQLiteQuery
 import io.github.radumariusi.akvodhub.parser.VodKind
 import io.github.radumariusi.akvodhub.parser.match.MediaType
+import io.github.radumariusi.akvodhub.parser.title.VideoQuality
 import kotlinx.coroutines.flow.Flow
 
 /** O intrare care așteaptă potrivirea TMDB (doar coloanele de care are nevoie potrivirea). */
@@ -337,10 +338,17 @@ interface CatalogDao {
     @Query("UPDATE title SET isNew = 0 WHERE isNew = 1 AND (addedAt <= :cutoff OR addedAt > :now)")
     suspend fun expireNewBadges(cutoff: Long, now: Long): Int
 
+    @Query(
+        "UPDATE raw_entry SET quality = :quality, confirmedQuality = :quality WHERE id = :id AND " +
+            "CASE confirmedQuality WHEN 'UHD' THEN 3 WHEN 'FHD' THEN 2 WHEN 'HD' THEN 1 WHEN 'SD' THEN 0 ELSE -1 END < :rank",
+    )
+    suspend fun confirmQuality(id: Long, quality: VideoQuality, rank: Int): Int
+
     /** O „amprentă” ieftină a catalogului: dacă nu s-a schimbat, indexarea nu are ce reface. */
     @Query(
         "SELECT (SELECT COUNT(*) || ':' || TOTAL(id) || ':' || TOTAL(titleId) || ':' || " +
-            "IFNULL(MAX(seenRun), 0) FROM raw_entry) || '|' || " +
+            "IFNULL(MAX(seenRun), 0) || ':' || TOTAL(CASE confirmedQuality WHEN 'UHD' THEN 4 WHEN 'FHD' THEN 3 " +
+            "WHEN 'HD' THEN 2 WHEN 'SD' THEN 1 ELSE 0 END) FROM raw_entry) || '|' || " +
             "(SELECT COUNT(*) || ':' || IFNULL(MAX(updatedAt), 0) || ':' || TOTAL(sourceCount > 0) FROM title)",
     )
     suspend fun fingerprint(): String

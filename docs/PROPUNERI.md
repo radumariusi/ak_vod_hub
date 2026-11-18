@@ -150,6 +150,13 @@ Vezi detalii despre schema Room și limitele cunoscute în [HANDOFF.md](HANDOFF.
 
 ---
 
+## Retușuri TV după v0.1.40
+
+- Hero comun pentru Acasă, Filme și Seriale, cu sigla TMDB în engleză când există.
+- Derulare cu focus stabil, câmpuri și butoane coerente, pictograme de player centrate și subtitrări în două coloane.
+- Episoade Xtream publicate progresiv, etichete generice în română și eliminarea comenzii Trailer care deschidea YouTube.
+- Rezoluții declarate din răspunsul Xtream și confirmate la redare, cu actualizarea rezumatelor existente.
+
 ## Ce ar îngreuna aplicația (de evitat sau doar opțional)
 
 1. **Trailere redate în aplicație / pe fundal** (YouTube, WebView): megabytes în plus și RAM. → Deschidem aplicația YouTube.

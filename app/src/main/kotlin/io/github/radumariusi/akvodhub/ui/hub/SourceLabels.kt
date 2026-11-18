@@ -11,6 +11,7 @@ fun sourceTags(
 ): String {
     val entry = info?.entry
     return listOfNotNull(
+        "Rezoluție confirmată".takeIf { entry?.confirmedQuality != null },
         source.languages
             .joinToString(
                 "+",

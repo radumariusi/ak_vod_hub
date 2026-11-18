@@ -362,3 +362,21 @@ Retestarea pe Android 11 TV și instalarea peste versiunea existentă sunt în a
 De verificat pe TV după instalarea din updater: import manual și mesajul exact la eroare; primul și ultimul rând
 pentru toate cele trei dimensiuni din Acasă, grile, Lista mea, actori și recomandări; Înapoi din fișă și din meniurile
 playerului; tastatură doar la OK/atingere; episoade, restart și ascunderea variantelor fără pierderea datelor.
+
+
+### Retușuri TV după v0.1.40
+
+Hero-ul din Acasă, Filme și Seriale folosește setarea `home_hero` existentă și aceeași compoziție de fundal
+ca fișa. Cererile pentru siglă și backdrop rămân la focus stabil, cu sigle EN/neutre și fallback la text.
+Posterele lasă derularea în grija focusului Compose pentru întregul card, cu contur și dimensiuni constante.
+Câmpurile și comenzile folosesc stilurile comune, tastatura rămâne la activare. Subtitrările interne și
+externe au liste independente. Butonul Trailer și integrarea de deschidere YouTube au fost eliminate.
+
+Episoadele Xtream se descarcă cu maximum trei cereri simultane și se publică pe lot, separat de importul
+complet. Tranzacția verifică din nou serialul părinte, apoi aplică filtrele la episoade. Gruparea rulează
+în afara firului UI. Rezumatele se reindexează ulterior prin workerul existent.
+
+Room 17→18 adaugă `providerQuality` și `confirmedQuality`. Numele, categoria și câmpurile furnizorului
+pot stabili calitatea înainte de redare. Media3 confirmă dimensiunile sursei efectiv pornite, iar catalogul
+păstrează cea mai mare rezoluție observată pentru variante adaptive. Datele confirmate se păstrează la
+refresh pentru aceeași intrare. Sursele fără declarație sau măsurătoare rămân „Calitate nedeclarată”.

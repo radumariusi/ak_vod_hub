@@ -200,7 +200,8 @@ object AppModule {
         tmdb: TmdbClient,
         settings: TmdbSettings,
         playback: PlaybackSettings,
-    ): HubRepository = HubRepository(db, indexer, importer, tmdb, settings, playback)
+        matchScheduler: MatchScheduler,
+    ): HubRepository = HubRepository(db, indexer, importer, tmdb, settings, playback, matchScheduler)
 
     @Provides
     @Singleton

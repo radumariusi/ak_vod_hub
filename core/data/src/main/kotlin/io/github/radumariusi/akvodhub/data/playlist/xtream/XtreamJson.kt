@@ -1,6 +1,8 @@
 package io.github.radumariusi.akvodhub.data.playlist.xtream
 
 import io.github.radumariusi.akvodhub.parser.playlist.JsonObjectStream
+import io.github.radumariusi.akvodhub.parser.title.VideoQuality
+import io.github.radumariusi.akvodhub.parser.title.VideoResolution
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -34,6 +36,7 @@ object XtreamJson {
             containerExtension = o.str("container_extension"),
             tmdbId = (o.long("tmdb") ?: o.long("tmdb_id"))?.takeIf { it > 0 },
             added = o.long("added"),
+            quality = o.declaredQuality(),
         )
     }
 
@@ -46,6 +49,7 @@ object XtreamJson {
             cover = o.str("cover"),
             tmdbId = (o.long("tmdb") ?: o.long("tmdb_id"))?.takeIf { it > 0 },
             lastModified = o.long("last_modified"),
+            quality = o.declaredQuality(),
         )
     }
 
@@ -74,6 +78,7 @@ object XtreamJson {
                     episode = e.long("episode_num")?.toInt(),
                     containerExtension = e.str("container_extension"),
                     added = e.long("added"),
+                    quality = e.declaredQuality(),
                 )
             }
         }
@@ -88,6 +93,18 @@ object XtreamJson {
                 id to o.str("category_name")?.trim().orEmpty()
             }?.toMap()
             .orEmpty()
+
+    private fun JsonObject.declaredQuality(): VideoQuality? {
+        val video = this["video"] as? JsonObject ?: (this["info"] as? JsonObject)?.get("video") as? JsonObject
+        for (data in listOfNotNull(video, this)) {
+            val width = data.str("width")?.toIntOrNull()
+            val height = data.str("height")?.toIntOrNull()
+            if (width != null && height != null) VideoResolution.quality(width, height)?.let { return it }
+            VideoResolution.declared(data.str("resolution"))?.let { return it }
+            VideoResolution.declared(data.str("quality"))?.let { return it }
+        }
+        return null
+    }
 
     internal fun JsonObject.str(key: String): String? {
         val value = this[key]

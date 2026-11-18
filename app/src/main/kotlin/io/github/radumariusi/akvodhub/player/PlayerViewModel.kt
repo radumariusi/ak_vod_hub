@@ -9,6 +9,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Tracks
+import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -38,6 +39,7 @@ import io.github.radumariusi.akvodhub.parser.stremio.AddonSubtitle
 import io.github.radumariusi.akvodhub.parser.stremio.SubtitleChoice
 import io.github.radumariusi.akvodhub.parser.stremio.SubtitleLanguages
 import io.github.radumariusi.akvodhub.parser.subtitle.SubtitleDocument
+import io.github.radumariusi.akvodhub.parser.title.VideoResolution
 import io.github.radumariusi.akvodhub.ui.hub.sourceLabel
 import io.github.radumariusi.akvodhub.ui.hub.sourceShortLabel
 import kotlinx.coroutines.CancellationException
@@ -87,6 +89,7 @@ data class PlayerUiState(
     val subtitle: String? = null,
     /** Sursa curentă, ex. „Sursa 1 din 5 · 4K · EN · H265 · MKV — Playlist A”. */
     val sourceLabel: String? = null,
+    val detectedResolution: String? = null,
     val loading: Boolean = true,
     /** Mesaj trecător, ex. „4K EN nu merge (HTTP 404). Încerc sursa 2 din 5: 1080p RO”. */
     val notice: String? = null,
@@ -228,6 +231,14 @@ class PlayerViewModel
                     sourceFailed(PlaybackErrors.describe(error))
                 }
 
+                override fun onVideoSizeChanged(videoSize: VideoSize) {
+                    val entryId = player.currentMediaItem?.mediaId?.toLongOrNull() ?: return
+                    if (entryId != queue?.current) return
+                    val quality = VideoResolution.quality(videoSize.width, videoSize.height) ?: return
+                    mutableState.update { it.copy(detectedResolution = "${videoSize.width} × ${videoSize.height}") }
+                    viewModelScope.launch { repository.confirmQuality(entryId, quality) }
+                }
+
                 override fun onTracksChanged(tracks: Tracks) {
                     if (tracks.containsType(C.TRACK_TYPE_VIDEO) && !tracks.isTypeSupported(C.TRACK_TYPE_VIDEO)) {
                         val codec = TrackOptions.videoCodec(tracks)?.let { "$it " }.orEmpty()
@@ -292,7 +303,7 @@ class PlayerViewModel
             if (details.title.mediaType != MediaType.TV) searchAddonSubtitles(null, null)
             val watch = repository.watchState(request.titleId)
             if (details.title.mediaType == MediaType.TV) {
-                val episodes = repository.episodes(request.titleId, refresh = false)
+                val episodes = repository.episodes(request.titleId)
                 seasons = episodes.seasons
                 this.details = episodes.sources
                 val all = seasons.flatMap { it.episodes }
@@ -378,7 +389,13 @@ class PlayerViewModel
             player.trackSelectionParameters = PlayerFactory.apply(player.trackSelectionParameters, trackPreferences())
             startPosition = positionMs
             mutableState.update {
-                it.copy(loading = true, sourceLabel = currentLabel(), sources = sourceOptions(), audio = emptyList())
+                it.copy(
+                    loading = true,
+                    sourceLabel = currentLabel(),
+                    sources = sourceOptions(),
+                    audio = emptyList(),
+                    detectedResolution = null,
+                )
             }
             viewModelScope.launch {
                 val url = repository.streamUrl(id)

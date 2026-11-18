@@ -106,9 +106,9 @@ interface PlaylistDao {
     suspend fun followedSeries(afterId: Long, limit: Int): List<RawEntryEntity>
 
     @Query(
-        "SELECT firstSeenAt FROM raw_entry WHERE sourceId = :sourceId AND providerKey = 'series:' || :seriesId LIMIT 1",
+        "SELECT * FROM raw_entry WHERE sourceId = :sourceId AND providerKey = 'series:' || :seriesId LIMIT 1",
     )
-    suspend fun seriesFirstSeen(sourceId: Long, seriesId: Long): Long?
+    suspend fun xtreamSeries(sourceId: Long, seriesId: Long): RawEntryEntity?
 
     @Query(
         "SELECT EXISTS(SELECT 1 FROM raw_entry WHERE sourceId = :sourceId AND kind = 'EPISODE' AND seriesId = :seriesId)",

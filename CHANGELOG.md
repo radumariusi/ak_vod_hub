@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-11-18 — Retușuri după testarea v0.1.40
+
+- Previzualizare comună pentru Acasă, Filme și Seriale cu fundalul și sigla TMDB în engleză. Focus stabil și componente TV aliniate.
+- Episoadele Xtream apar pe măsură ce sosesc, cu etichete românești pentru numele generice. Fișa păstrează vizionarea în aplicație.
+- Subtitrările au coloane interne și externe. Rezoluția confirmată la redare rămâne asociată sursei.
+
+
 ## Etapa 16 — UX și corecții TV
 
 - Refresh Xtream atomic, cu diagnostic pe operație și păstrarea catalogului anterior la eroare.

@@ -2,16 +2,12 @@
 
 package io.github.radumariusi.akvodhub.ui.hub
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,7 +17,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,20 +26,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import coil3.compose.AsyncImage
 import io.github.radumariusi.akvodhub.data.db.ContinueItem
 import io.github.radumariusi.akvodhub.data.db.TitleCard
 import io.github.radumariusi.akvodhub.data.playlist.LibraryTotals
@@ -57,7 +47,6 @@ import io.github.radumariusi.akvodhub.player.PlayerActivity
 import io.github.radumariusi.akvodhub.ui.formatCount
 import io.github.radumariusi.akvodhub.ui.touch.Button
 import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
-import kotlinx.coroutines.delay
 
 /**
  * Acasă: în sus, fișa titlului cu focus (fundal, descriere); dedesubt, rânduri orizontale
@@ -156,18 +145,17 @@ private fun HomeRows(
     }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val extra = if (rows.any { it.key == HomeViewModel.CONTINUE }) 64.dp else 0.dp
-        val heroHeight = (maxHeight - PosterHeight - 108.dp - extra).coerceIn(0.dp, 200.dp)
+        val heroHeight = (maxHeight - PosterHeight - 96.dp).coerceIn(108.dp, 204.dp).coerceAtMost(maxHeight * 0.43f)
         Column(Modifier.fillMaxSize()) {
             val prefs by viewModel.prefs.collectAsState()
-            if (prefs.homeHero && heroHeight >= 104.dp) {
-                Hero(focused, fallback = rows[0].items[0], logo = viewModel::logo, height = heroHeight)
+            if (prefs.homeHero) {
+                CatalogHero(rows.first().items.first(), { focused.value }, viewModel::logo, heroHeight)
             }
             LazyColumn(
                 state = rememberLazyListState(),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(bottom = 24.dp),
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.weight(1f).clipToBounds(),
             ) {
                 items(rows, key = { it.key }) { row ->
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -202,6 +190,7 @@ private fun HomeRows(
                                             onRestored()
                                         },
                                         supportingText = info?.progressLabel(),
+                                        reserveSupportingText = row.key == HomeViewModel.CONTINUE,
                                     )
                                     if (info != null && prefs.continueDirect) {
                                         OutlinedButton(onClick = { actions(card, key, info) }) { Text("Acțiuni") }
@@ -227,70 +216,6 @@ private fun cardKey(
     row: HomeRow,
     card: TitleCard,
 ) = "home:${row.key}:${card.id}"
-
-/** Fișa titlului cu focus. Se schimbă cu o mică întârziere, ca derularea rapidă să nu încarce fiecare fundal. */
-@Composable
-private fun Hero(
-    focused: MutableState<TitleCard?>,
-    fallback: TitleCard,
-    logo: suspend (Long) -> String?,
-    height: Dp,
-) {
-    val target = focused.value ?: fallback
-    var shown by remember { mutableStateOf(target) }
-    LaunchedEffect(target) {
-        delay(HERO_DELAY_MS)
-        shown = target
-    }
-    var logoPath by remember(shown.id) { mutableStateOf<String?>(null) }
-    LaunchedEffect(shown.id) { logoPath = logo(shown.id) }
-    val background = MaterialTheme.colorScheme.background
-    Box(Modifier.fillMaxWidth().height(height)) {
-        val backdrop = Images.hero(shown.backdropPath)
-        if (backdrop != null) {
-            AsyncImage(
-                model = backdrop,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                alignment = Alignment.TopCenter,
-                modifier = Modifier.align(Alignment.TopEnd).fillMaxHeight().fillMaxWidth(0.62f),
-            )
-        }
-        Box(
-            Modifier.fillMaxSize().background(
-                Brush.horizontalGradient(
-                    0.35f to background,
-                    0.75f to background.copy(alpha = 0.4f),
-                    1f to Color.Transparent,
-                ),
-            ),
-        )
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.7f to Color.Transparent, 1f to background)))
-        Column(
-            modifier = Modifier.widthIn(max = 520.dp).padding(top = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            TitleHeading(shown.name, logoPath)
-            val meta = shown.meta()
-            if (meta.isNotEmpty()) {
-                Text(
-                    meta,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            shown.overview?.takeIf { height >= 130.dp }?.let {
-                Text(
-                    it,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = ((height.value.toInt() - 105) / 20).coerceIn(1, 4),
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-    }
-}
 
 @Composable
 private fun EmptyLibrary(onOpenSettings: () -> Unit) {
@@ -320,5 +245,3 @@ fun Message(text: String) {
         modifier = Modifier.widthIn(max = 640.dp).padding(top = 16.dp),
     )
 }
-
-private const val HERO_DELAY_MS = 300L
