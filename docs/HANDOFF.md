@@ -435,7 +435,10 @@ Rândul rămâne utilizabil cu datele din playlist și, dacă există, imaginea 
 Căutarea siglelor folosește un buget de 2,5 s pentru lista TMDB, fără blocaj global între titluri. Hero
 încearcă variantele cu 1,6 s per imagine și cel mult 6 s în total, cu PNG w300. Fișa păstrează PNG w500,
 cu cel mult 2 s per imagine. SVG folosește originalul. Lipsa confirmată se salvează în cache, iar timeout-ul
-permite reîncercarea la revenire. Preîncărcarea celor până la patru vecini este anulată când catalogul intră în fundal.
+permite reîncercarea la revenire. După 180 ms de focus, se încearcă pe rând până la patru vecini, în paralel
+cu titlul curent. Când un vecin deja în curs primește focus, cererea continuă. Cererile celorlalte titluri
+se anulează, iar intrarea în fundal anulează toate cererile hero. Filme și Seriale folosesc posterele portret
+de pe Acasă, cu notele jos și titlul în hero, în accesibilitate și ca rezervă dacă imaginea lipsește.
 
 Media3 păstrează țintele de memorie ale celor trei profiluri. Normal și Mare au o rezervă inițială mai
 mare în timp. Trei întreruperi de cel puțin 400 ms sau două care însumează 4 s în 35 s declanșează
