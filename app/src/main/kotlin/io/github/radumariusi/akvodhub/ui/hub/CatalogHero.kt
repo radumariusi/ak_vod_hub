@@ -1,11 +1,11 @@
 package io.github.radumariusi.akvodhub.ui.hub
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,7 +22,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -82,7 +81,9 @@ internal fun TitleBackdrop(path: String?, modifier: Modifier = Modifier, opacity
     }
 }
 
-internal fun catalogHeroHeight(available: Dp): Dp = (available * 0.54f).coerceIn(136.dp, 264.dp)
+@Composable
+internal fun catalogHeroHeight(available: Dp): Dp =
+    minOf((available * 0.54f).coerceAtMost(264.dp), available - PosterHeight - 64.dp).coerceAtLeast(136.dp)
 
 private data class HeroPresentation(val card: TitleCard, val logo: Image?)
 
@@ -99,6 +100,7 @@ internal fun CatalogHero(
     neighborTitleIds: () -> List<Long> = { emptyList() },
     onPlay: (TitleCard) -> Unit,
     onDetails: (TitleCard) -> Unit,
+    extraActions: @Composable RowScope.() -> Unit = {},
 ) {
     val target = focused() ?: fallback
     val latestTarget by rememberUpdatedState(target)
@@ -182,17 +184,8 @@ internal fun CatalogHero(
     val display = if (cachedLogo != null) HeroPresentation(target, cachedLogo) else presentation
     val shown = if (display.card.id == target.id) target else display.card
     LaunchedEffect(shown.backdropPath) { onBackdropChanged?.invoke(shown.backdropPath) }
-    val colors = MaterialTheme.colorScheme
-    val shape = MaterialTheme.shapes.large
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .height(height)
-            .clip(shape)
-            .background(colors.surface)
-            .border(1.dp, colors.onSurface.copy(alpha = 0.16f), shape),
-    ) {
-        TitleBackdrop(shown.backdropPath, Modifier.matchParentSize(), opacity = 0.93f)
+    Box(Modifier.fillMaxWidth().height(height)) {
+        if (onBackdropChanged == null) TitleBackdrop(shown.backdropPath, Modifier.matchParentSize(), opacity = 0.82f)
         Column(
             Modifier
                 .align(Alignment.BottomStart)
@@ -220,6 +213,7 @@ internal fun CatalogHero(
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Button(onClick = { onPlay(shown) }) { Text("Redă") }
                 OutlinedButton(onClick = { onDetails(shown) }) { Text("Detalii") }
+                extraActions()
             }
         }
     }

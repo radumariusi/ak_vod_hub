@@ -8,11 +8,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -218,7 +220,7 @@ fun AppRoot(
         states.SaveableStateProvider("main") {
             Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                 if (playbackPrefs.homeHero) {
-                    TitleBackdrop(hubBackdrop, Modifier.matchParentSize(), opacity = 0.32f)
+                    TitleBackdrop(hubBackdrop, Modifier.matchParentSize(), opacity = 0.86f)
                 }
                 Column(Modifier.fillMaxSize()) {
                     MainTabs(current) { current = it }
@@ -320,46 +322,46 @@ private fun MainTabs(current: Destination, onSelect: (Destination) -> Unit) {
     val tabs = remember { Destination.entries.associateWith { FocusRequester() } }
     val list = rememberLazyListState()
     val scope = rememberCoroutineScope()
-    LazyRow(
-        state = list,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        contentPadding = PaddingValues(horizontal = 32.dp, vertical = 12.dp),
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.9f))
-                .focusProperties {
-                    onEnter = {
-                        if (requestedFocusDirection == FocusDirection.Up) {
-                            val active = tabs.getValue(current)
-                            if (!runCatching { active.requestFocus() }.getOrDefault(false)) {
-                                cancelFocusChange()
-                                scope.launch {
-                                    list.scrollToItem(current.ordinal + 1)
-                                    withFrameNanos { }
-                                    runCatching { active.requestFocus() }
+    BoxWithConstraints(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface.copy(alpha = 0.9f))) {
+        Text(
+            "AK VOD",
+            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.align(Alignment.CenterStart).padding(start = 20.dp),
+        )
+        LazyRow(
+            state = list,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 12.dp),
+            modifier =
+                Modifier
+                    .align(if (maxWidth >= 760.dp) Alignment.Center else Alignment.CenterEnd)
+                    .widthIn(max = (maxWidth - if (maxWidth >= 760.dp) 176.dp else 100.dp).coerceAtLeast(1.dp))
+                    .focusProperties {
+                        onEnter = {
+                            if (requestedFocusDirection == FocusDirection.Up) {
+                                val active = tabs.getValue(current)
+                                if (!runCatching { active.requestFocus() }.getOrDefault(false)) {
+                                    cancelFocusChange()
+                                    scope.launch {
+                                        list.scrollToItem(current.ordinal)
+                                        withFrameNanos { }
+                                        runCatching { active.requestFocus() }
+                                    }
                                 }
                             }
                         }
-                    }
-                }.focusGroup(),
-    ) {
-        item("brand") {
-            Text(
-                "AK VOD",
-                color = MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(end = 12.dp),
-            )
-        }
-        items(Destination.entries, key = { it.name }) { destination ->
-            SelectionTab(
-                label = destination.label,
-                active = current == destination,
-                modifier = Modifier.focusRequester(tabs.getValue(destination)),
-                onClick = { onSelect(destination) },
-            )
+                    }.focusGroup(),
+        ) {
+            items(Destination.entries, key = { it.name }) { destination ->
+                SelectionTab(
+                    label = destination.label,
+                    active = current == destination,
+                    modifier = Modifier.focusRequester(tabs.getValue(destination)),
+                    onClick = { onSelect(destination) },
+                )
+            }
         }
     }
 }
