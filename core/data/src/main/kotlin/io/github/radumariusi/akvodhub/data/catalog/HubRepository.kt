@@ -36,6 +36,7 @@ import io.github.radumariusi.akvodhub.parser.catalog.PersonalLibrary
 import io.github.radumariusi.akvodhub.parser.catalog.PlaylistNews
 import io.github.radumariusi.akvodhub.parser.catalog.PosterBadges
 import io.github.radumariusi.akvodhub.parser.catalog.TitleLogo
+import io.github.radumariusi.akvodhub.parser.match.MediaType
 import io.github.radumariusi.akvodhub.parser.match.QualityGroup
 import io.github.radumariusi.akvodhub.parser.match.SourceGrouping
 import io.github.radumariusi.akvodhub.parser.match.SourceInfo
@@ -75,6 +76,10 @@ data class Person(
 data class Credits(
     val directors: List<String>,
     val cast: List<Person>,
+    /** Scenariști (filme) sau creatori (seriale). */
+    val writers: List<String> = emptyList(),
+    /** Perechi „etichetă → valoare” pentru secțiunea Informații (studiouri, premieră, buget…). */
+    val facts: List<Pair<String, String>> = emptyList(),
 )
 
 /** O sursă de pe pagina de detalii: intrarea din playlist + numele playlist-ului. */
@@ -600,14 +605,21 @@ class HubRepository(
         if (title.isLocal) return null
         creditsCache[title.id]?.let { return it }
         val key = settings.apiKey() ?: return null
-        val credits =
+        val info =
             try {
-                tmdb.credits(key, title.mediaType, title.tmdbId)
+                tmdb.titleInfo(key, title.mediaType, title.tmdbId)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 null
             } ?: return null
+        val credits = info.allCredits
+        val writers =
+            if (title.mediaType == MediaType.TV) {
+                info.createdBy.mapNotNull { it.name }
+            } else {
+                credits.crew.filter { it.job in WRITER_JOBS }.map { it.name }
+            }
         val result =
             Credits(
                 directors =
@@ -617,6 +629,8 @@ class HubRepository(
                         .distinct()
                         .take(3),
                 cast = credits.cast.take(MAX_CAST).map { Person(it.name, it.role, it.profilePath, it.id) },
+                writers = writers.distinct().take(4),
+                facts = TitleFacts.from(info, title),
             )
         creditsCache[title.id] = result
         return result
@@ -697,5 +711,6 @@ class HubRepository(
         const val HEALTH_KEY = "source-health"
         const val MAX_LANGUAGES = 30
         const val MAX_CAST = 15
+        val WRITER_JOBS = setOf("Screenplay", "Writer", "Story", "Novel", "Author")
     }
 }

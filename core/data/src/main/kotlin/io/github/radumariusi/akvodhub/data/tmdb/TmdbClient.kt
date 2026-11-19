@@ -97,6 +97,31 @@ class TmdbClient(
         return json.decodeFromString<TmdbCredits>(body)
     }
 
+    /** Fișa completă (studiouri, date, buget, creatori) cu distribuția atașată. null = nu există pe TMDB. */
+    suspend fun titleInfo(
+        key: String,
+        type: MediaType,
+        tmdbId: Long,
+    ): TmdbTitleInfo? {
+        val tv = type == MediaType.TV
+        val url =
+            url(if (tv) "tv/$tmdbId" else "movie/$tmdbId")
+                .addQueryParameter("language", METADATA_LANGUAGE)
+                .addQueryParameter("append_to_response", if (tv) "aggregate_credits" else "credits")
+        val body = get(key, url.build()) ?: return null
+        return json.decodeFromString<TmdbTitleInfo>(body)
+    }
+
+    /** Datele unei persoane (biografie, naștere). null = nu există. */
+    suspend fun person(
+        key: String,
+        personId: Long,
+    ): TmdbPerson? {
+        val body =
+            get(key, url("person/$personId").addQueryParameter("language", METADATA_LANGUAGE).build()) ?: return null
+        return json.decodeFromString<TmdbPerson>(body)
+    }
+
     /** Recomandări, similare, distribuție și colecție pentru un titlu (o cerere). null = nu există pe TMDB. */
     suspend fun related(
         key: String,

@@ -215,3 +215,53 @@ data class TmdbLogo(
     @SerialName("iso_639_1") val language: String? = null,
     @SerialName("vote_count") val votes: Int = 0,
 )
+
+@Serializable
+data class TmdbNamed(
+    val id: Long? = null,
+    val name: String? = null,
+)
+
+@Serializable
+data class TmdbSpokenLanguage(
+    @SerialName("iso_639_1") val code: String? = null,
+    @SerialName("english_name") val englishName: String? = null,
+)
+
+/** Fișa completă a unui titlu, cu distribuția atașată (`movie/{id}` sau `tv/{id}` + credits), o cerere. */
+@Serializable
+data class TmdbTitleInfo(
+    val credits: TmdbCredits? = null,
+    @SerialName("aggregate_credits") val aggregateCredits: TmdbCredits? = null,
+    @SerialName("production_companies") val companies: List<TmdbNamed> = emptyList(),
+    @SerialName("production_countries") val countries: List<TmdbNamed> = emptyList(),
+    val networks: List<TmdbNamed> = emptyList(),
+    @SerialName("created_by") val createdBy: List<TmdbNamed> = emptyList(),
+    @SerialName("spoken_languages") val spokenLanguages: List<TmdbSpokenLanguage> = emptyList(),
+    @SerialName("release_date") val releaseDate: String? = null,
+    @SerialName("first_air_date") val firstAirDate: String? = null,
+    @SerialName("last_air_date") val lastAirDate: String? = null,
+    val status: String? = null,
+    val budget: Long? = null,
+    val revenue: Long? = null,
+    @SerialName("number_of_seasons") val seasons: Int? = null,
+    @SerialName("number_of_episodes") val episodes: Int? = null,
+    @SerialName("vote_count") val voteCount: Int? = null,
+    @SerialName("original_title") val originalTitle: String? = null,
+    @SerialName("original_name") val originalName: String? = null,
+) {
+    val allCredits: TmdbCredits get() = credits ?: aggregateCredits ?: TmdbCredits()
+}
+
+/** O persoană (`/person/{id}`): biografie, naștere, meserie. */
+@Serializable
+data class TmdbPerson(
+    val id: Long,
+    val name: String? = null,
+    val biography: String? = null,
+    val birthday: String? = null,
+    val deathday: String? = null,
+    @SerialName("place_of_birth") val placeOfBirth: String? = null,
+    @SerialName("known_for_department") val department: String? = null,
+    @SerialName("profile_path") val profilePath: String? = null,
+)
