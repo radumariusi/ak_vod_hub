@@ -138,6 +138,7 @@ fun BrowseScreen(
                 with(gridCells) { calculateCrossAxisCellSizes(available, 14.dp.roundToPx()).size }
             }
         val heroHeight = catalogHeroHeight(maxHeight)
+        val showGridHint = maxWidth >= 600.dp
         val firstId = state.items.firstOrNull()?.id
         LaunchedEffect(firstId, columns) {
             if (search) return@LaunchedEffect
@@ -196,7 +197,7 @@ fun BrowseScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(title, style = MaterialTheme.typography.titleMedium)
-                    if (maxWidth >= 600.dp) {
+                    if (showGridHint) {
                         Text("OK pentru detalii · Ține OK pentru acțiuni", style = MaterialTheme.typography.labelSmall)
                     }
                 }
