@@ -499,3 +499,13 @@ de filme și seriale se citesc înaintea rândurilor de noutăți și genuri. Or
 vizibilitatea rămân cele configurate. Reindexarea locală pornește după prima rundă de citire și este
 disponibilă și offline. O notificare în timpul citirii programează o rundă nouă, fără să anuleze runda
 în curs. Paginarea rămâne limitată. Timpul la pornire pe catalogul real se verifică pe TV.
+
+
+### Focus și derulare după v0.1.48
+
+În Filme și Seriale, poziția grilei se aliniază la rândul cardului focalizat. Spațiul de după ultimul
+rând permite aceeași aliniere la capăt. Derularea tactilă se fixează pe un rând. Sus/Jos navighează
+prin grilă. OK deschide fișa direct de pe poster, iar apăsarea lungă pe OK sau atingerea lungă mută
+focusul pe Detalii în hero, cu titlul cardului păstrat. Comanda pornește la eliberarea tastei. În jos
+din hero se restaurează ultimul card din grilă. Paginarea rămâne limitată. Nu sunt modificări de
+schemă sau dependențe. Telecomanda și aspectul ultimului rând se verifică pe TV.

@@ -198,6 +198,10 @@ Vezi detalii despre schema Room și limitele cunoscute în [HANDOFF.md](HANDOFF.
 
 - Primele rânduri folosesc catalogul salvat și sunt publicate progresiv. Pregătirea indexului continuă separat, iar ecranul se actualizează când datele se schimbă.
 
+## Focus și derulare după v0.1.48
+
+- Filme și Seriale aliniază grila la rândul curent. Detalii este accesibil prin OK direct pe poster sau prin apăsarea lungă pe OK pentru mutarea în hero.
+
 ## Ce ar îngreuna aplicația (de evitat sau doar opțional)
 
 1. **Trailere redate în aplicație / pe fundal** (YouTube, WebView): megabytes în plus și RAM. → Deschidem aplicația YouTube.

@@ -1,7 +1,10 @@
-@file:OptIn(ExperimentalTvMaterial3Api::class)
+@file:OptIn(ExperimentalTvMaterial3Api::class, ExperimentalComposeUiApi::class)
 
 package io.github.radumariusi.akvodhub.ui.hub
 
+import androidx.compose.foundation.gestures.ScrollableDefaults
+import androidx.compose.foundation.gestures.snapping.SnapPosition
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -29,9 +32,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.input.ImeAction
@@ -90,6 +95,7 @@ fun BrowseScreen(
     var showFilters by remember { mutableStateOf(false) }
     var restoreFiltersFocus by remember { mutableStateOf(false) }
     val filtersFocus = remember { FocusRequester() }
+    val detailsFocus = remember { FocusRequester() }
     LaunchedEffect(showFilters) {
         if (!showFilters && restoreFiltersFocus) {
             filtersFocus.requestFocus()
@@ -132,6 +138,15 @@ fun BrowseScreen(
                 with(gridCells) { calculateCrossAxisCellSizes(available, 14.dp.roundToPx()).size }
             }
         val heroHeight = catalogHeroHeight(maxHeight)
+        val firstId = state.items.firstOrNull()?.id
+        LaunchedEffect(firstId, columns) {
+            if (search) return@LaunchedEffect
+            val id = preview.value?.id ?: return@LaunchedEffect
+            val index = state.items.indexOfFirst { it.id == id }
+            if (index >= 0 && grid.layoutInfo.visibleItemsInfo.any { it.key == id }) {
+                grid.scrollToItem(index)
+            }
+        }
         Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(if (showHero) 0.dp else 6.dp)) {
             val fallback = state.items.firstOrNull()
             if (showHero && fallback != null) {
@@ -149,6 +164,7 @@ fun BrowseScreen(
                         context.startActivity(PlayerActivity.intent(context, PlayRequest(card.id, resume = true)))
                     },
                     onDetails = { card -> onOpen(card, "browse:$screenKey:${card.id}") },
+                    detailsModifier = Modifier.focusRequester(detailsFocus),
                     extraActions = {
                         OutlinedButton(
                             onClick = { showFilters = true },
@@ -174,7 +190,16 @@ fun BrowseScreen(
                 }
             }
             if (showHero && fallback != null) {
-                Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 4.dp))
+                Row(
+                    Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(title, style = MaterialTheme.typography.titleMedium)
+                    if (maxWidth >= 600.dp) {
+                        Text("OK pentru detalii · Ține OK pentru acțiuni", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
             } else {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -190,24 +215,55 @@ fun BrowseScreen(
 
             when {
                 state.items.isNotEmpty() -> {
-                    LazyVerticalGrid(
-                        state = grid,
-                        columns = gridCells,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        contentPadding = PaddingValues(start = 6.dp, end = 6.dp, top = 10.dp, bottom = 32.dp),
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        itemsIndexed(state.items, key = { _, card -> card.id }) { _, card ->
-                            val key = "browse:$screenKey:${card.id}"
-                            PosterCard(
-                                card = card,
-                                onClick = { onOpen(card, key) },
-                                onFocused = { if (showHero) preview.value = card },
-                                requestFocus = key == restoreKey,
-                                onFocusRequested = onRestored,
-                                showTitle = search,
-                            )
+                    BoxWithConstraints(Modifier.weight(1f)) {
+                        val trailing = if (search) 32.dp else (maxHeight - PosterHeight - 30.dp).coerceAtLeast(32.dp)
+                        val fling =
+                            if (search) {
+                                ScrollableDefaults.flingBehavior()
+                            } else {
+                                rememberSnapFlingBehavior(
+                                    grid,
+                                    SnapPosition.Start,
+                                )
+                            }
+                        LazyVerticalGrid(
+                            state = grid,
+                            columns = gridCells,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(start = 6.dp, end = 6.dp, top = 10.dp, bottom = trailing),
+                            flingBehavior = fling,
+                            modifier = Modifier.fillMaxSize().then(if (search) Modifier else Modifier.focusRestorer()),
+                        ) {
+                            itemsIndexed(state.items, key = { _, card -> card.id }) { index, card ->
+                                val key = "browse:$screenKey:${card.id}"
+                                PosterCard(
+                                    card = card,
+                                    onClick = { onOpen(card, key) },
+                                    onFocused = {
+                                        if (!search) {
+                                            preview.value = card
+                                            if (grid.firstVisibleItemIndex / columns != index / columns ||
+                                                grid.firstVisibleItemScrollOffset != 0
+                                            ) {
+                                                grid.requestScrollToItem(index)
+                                            }
+                                        }
+                                    },
+                                    onLongClick =
+                                        if (showHero) {
+                                            {
+                                                preview.value = card
+                                                detailsFocus.requestFocus()
+                                            }
+                                        } else {
+                                            null
+                                        },
+                                    requestFocus = key == restoreKey,
+                                    onFocusRequested = onRestored,
+                                    showTitle = search,
+                                )
+                            }
                         }
                     }
                 }
