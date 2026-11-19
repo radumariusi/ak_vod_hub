@@ -22,6 +22,9 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
+    // Testul de migrare Room rulează pe JVM cu SQLite-ul Android din Robolectric.
+    testOptions.unitTests.isIncludeAndroidResources = true
 }
 
 dependencies {
@@ -35,4 +38,5 @@ dependencies {
     api(libs.androidx.work.runtime)
 
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
 }
