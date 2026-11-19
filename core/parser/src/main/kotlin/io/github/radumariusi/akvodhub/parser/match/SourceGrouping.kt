@@ -82,6 +82,7 @@ object SourceGrouping {
         when (language) {
             null -> "Limbă audio necunoscută"
             ParsedTitle.MULTI -> "MULTI"
+            ParsedTitle.ORIGINAL -> "Original"
             else -> language.uppercase()
         }
 

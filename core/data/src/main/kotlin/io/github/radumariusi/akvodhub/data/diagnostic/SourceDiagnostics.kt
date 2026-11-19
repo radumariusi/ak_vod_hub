@@ -1,6 +1,7 @@
 package io.github.radumariusi.akvodhub.data.diagnostic
 
 import io.github.radumariusi.akvodhub.data.db.AkVodDatabase
+import io.github.radumariusi.akvodhub.data.db.DiagnosticCategory
 import io.github.radumariusi.akvodhub.data.db.DiagnosticName
 import io.github.radumariusi.akvodhub.data.db.PlaylistType
 import io.github.radumariusi.akvodhub.data.playlist.PlaylistImporter
@@ -53,6 +54,12 @@ class SourceDiagnostics(
                 noQuality = counts.sumOf { it.noQuality },
                 categoriesWithoutLanguage = categories,
             )
+        }
+
+    /** Cele mai mari categorii, pentru regulile de limbă din Setări → Conținut. */
+    suspend fun categories(): List<DiagnosticCategory> =
+        withContext(Dispatchers.IO) {
+            dao.diagnosticCategories(CATEGORY_LIMIT).distinctBy { it.groupTitle.trim() }.take(RULE_CATEGORIES)
         }
 
     suspend fun report(): String =
@@ -162,6 +169,7 @@ class SourceDiagnostics(
 
     private companion object {
         const val CATEGORY_LIMIT = 400
+        const val RULE_CATEGORIES = 150
         const val NAME_LIMIT = 300
         const val XTREAM_TIMEOUT_MS = 15_000L
     }

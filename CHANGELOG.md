@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-11-19 — Limba audio și rezoluția surselor (C)
+
+- „RO - Titlu” (și secțiunile NL, SE, NO, DK, FI, GR) înseamnă audio original cu subtitrare în limba secțiunii. Limba originală vine de la TMDB: Clanul sau Burebista rămân „Audio RO”, un film american devine „Audio EN · Sub RO”. Fără potrivire TMDB, sursa apare „Audio Original”.
+- Țara din coada numelui după an („(TR)”, „(US)”, „(RO)”) dă limba audio. VO/VOST/VOSTFR/OmU = audio original; SUBTITRAT/SUBTITULADO = subtitrare.
+- Categoriile cu nume de țară (ITALY, FRANCE, ESPAÑA, ROMANIA…) și QC/LA sunt recunoscute. IN, BE, CH, CA nu mai sunt luate drept limbi (hindi, olandeză, germană).
+- Rezoluția scrisă ca 1920x1080 în nume e citită. Dolby Vision e recunoscut și cu litere mici în superscript.
+- Episoadele Xtream iau limba audio trimisă de furnizor („rum” → RO). Limbile pistelor audio văzute la redare se salvează pe sursă și au prioritate (migrare 19 → 20).
+- Setări → Conținut → „Limba audio pe categorii”: pentru o categorie greșită alegi Automat, Audio original sau Dublat. Sursele se reanalizează în fundal.
+- Catalogul salvat se reanalizează o dată în fundal, în loturi, cu regulile noi.
+
 ## 2026-11-19 — Propuneri ușoare (B)
 
 - Tasta Play / Play-Pauză a telecomenzii pe un poster (Acasă, Filme, Seriale, Căutare) pornește direct redarea, fără fișă.

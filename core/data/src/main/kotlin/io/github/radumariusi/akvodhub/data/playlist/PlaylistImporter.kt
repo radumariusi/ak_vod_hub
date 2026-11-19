@@ -178,6 +178,7 @@ class PlaylistImporter(
                             containerExt = e.containerExtension,
                             providerAddedAt = e.added,
                             providerQuality = e.quality,
+                            providerLanguages = e.language,
                             firstSeenAt = firstSeen,
                             seenRun = now,
                             matchState = MatchState.INHERITED,
@@ -447,10 +448,13 @@ class PlaylistImporter(
                                     old.containerExt == parsed.containerExt && old.season == parsed.season &&
                                     old.episode == parsed.episode
                             val confirmed = old.confirmedQuality.takeIf { sameStream }
+                            val confirmedLanguages = old.confirmedLanguages.takeIf { sameStream }
                             updates +=
                                 parsed.copy(
                                     quality = confirmed ?: parsed.quality,
                                     confirmedQuality = confirmed,
+                                    languages = confirmedLanguages ?: parsed.languages,
+                                    confirmedLanguages = confirmedLanguages,
                                     id = old.id,
                                     firstSeenAt = old.firstSeenAt,
                                     visible = old.visible,

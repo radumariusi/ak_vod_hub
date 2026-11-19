@@ -42,4 +42,13 @@ class DubLabelTest {
         result.addSource(null)
         assertNull(result.label())
     }
+
+    @Test
+    fun originalMarkerCountsAsOriginalAudio() {
+        val label = DubLabel("en")
+        label.addSource("ori")
+        label.addSource("ro")
+        assertEquals(null, label.label())
+        assertEquals(true, label.hasOriginalAudio)
+    }
 }

@@ -9,6 +9,7 @@ import coil3.disk.DiskCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.crossfade
 import dagger.hilt.android.HiltAndroidApp
+import io.github.radumariusi.akvodhub.data.catalog.CatalogIndexer
 import io.github.radumariusi.akvodhub.data.catalog.MatchScheduler
 import io.github.radumariusi.akvodhub.data.imdb.ImdbRatingsScheduler
 import io.github.radumariusi.akvodhub.data.playlist.PlaylistWorkerFactory
@@ -40,6 +41,7 @@ class AkVodHubApp :
 
     override fun onCreate() {
         super.onCreate()
+        CatalogIndexer.loadCategoryRules(this)
         homeScreen.start(appScope)
         matchScheduler.enqueue()
         imdbScheduler.ensureScheduled()

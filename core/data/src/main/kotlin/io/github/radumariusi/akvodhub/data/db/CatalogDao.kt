@@ -23,6 +23,7 @@ data class PendingEntry(
     val title: String?,
     val year: Int?,
     val languages: String?,
+    val subtitles: String? = null,
     val tmdbId: Long?,
     val matchState: Int,
 )
@@ -43,14 +44,14 @@ interface CatalogDao {
 
     /** Intrări cu ID TMDB de la furnizor: se leagă direct, fără căutare. */
     @Query(
-        "SELECT id, kind, name, groupTitle, title, year, languages, tmdbId, matchState FROM raw_entry " +
+        "SELECT id, kind, name, groupTitle, title, year, languages, subtitles, tmdbId, matchState FROM raw_entry " +
             "WHERE matchState = 0 AND tmdbId IS NOT NULL LIMIT :limit",
     )
     suspend fun pendingWithProviderId(limit: Int): List<PendingEntry>
 
     /** Intrări de căutat pe TMDB după nume. */
     @Query(
-        "SELECT id, kind, name, groupTitle, title, year, languages, tmdbId, matchState FROM raw_entry " +
+        "SELECT id, kind, name, groupTitle, title, year, languages, subtitles, tmdbId, matchState FROM raw_entry " +
             "WHERE (matchState = 0 AND tmdbId IS NULL) OR matchState = 4 LIMIT :limit",
     )
     suspend fun pendingSearch(limit: Int): List<PendingEntry>
@@ -299,7 +300,7 @@ interface CatalogDao {
 
     /** Combinațiile de limbi din playlist-uri, cele mai frecvente primele (pentru filtrul „Limbă”). */
     @Query(
-        "SELECT language FROM title_source_option WHERE language <> '' " +
+        "SELECT language FROM title_source_option WHERE language <> '' AND language <> 'ori' " +
             "GROUP BY language ORDER BY COUNT(*) DESC LIMIT 80",
     )
     suspend fun languageCombinations(): List<String>
@@ -308,7 +309,7 @@ interface CatalogDao {
 
     /** Intrări fără titlu încă (de potrivit sau negăsite pe TMDB), pentru titlurile locale. */
     @Query(
-        "SELECT id, kind, name, groupTitle, title, year, languages, tmdbId, matchState FROM raw_entry " +
+        "SELECT id, kind, name, groupTitle, title, year, languages, subtitles, tmdbId, matchState FROM raw_entry " +
             "WHERE titleId IS NULL AND matchState IN (0, 2, 4) AND id > :afterId ORDER BY id LIMIT :limit",
     )
     suspend fun unlinked(
@@ -358,6 +359,12 @@ interface CatalogDao {
     )
     suspend fun confirmQuality(id: Long, quality: VideoQuality, rank: Int): Int
 
+    @Query(
+        "UPDATE raw_entry SET languages = :languages, confirmedLanguages = :languages " +
+            "WHERE id = :id AND confirmedLanguages IS NOT :languages",
+    )
+    suspend fun confirmLanguages(id: Long, languages: String): Int
+
     /**
      * Amprenta structurală: se schimbă doar la import (intrări noi, șterse sau văzute din nou). Atunci refacem
      * tot catalogul. Restul schimbărilor (potriviri TMDB, calitate confirmată) le notează trigger-ele din
@@ -383,5 +390,6 @@ private const val SUMMARIES_SQL =
         "WHEN 'SD' THEN 0 END) FROM raw_entry r WHERE r.titleId = title.id AND r.visible = 1), " +
         "qualities = (SELECT ',' || group_concat(DISTINCT r.quality) || ',' FROM raw_entry r " +
         "WHERE r.titleId = title.id AND r.visible = 1), " +
-        "audioLanguages = (SELECT ',' || group_concat(DISTINCT r.languages) || ',' FROM raw_entry r " +
-        "WHERE r.titleId = title.id AND r.visible = 1)"
+        "audioLanguages = (SELECT ',' || group_concat(DISTINCT trim(" +
+        "replace(',' || r.languages || ',', ',ori,', ',' || COALESCE(lower(title.originalLanguage), 'ori') || ',')" +
+        ", ',')) || ',' FROM raw_entry r WHERE r.titleId = title.id AND r.visible = 1)"

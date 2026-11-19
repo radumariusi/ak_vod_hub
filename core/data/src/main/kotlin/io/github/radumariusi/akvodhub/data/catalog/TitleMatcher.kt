@@ -371,6 +371,7 @@ class TitleMatcher(
                 title = entry.title,
                 year = entry.year,
                 languages = entry.languages?.split(',').orEmpty(),
+                subtitles = entry.subtitles?.split(',').orEmpty(),
             )
         } else {
             // Intrare importată înainte de etapa 3 (încă neparsată).
@@ -380,7 +381,7 @@ class TitleMatcher(
     private fun query(entry: PendingEntry): MatchQuery? {
         val p = parsed(entry)
         if (p.title.isBlank()) return null
-        return MatchQuery(mediaType(entry.kind), p.title, p.year, p.languages.singleOrNull())
+        return MatchQuery(mediaType(entry.kind), p.title, p.year, ParsedTitle.nameLanguage(p.languages, p.subtitles))
     }
 
     private fun mediaType(kind: VodKind) = if (kind == VodKind.MOVIE) MediaType.MOVIE else MediaType.TV

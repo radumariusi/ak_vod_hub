@@ -88,6 +88,10 @@ data class RawEntryEntity(
     val languages: String? = null,
     /** Limbile subtitrărilor declarate în nume, la fel ca [languages]. */
     val subtitles: String? = null,
+    /** Limba audio trimisă de furnizor (Xtream `get_series_info`, pe episod), ISO 639-1. */
+    val providerLanguages: String? = null,
+    /** Limbile pistelor audio văzute la redare; au prioritate față de nume și furnizor. */
+    val confirmedLanguages: String? = null,
     /** Titlul TMDB ([TitleEntity]) de care aparține intrarea; toate sursele aceluiași film au același [titleId]. */
     val titleId: Long? = null,
     /** Starea potrivirii TMDB, vezi [MatchState]. */
@@ -105,7 +109,8 @@ data class RawEntryEntity(
             containerExt == other.containerExt &&
             tmdbId == other.tmdbId &&
             providerAddedAt == other.providerAddedAt &&
-            providerQuality == other.providerQuality
+            providerQuality == other.providerQuality &&
+            providerLanguages == other.providerLanguages
 
     /** Aceeași intrare, cu câmpurile parsate din nume și categorie. Sezonul/episodul dat de furnizor are prioritate. */
     fun parsed(): RawEntryEntity {
@@ -118,7 +123,7 @@ data class RawEntryEntity(
             quality = confirmedQuality ?: providerQuality ?: p.quality,
             hdr = p.hdr,
             codec = p.codec,
-            languages = p.languages.joinToString(",").ifEmpty { null },
+            languages = confirmedLanguages ?: providerLanguages ?: p.languages.joinToString(",").ifEmpty { null },
             subtitles = p.subtitles.joinToString(",").ifEmpty { null },
         )
     }

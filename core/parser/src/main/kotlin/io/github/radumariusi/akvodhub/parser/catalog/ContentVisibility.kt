@@ -2,11 +2,18 @@ package io.github.radumariusi.akvodhub.parser.catalog
 
 /** Aplică ascunderea limbii pe variante și ascunderea explicită a categoriilor pe titluri. */
 object ContentVisibility {
+    /**
+     * Limbile audio ale sursei `r` ca listă `,a,b,`, cu `ori` (audio original) înlocuit de limba originală
+     * a titlului `t` (rămâne `ori` dacă TMDB nu o știe).
+     */
+    const val RESOLVED_LANGUAGES =
+        "replace(',' || r.languages || ',', ',ori,', ',' || COALESCE(lower(t.originalLanguage), 'ori') || ',')"
+
     const val SOURCE_OPTIONS =
         "WITH RECURSIVE options(titleId, quality, language, originalAudio, rest) AS (" +
             "SELECT t.id, COALESCE(r.quality, ''), '', CASE WHEN t.originalLanguage IS NOT NULL AND " +
-            "instr(',' || r.languages || ',', ',' || lower(t.originalLanguage) || ',') > 0 THEN 1 ELSE 0 END, " +
-            "COALESCE(r.languages || ',', '') FROM raw_entry r JOIN title t ON t.id = r.titleId " +
+            "instr($RESOLVED_LANGUAGES, ',' || lower(t.originalLanguage) || ',') > 0 THEN 1 ELSE 0 END, " +
+            "COALESCE(substr($RESOLVED_LANGUAGES, 2), '') FROM raw_entry r JOIN title t ON t.id = r.titleId " +
             "WHERE r.visible = 1 " +
             "UNION ALL SELECT titleId, quality, substr(rest, 1, instr(rest, ',') - 1), originalAudio, " +
             "substr(rest, instr(rest, ',') + 1) FROM options WHERE rest <> '') " +

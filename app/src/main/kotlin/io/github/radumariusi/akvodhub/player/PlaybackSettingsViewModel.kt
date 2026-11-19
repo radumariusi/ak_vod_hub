@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.radumariusi.akvodhub.data.catalog.HubRepository
+import io.github.radumariusi.akvodhub.data.db.DiagnosticCategory
 import io.github.radumariusi.akvodhub.data.diagnostic.SourceDiagnostics
 import io.github.radumariusi.akvodhub.data.player.PlaybackPrefs
 import io.github.radumariusi.akvodhub.data.player.PlaybackSettings
@@ -16,6 +17,7 @@ import io.github.radumariusi.akvodhub.parser.catalog.PosterBadge
 import io.github.radumariusi.akvodhub.parser.catalog.PosterSize
 import io.github.radumariusi.akvodhub.parser.player.SourceProfile
 import io.github.radumariusi.akvodhub.parser.player.SourceRule
+import io.github.radumariusi.akvodhub.parser.title.CategoryMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -156,6 +158,29 @@ class PlaybackSettingsViewModel
                 language != null -> list += language
             }
             settings.setSubtitleLanguages(list.distinct())
+        }
+
+        private val mutableCategories = MutableStateFlow<List<DiagnosticCategory>?>(null)
+
+        /** Categoriile din playlist (null = încă neîncărcate). */
+        val categories = mutableCategories.asStateFlow()
+        private val mutableCategoryRules = MutableStateFlow(repository.categoryRules())
+        val categoryRules = mutableCategoryRules.asStateFlow()
+
+        fun loadCategories() {
+            viewModelScope.launch {
+                mutableCategories.value = runCatching { diagnostics.categories() }.getOrDefault(emptyList())
+            }
+        }
+
+        /** Automat → Audio original → Dublat → Automat. */
+        fun cycleCategoryRule(category: String) {
+            val key = category.trim()
+            val current = mutableCategoryRules.value[key] ?: CategoryMode.AUTO
+            val next = CategoryMode.entries[(current.ordinal + 1) % CategoryMode.entries.size]
+            val rules = mutableCategoryRules.value + (key to next)
+            mutableCategoryRules.value = rules.filterValues { it != CategoryMode.AUTO }
+            repository.setCategoryRules(rules)
         }
 
         fun setContent(key: String, value: String) {

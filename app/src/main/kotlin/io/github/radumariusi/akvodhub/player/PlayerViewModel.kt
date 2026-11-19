@@ -30,6 +30,7 @@ import io.github.radumariusi.akvodhub.parser.catalog.MergedSeason
 import io.github.radumariusi.akvodhub.parser.match.MediaType
 import io.github.radumariusi.akvodhub.parser.match.SourceInfo
 import io.github.radumariusi.akvodhub.parser.player.BufferPreset
+import io.github.radumariusi.akvodhub.parser.player.ConfirmedLanguages
 import io.github.radumariusi.akvodhub.parser.player.EpisodeOrder
 import io.github.radumariusi.akvodhub.parser.player.FallbackQueue
 import io.github.radumariusi.akvodhub.parser.player.PlaybackRecovery
@@ -318,6 +319,9 @@ class PlayerViewModel
                             if (lastSourceTracks != observation) {
                                 lastSourceTracks = observation
                                 viewModelScope.launch { repository.rememberSourceTracks(entryId, snapshot) }
+                                ConfirmedLanguages.of(TrackOptions.languages(tracks, C.TRACK_TYPE_AUDIO))?.let {
+                                    viewModelScope.launch { repository.confirmLanguages(entryId, it) }
+                                }
                             }
                         }
                         embeddedTextLanguages =
