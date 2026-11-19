@@ -12,9 +12,9 @@ apksigner="${build_tools}apksigner"
 certificate() {
   local output digests
   output=$("$apksigner" verify --print-certs "$1")
-  # Formatul diferă între versiunile build-tools („Signer #1 …” sau „Signer (minSdkVersion=…) …”), iar
+  # Formatul diferă între versiunile build-tools („Signer #1 …”, „V2 Signer: …”, „Signer (minSdkVersion=…) …”), iar
   # schemele v1/v2/v3 pot lista același semnatar de mai multe ori: contează amprentele distincte.
-  digests=$(sed -n 's/^Signer.* certificate SHA-256 digest: //p' <<<"$output" | sed 's/[:[:space:]]//g' |
+  digests=$(sed -n 's/^.*Signer.* certificate SHA-256 digest: //p' <<<"$output" | sed 's/[:[:space:]]//g' |
     tr 'A-F' 'a-f' | sort -u)
   if [[ -z "$digests" || $(wc -l <<<"$digests") -ne 1 ]]; then
     echo "$1: se așteaptă un singur certificat de semnare. apksigner a afișat:" >&2
