@@ -18,6 +18,9 @@ import io.github.radumariusi.akvodhub.parser.match.MediaType
 import io.github.radumariusi.akvodhub.parser.match.TitleSimilarity
 import io.github.radumariusi.akvodhub.parser.player.PlaybackActivityState
 import io.github.radumariusi.akvodhub.parser.player.SeriesPlayback
+import io.github.radumariusi.akvodhub.parser.title.CategoryMode
+import io.github.radumariusi.akvodhub.parser.title.CategoryRules
+import io.github.radumariusi.akvodhub.parser.title.ParsedTitle
 import io.github.radumariusi.akvodhub.parser.title.TitleParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -46,7 +49,7 @@ class CatalogIndexer(
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private val dao = db.catalogDao()
-    private val prefs = context.getSharedPreferences("catalog_index", Context.MODE_PRIVATE)
+    private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     private val contentPrefs = context.getSharedPreferences("playback", Context.MODE_PRIVATE)
     private val mutex = Mutex()
     private val mutableVersion = MutableStateFlow(0L)
@@ -121,11 +124,21 @@ class CatalogIndexer(
             }
         }
 
+    /** Regulile pe categorii din Setări → Conținut; reparsăm toate intrările salvate. */
+    fun setCategoryRules(rules: Map<String, CategoryMode>) {
+        CategoryRules.rules = rules.filterValues { it != CategoryMode.AUTO }
+        prefs
+            .edit()
+            .putString(CATEGORY_RULES, CategoryRules.encode(rules))
+            .putLong(SOURCE_METADATA_CURSOR, 0L)
+            .apply()
+    }
+
     /** Reparsează intrările salvate după actualizarea regulilor, în loturi reluabile. */
     suspend fun refreshSourceMetadata(): Boolean =
         mutex.withLock {
             withContext(Dispatchers.IO) {
-                val key = "source_metadata_v2_after_id"
+                val key = SOURCE_METADATA_CURSOR
                 var after = prefs.getLong(key, 0L)
                 if (after < 0L) return@withContext true
                 val playlist = db.playlistDao()
@@ -153,7 +166,10 @@ class CatalogIndexer(
                                                         type,
                                                         title,
                                                         parsed.year,
-                                                        parsed.languages?.split(',')?.singleOrNull(),
+                                                        ParsedTitle.nameLanguage(
+                                                            parsed.languages?.split(',').orEmpty(),
+                                                            parsed.subtitles?.split(',').orEmpty(),
+                                                        ),
                                                     ).alternatives.isNotEmpty()
                                             )
                                     if (local && nameChanged && entry.titleId != null) {
@@ -441,6 +457,18 @@ class CatalogIndexer(
 
     companion object {
         private const val TAG = "CatalogIndexer"
+        private const val PREFS = "catalog_index"
+        private const val CATEGORY_RULES = "category_rules"
+        private const val SOURCE_METADATA_CURSOR = "source_metadata_v3_after_id"
+
+        /** La pornirea aplicației, înainte de orice import sau reparsare. */
+        fun loadCategoryRules(context: Context) {
+            CategoryRules.rules =
+                CategoryRules.decode(
+                    context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(CATEGORY_RULES, null),
+                )
+        }
+
         private const val FINGERPRINT = "fingerprint_v19"
         private const val TITLES_STAMP = "titles_stamp"
 

@@ -13,12 +13,12 @@ internal object TitleTags {
                 vararg codes: String,
             ) = codes.forEach { put(it, iso) }
             add("en", "EN", "ENG", "UK", "GB", "US", "USA")
-            add("de", "DE", "GER", "DEU", "AT", "CH")
+            add("de", "DE", "GER", "DEU", "AT")
             add("fr", "FR", "FRE", "FRA")
             add("it", "IT", "ITA")
             add("es", "ES", "ESP", "SPA", "LAT", "LATINO", "MX")
             add("pt", "PT", "POR", "BR")
-            add("nl", "NL", "DUT", "NLD", "BE")
+            add("nl", "NL", "DUT", "NLD")
             add("pl", "PL", "POL")
             add("ro", "RO", "ROM", "RON", "MD")
             add("ru", "RU", "RUS")
@@ -35,7 +35,8 @@ internal object TitleTags {
             add("sq", "AL", "SQ", "ALB")
             add("bg", "BG", "BUL")
             add("uk", "UA", "UKR")
-            add("hi", "HI", "HIN", "IN")
+            // Fără „IN” (India are multe limbi), „BE” și „CH” (țări cu mai multe limbi).
+            add("hi", "HI", "HIN")
             add("ja", "JP", "JA", "JPN")
             add("ko", "KR", "KO", "KOR")
             add("zh", "CN", "ZH", "CHI")
@@ -57,6 +58,88 @@ internal object TitleTags {
             add("ur", "PK", "UR", "URD")
             add("ta", "TA", "TAM")
             add("te", "TE", "TEL")
+        }
+
+    /** Prefixe de secțiune care nu sunt coduri de limbă, valabile doar ca prefix (`QC - Films`, `LA - Películas`). */
+    val prefixOnlyCodes: Map<String, String> = mapOf("QC" to "fr", "LA" to "es")
+
+    /** Prefixe de țări cu mai multe limbi: se scot din titlu, fără să stabilească limba (`IN| 3 Idiots`). */
+    val multilingualPrefixes = setOf("IN", "BE", "CH", "CA", "AF", "MT")
+
+    /**
+     * Țara de origine, scrisă după an (`Titlu (2022) (TR)`) → limba audio originală. Țările cu mai multe limbi
+     * (India, Belgia, Elveția, Canada) lipsesc intenționat.
+     */
+    val countryLanguage: Map<String, String> =
+        mapOf(
+            "US" to "en",
+            "GB" to "en",
+            "UK" to "en",
+            "IE" to "en",
+            "AU" to "en",
+            "NZ" to "en",
+            "TR" to "tr",
+            "DE" to "de",
+            "AT" to "de",
+            "FR" to "fr",
+            "IT" to "it",
+            "ES" to "es",
+            "MX" to "es",
+            "AR" to "es",
+            "CO" to "es",
+            "CL" to "es",
+            "BR" to "pt",
+            "PT" to "pt",
+            "RO" to "ro",
+            "MD" to "ro",
+            "KR" to "ko",
+            "JP" to "ja",
+            "CN" to "zh",
+            "TW" to "zh",
+            "HK" to "zh",
+            "RU" to "ru",
+            "PL" to "pl",
+            "NL" to "nl",
+            "SE" to "sv",
+            "NO" to "no",
+            "DK" to "da",
+            "FI" to "fi",
+            "GR" to "el",
+            "HU" to "hu",
+            "CZ" to "cs",
+            "SK" to "sk",
+            "IL" to "he",
+            "IR" to "fa",
+            "TH" to "th",
+            "UA" to "uk",
+            "RS" to "sr",
+            "HR" to "hr",
+            "BG" to "bg",
+            "IS" to "is",
+            "EG" to "ar",
+            "SA" to "ar",
+            "ID" to "id",
+            "VN" to "vi",
+        )
+
+    /** Nume de țări, ca în categoriile „ITALY SERIE”, „GERMANY NETFLIX”, „ESPAÑA SERIES” → limba secțiunii. */
+    val countryNames: Map<String, String> =
+        buildMap {
+            fun add(
+                iso: String,
+                vararg names: String,
+            ) = names.forEach { put(it, iso) }
+            add("it", "ITALY", "ITALIA")
+            add("fr", "FRANCE", "QUEBEC", "QUÉBEC")
+            add("de", "GERMANY", "DEUTSCHLAND")
+            add("es", "ESPAÑA", "ESPANA", "SPAIN")
+            add("ro", "ROMANIA", "ROMÂNIA")
+            add("tr", "TURKEY", "TURKIYE", "TÜRKIYE")
+            add("pl", "POLAND", "POLSKA")
+            add("nl", "NEDERLAND", "HOLLAND")
+            add("el", "GREECE")
+            add("hu", "HUNGARY")
+            add("pt", "PORTUGAL")
         }
 
     /** Nume de limbi (în engleză și în limba respectivă) → ISO 639-1. */
@@ -112,14 +195,23 @@ internal object TitleTags {
             "LEGENDADO" to "pt",
             "LEG" to "pt",
             "SUBTITRAT" to "ro",
+            "SUBTITRATE" to "ro",
             "SUBTITRARE" to "ro",
+            "SUBTITULADO" to "es",
+            "SUBTITULADA" to "es",
             "NAPISY" to "pl",
             "UNTERTITEL" to "de",
             "ONDERTITELD" to "nl",
         )
 
     /** Cuvinte care arată că urmează / precedă limba subtitrării (`SUB RO`, `RO SUBS`). */
-    val subtitleWords = setOf("SUB", "SUBS", "SUBBED", "SUBTITLE", "SUBTITLES", "SUBT", "STR", "VOST", "VO")
+    val subtitleWords = setOf("SUB", "SUBS", "SUBBED", "SUBTITLE", "SUBTITLES", "SUBT", "STR")
+
+    /** Versiune originală: audio în limba originală a titlului (`VO`, `OV`, `VOST`, `ORIGINAL`). */
+    val originalAudio = setOf("VO", "OV", "VOST", "ORIGINAL", "OMU", "OMDU")
+
+    /** Versiune originală subtitrată, cu limba subtitrării în etichetă. */
+    val originalWithSubtitles = setOf("VOSTFR", "STFR", "VOSE")
 
     val multiAudio = setOf("MULTI", "MULTIAUDIO", "MULTILANG", "MULTILANGUAGE", "DUAL", "DUALAUDIO", "MULTI-AUDIO")
     val multiSub = setOf("MULTISUB", "MULTISUBS")

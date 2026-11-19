@@ -43,6 +43,8 @@ import io.github.radumariusi.akvodhub.parser.player.SourceHealth
 import io.github.radumariusi.akvodhub.parser.player.SourceHealthRecord
 import io.github.radumariusi.akvodhub.parser.player.SourceProfile
 import io.github.radumariusi.akvodhub.parser.stremio.StremioIds
+import io.github.radumariusi.akvodhub.parser.title.CategoryMode
+import io.github.radumariusi.akvodhub.parser.title.CategoryRules
 import io.github.radumariusi.akvodhub.parser.title.VideoQuality
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -386,7 +388,7 @@ class HubRepository(
         val title = dao.titleById(titleId) ?: return null
         val entries = dao.sources(titleId).filter { it.kind == VodKind.MOVIE }
         val sources = describe(entries)
-        val groups = SourceGrouping.group(entries.map { it.toSourceInfo() }, preferredLanguages)
+        val groups = SourceGrouping.group(entries.map { it.toSourceInfo(title.originalLanguage) }, preferredLanguages)
         return TitleDetails(
             title = title,
             groups = groups,
@@ -447,6 +449,7 @@ class HubRepository(
     suspend fun episodes(titleId: Long): SeriesEpisodes =
         withContext(Dispatchers.Default) {
             val entries = dao.episodes(titleId)
+            val original = dao.titleById(titleId)?.originalLanguage
             val sources = describe(entries)
             val parents = episodeParents(titleId).associateBy { it.sourceId to it.streamId }
             val seasons =
@@ -456,8 +459,8 @@ class HubRepository(
                             it.season,
                             it.episode,
                             it.name,
-                            it.toSourceInfo().let { source ->
-                                val parent = parents[it.sourceId to it.seriesId]?.toSourceInfo()
+                            it.toSourceInfo(original).let { source ->
+                                val parent = parents[it.sourceId to it.seriesId]?.toSourceInfo(original)
                                 if (parent == null) {
                                     source
                                 } else {
@@ -647,6 +650,21 @@ class HubRepository(
     /** Linkul de redare al unei surse (la Xtream se construiește din cont, ca parola să nu stea în fiecare intrare). */
     suspend fun confirmQuality(entryId: Long, quality: VideoQuality) {
         if (dao.confirmQuality(entryId, quality, quality.ordinal) > 0) {
+            matchScheduler.enqueueAfterPlaybackPause()
+        }
+    }
+
+    /** Regulile de limbă pe categorii (Setări → Conținut); reparsarea rulează în fundal. */
+    fun categoryRules(): Map<String, CategoryMode> = CategoryRules.rules
+
+    fun setCategoryRules(rules: Map<String, CategoryMode>) {
+        indexer.setCategoryRules(rules)
+        matchScheduler.enqueue()
+    }
+
+    /** Limbile pistelor audio văzute la redare (vezi `ConfirmedLanguages`) devin limbile sursei. */
+    suspend fun confirmLanguages(entryId: Long, languages: String) {
+        if (dao.confirmLanguages(entryId, languages) > 0) {
             matchScheduler.enqueueAfterPlaybackPause()
         }
     }

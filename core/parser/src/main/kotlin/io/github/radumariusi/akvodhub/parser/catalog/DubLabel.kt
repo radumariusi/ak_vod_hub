@@ -1,5 +1,6 @@
 package io.github.radumariusi.akvodhub.parser.catalog
 
+import io.github.radumariusi.akvodhub.parser.title.ParsedTitle
 import java.util.Locale
 
 /** Acumulator în flux: păstrează doar limbile distincte, nu lista surselor. */
@@ -18,7 +19,7 @@ class DubLabel(originalLanguage: String?) {
         for (token in tokens) {
             val code = token.trim().lowercase(Locale.ROOT)
             when {
-                code == original -> {
+                code == original || code == ParsedTitle.ORIGINAL -> {
                     originalAvailable = true
                     declaredOriginal = true
                 }

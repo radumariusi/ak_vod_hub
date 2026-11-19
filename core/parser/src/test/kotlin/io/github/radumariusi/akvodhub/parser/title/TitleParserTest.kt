@@ -91,7 +91,11 @@ class TitleParserTest {
         val c = TitleParser.parse("RO - Matrix (1999) FHD")
         assertEquals("Matrix", c.title)
         assertEquals(VideoQuality.FHD, c.quality)
-        assertEquals(listOf("ro"), c.languages)
+        // Secțiunea „RO - ” la furnizorii români înseamnă subtitrare RO, cu audio original.
+        assertEquals(listOf(ParsedTitle.ORIGINAL), c.languages)
+        assertEquals(listOf("ro"), c.subtitles)
+        assertEquals(listOf("tr"), TitleParser.parse("RO - Flori însângerate (2022) (TR)").languages)
+        assertEquals(listOf("ro"), TitleParser.parse("RO - Cei trimiși (2025) (RO)").languages)
 
         val d = TitleParser.parse("Breaking Bad S01E02")
         assertEquals("Breaking Bad", d.title)

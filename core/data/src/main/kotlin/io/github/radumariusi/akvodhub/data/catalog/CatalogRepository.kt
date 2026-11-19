@@ -9,6 +9,7 @@ import io.github.radumariusi.akvodhub.data.tmdb.TmdbSettings
 import io.github.radumariusi.akvodhub.parser.match.QualityGroup
 import io.github.radumariusi.akvodhub.parser.match.SourceGrouping
 import io.github.radumariusi.akvodhub.parser.match.SourceInfo
+import io.github.radumariusi.akvodhub.parser.title.ParsedTitle
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import java.io.IOException
@@ -95,14 +96,23 @@ class CatalogRepository(
     suspend fun sourceGroups(
         titleId: Long,
         preferredLanguages: List<String> = emptyList(),
-    ): List<QualityGroup> = SourceGrouping.group(dao.sources(titleId).map { it.toSourceInfo() }, preferredLanguages)
+    ): List<QualityGroup> {
+        val original = dao.titleById(titleId)?.originalLanguage
+        return SourceGrouping.group(dao.sources(titleId).map { it.toSourceInfo(original) }, preferredLanguages)
+    }
 }
 
-fun RawEntryEntity.toSourceInfo() =
-    SourceInfo(
+/**
+ * [originalLanguage] (limba originală TMDB) înlocuiește „audio original” (`ori`); o subtitrare în aceeași
+ * limbă cu singurul audio (ex. film românesc din secțiunea „RO - ”) nu mai e afișată.
+ */
+fun RawEntryEntity.toSourceInfo(originalLanguage: String? = null): SourceInfo {
+    val audio = ParsedTitle.resolve(languages?.split(',').orEmpty(), originalLanguage)
+    return SourceInfo(
         id = id,
         quality = quality,
         hdr = hdr,
-        languages = languages?.split(',').orEmpty(),
-        subtitles = subtitles?.split(',').orEmpty(),
+        languages = audio,
+        subtitles = subtitles?.split(',').orEmpty().filterNot { it == audio.singleOrNull() },
     )
+}

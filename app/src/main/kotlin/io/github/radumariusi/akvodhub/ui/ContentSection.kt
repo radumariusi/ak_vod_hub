@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import io.github.radumariusi.akvodhub.parser.catalog.PosterBadge
+import io.github.radumariusi.akvodhub.parser.title.CategoryMode
 import io.github.radumariusi.akvodhub.player.PlaybackSettingsViewModel
 import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
 
@@ -43,8 +44,40 @@ fun ContentSection(viewModel: PlaybackSettingsViewModel) {
         OutlinedButton(onClick = { viewModel.togglePosterBadge(PosterBadge.DUB) }) {
             Text("Etichete DUB: " + if (PosterBadge.DUB in prefs.posterBadges) "da" else "nu")
         }
+        CategoryRulesList(viewModel)
     }
 }
+
+/** Limba pe categorii: Automat → Audio original (limba categoriei devine subtitrare) → Dublat. */
+@Composable
+private fun CategoryRulesList(viewModel: PlaybackSettingsViewModel) {
+    val categories by viewModel.categories.collectAsState()
+    val rules by viewModel.categoryRules.collectAsState()
+    Text("Limba audio pe categorii", style = MaterialTheme.typography.titleLarge)
+    Text(
+        "Dacă o categorie are limba detectată greșit, alege: Automat, Audio original (categoria = subtitrare) " +
+            "sau Dublat (categoria = limba audio). Sursele se reanalizează în fundal.",
+    )
+    val list = categories
+    if (list == null) {
+        OutlinedButton(onClick = viewModel::loadCategories) { Text("Arată categoriile") }
+        return
+    }
+    if (list.isEmpty()) Text("Nicio categorie în playlist-uri.")
+    list.forEach { category ->
+        val mode = rules[category.groupTitle.trim()] ?: CategoryMode.AUTO
+        OutlinedButton(onClick = { viewModel.cycleCategoryRule(category.groupTitle) }) {
+            Text("${category.groupTitle.trim()} (${category.total}) · ${modeLabel(mode)}")
+        }
+    }
+}
+
+private fun modeLabel(mode: CategoryMode) =
+    when (mode) {
+        CategoryMode.AUTO -> "Automat"
+        CategoryMode.ORIGINAL -> "Audio original"
+        CategoryMode.DUBBED -> "Dublat"
+    }
 
 @Composable
 private fun ContentText(label: String, current: String, key: String, viewModel: PlaybackSettingsViewModel) {

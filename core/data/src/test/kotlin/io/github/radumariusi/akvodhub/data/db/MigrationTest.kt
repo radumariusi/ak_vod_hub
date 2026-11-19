@@ -101,7 +101,7 @@ class MigrationTest {
 
     private companion object {
         const val NAME = "migration-test.db"
-        const val LATEST = 19
+        const val LATEST = 20
         const val TRIGGERS = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'catalog_dirty_%'"
 
         /** Exact ce genera Room 2.x pentru entitățile v5 (commit 3396cc7, etapa 8). */

@@ -25,7 +25,7 @@ import io.github.radumariusi.akvodhub.parser.catalog.CatalogDirty
         EpisodeProgressEntity::class,
         CatalogDirtyEntity::class,
     ],
-    version = 19,
+    version = 20,
     exportSchema = false,
 )
 abstract class AkVodDatabase : RoomDatabase() {
@@ -49,6 +49,15 @@ abstract class AkVodDatabase : RoomDatabase() {
                 override fun onOpen(db: SupportSQLiteDatabase) {
                     createSearchTable(db)
                     CatalogDirty.TRIGGERS.forEach(db::execSQL)
+                }
+            }
+
+        /** Limba audio de la furnizor (episoade Xtream) și cea confirmată la redare. */
+        val MIGRATION_19_20 =
+            object : Migration(19, 20) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE raw_entry ADD COLUMN providerLanguages TEXT")
+                    db.execSQL("ALTER TABLE raw_entry ADD COLUMN confirmedLanguages TEXT")
                 }
             }
 
@@ -343,6 +352,7 @@ abstract class AkVodDatabase : RoomDatabase() {
                     MIGRATION_16_17,
                     MIGRATION_17_18,
                     MIGRATION_18_19,
+                    MIGRATION_19_20,
                 )
     }
 }

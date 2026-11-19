@@ -1,6 +1,7 @@
 package io.github.radumariusi.akvodhub.data.playlist.xtream
 
 import io.github.radumariusi.akvodhub.parser.playlist.JsonObjectStream
+import io.github.radumariusi.akvodhub.parser.stremio.SubtitleLanguages
 import io.github.radumariusi.akvodhub.parser.title.VideoQuality
 import io.github.radumariusi.akvodhub.parser.title.VideoResolution
 import kotlinx.serialization.json.Json
@@ -80,9 +81,18 @@ object XtreamJson {
                     containerExtension = e.str("container_extension"),
                     added = e.long("added"),
                     quality = e.declaredQuality(),
+                    language = e.audioLanguage(),
                 )
             }
         }
+    }
+
+    /** `info.audio.tags.language` (ISO 639-2, ex. `rum`) → ISO 639-1; `und` și codurile necunoscute → null. */
+    private fun JsonObject.audioLanguage(): String? {
+        val audio = (this["info"] as? JsonObject)?.get("audio") as? JsonObject ?: return null
+        val code = ((audio["tags"] as? JsonObject)?.str("language") ?: audio.str("language"))?.trim()?.lowercase()
+        if (code.isNullOrEmpty() || code == "und" || code == "mis" || code == "zxx") return null
+        return SubtitleLanguages.toIso1(code)?.takeIf { it.length == 2 && it.all { c -> c in 'a'..'z' } }
     }
 
     /** `get_vod_categories` / `get_series_categories` → id → nume. */

@@ -41,17 +41,20 @@ class CatalogSqlTest {
                 INSERT INTO raw_entry VALUES (2, 'UHD', 'en', 1, 'MOVIE', 'Filme pentru ADULȚI');
                 INSERT INTO raw_entry VALUES (3, 'UHD', 'mul', 1, 'MOVIE', 'Film');
                 INSERT INTO raw_entry VALUES (4, 'UHD', 'en,de', 1, 'MOVIE', 'Young Adult');
+                INSERT INTO raw_entry VALUES (5, 'UHD', 'ori', 1, 'MOVIE', 'RO - FILME');
             ''')
             build, page, hide = sys.argv[1:4]
             params = sys.argv[4:7]
             db.execute(build)
             plan = [row[3] for row in db.execute('EXPLAIN QUERY PLAN ' + page, params)]
             assert any('SEARCH s ' in detail and '(titleId=' in detail for detail in plan), plan
-            assert [row[0] for row in db.execute(page, params)] == [4, 2]
+            assert [row[0] for row in db.execute(page, params)] == [5, 4, 2]
             db.execute(hide, sys.argv[7:])
             db.execute('DELETE FROM title_source_option')
             db.execute(build)
-            assert [row[0] for row in db.execute(page, params)] == [4]
+            assert [row[0] for row in db.execute(page, params)] == [5, 4]
+            original = "SELECT language, originalAudio FROM title_source_option WHERE titleId = 5 AND language = 'en'"
+            assert db.execute(original).fetchall() == [('en', 1)]
             assert db.execute("SELECT visible FROM raw_entry WHERE titleId = 2 AND languages = 'en'").fetchone() == (0,)
             """.trimIndent()
         val process =

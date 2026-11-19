@@ -49,6 +49,8 @@ data class XtreamEpisode(
     val containerExtension: String?,
     val added: Long?,
     val quality: VideoQuality? = null,
+    /** Limba pistei audio declarate de furnizor (`info.audio.tags.language`), ISO 639-1. */
+    val language: String? = null,
 )
 
 class XtreamException(
