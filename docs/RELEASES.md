@@ -30,7 +30,7 @@ asset al cărui nume se termină în `.apk`. Updaterele vechi îl găsesc indife
 Cele trei variante `ak-vod-hub-<versiune>-<abi>.apk.bin` conțin APK-uri semnate și pot fi redenumite
 cu extensia `.apk` pentru instalare manuală. Updaterul nou încearcă arhitecturile declarate de Android,
 apoi universalul dacă dispozitivul acceptă una dintre arhitecturile lui.
-Workflow-ul verifică arhitecturile din fișiere, certificatul față de v0.1.14 și dimensiunile înainte de publicare.
+Workflow-ul verifică arhitecturile din fișiere, certificatul (cu `apksigner`, față de amprenta din `scripts/release-cert.sha256`, aceeași ca la v0.1.14) și dimensiunile înainte de publicare.
 
 ## Cheia de semnare
 
