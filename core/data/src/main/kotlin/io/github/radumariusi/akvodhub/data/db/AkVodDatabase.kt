@@ -6,6 +6,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import io.github.radumariusi.akvodhub.parser.catalog.CatalogDirty
 
 @Database(
     entities = [
@@ -22,8 +23,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         WatchlistEntity::class,
         TitleSourceOption::class,
         EpisodeProgressEntity::class,
+        CatalogDirtyEntity::class,
     ],
-    version = 18,
+    version = 19,
     exportSchema = false,
 )
 abstract class AkVodDatabase : RoomDatabase() {
@@ -37,29 +39,28 @@ abstract class AkVodDatabase : RoomDatabase() {
         fun create(context: Context): AkVodDatabase =
             Room
                 .databaseBuilder(context, AkVodDatabase::class.java, "akvodhub.db")
-                .addMigrations(
-                    MIGRATION_1_2,
-                    MIGRATION_2_3,
-                    MIGRATION_3_4,
-                    MIGRATION_4_5,
-                    MIGRATION_5_6,
-                    MIGRATION_6_7,
-                    MIGRATION_7_8,
-                    MIGRATION_8_9,
-                    MIGRATION_9_10,
-                    MIGRATION_10_11,
-                    MIGRATION_11_12,
-                    MIGRATION_12_13,
-                    MIGRATION_13_14,
-                    MIGRATION_14_15,
-                    MIGRATION_15_16,
-                    MIGRATION_16_17,
-                    MIGRATION_17_18,
-                ).addCallback(
-                    object : RoomDatabase.Callback() {
-                        override fun onOpen(db: SupportSQLiteDatabase) = createSearchTable(db)
-                    },
-                ).build()
+                .addMigrations(*MIGRATIONS)
+                .addCallback(OPEN_CALLBACK)
+                .build()
+
+        /** Pe lângă tabelele Room: indexul FTS și trigger-ele reindexării incrementale (idempotent). */
+        val OPEN_CALLBACK =
+            object : RoomDatabase.Callback() {
+                override fun onOpen(db: SupportSQLiteDatabase) {
+                    createSearchTable(db)
+                    CatalogDirty.TRIGGERS.forEach(db::execSQL)
+                }
+            }
+
+        /** Reindexare incrementală: titlurile atinse se notează în `catalog_dirty` (vezi `CatalogDirty`). */
+        val MIGRATION_18_19 =
+            object : Migration(18, 19) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `catalog_dirty` (`titleId` INTEGER NOT NULL, PRIMARY KEY(`titleId`))",
+                    )
+                }
+            }
 
         val MIGRATION_17_18 =
             object : Migration(17, 18) {
@@ -319,5 +320,29 @@ abstract class AkVodDatabase : RoomDatabase() {
                     )
                 }
             }
+
+        /** Toate migrările, în ordine (folosite și de testul de migrare). */
+        val MIGRATIONS: Array<Migration>
+            get() =
+                arrayOf(
+                    MIGRATION_1_2,
+                    MIGRATION_2_3,
+                    MIGRATION_3_4,
+                    MIGRATION_4_5,
+                    MIGRATION_5_6,
+                    MIGRATION_6_7,
+                    MIGRATION_7_8,
+                    MIGRATION_8_9,
+                    MIGRATION_9_10,
+                    MIGRATION_10_11,
+                    MIGRATION_11_12,
+                    MIGRATION_12_13,
+                    MIGRATION_13_14,
+                    MIGRATION_14_15,
+                    MIGRATION_15_16,
+                    MIGRATION_16_17,
+                    MIGRATION_17_18,
+                    MIGRATION_18_19,
+                )
     }
 }

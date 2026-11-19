@@ -1,16 +1,14 @@
 name: Baseline Profile
 
+# Doar la cerere (Actions → Baseline Profile → Run workflow): emulatorul durează ~30 min.
 on:
   workflow_dispatch:
-  pull_request:
-    branches: [main]
 
 permissions:
   contents: read
 
 jobs:
   generate:
-    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'jules/14-performance'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:

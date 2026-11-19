@@ -78,11 +78,13 @@ interface PlaylistDao {
     @Query("DELETE FROM raw_entry WHERE sourceId = :sourceId")
     suspend fun deleteEntries(sourceId: Long)
 
-    /** Episoadele Xtream iau titlul TMDB al serialului lor. */
+    /** Episoadele Xtream iau titlul TMDB al serialului lor (rescrie doar episoadele care chiar se schimbă). */
     @Query(
         "UPDATE raw_entry SET titleId = (SELECT s.titleId FROM raw_entry s WHERE s.sourceId = raw_entry.sourceId " +
             "AND s.providerKey = 'series:' || raw_entry.seriesId) " +
-            "WHERE kind = 'EPISODE' AND matchState = 3 AND seriesId IS NOT NULL",
+            "WHERE kind = 'EPISODE' AND matchState = 3 AND seriesId IS NOT NULL AND titleId IS NOT " +
+            "(SELECT s.titleId FROM raw_entry s WHERE s.sourceId = raw_entry.sourceId " +
+            "AND s.providerKey = 'series:' || raw_entry.seriesId)",
     )
     suspend fun inheritSeriesTitles()
 

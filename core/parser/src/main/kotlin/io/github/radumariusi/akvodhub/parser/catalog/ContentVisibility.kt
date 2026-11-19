@@ -13,6 +13,10 @@ object ContentVisibility {
             "INSERT OR IGNORE INTO title_source_option " +
             "SELECT titleId, quality, language, originalAudio FROM options"
 
+    /** [SOURCE_OPTIONS] doar pentru titlurile din [CatalogDirty] (reindexare incrementală). */
+    val DIRTY_SOURCE_OPTIONS =
+        SOURCE_OPTIONS.replace("WHERE r.visible = 1 ", "WHERE r.visible = 1 AND r.titleId IN ${CatalogDirty.IDS} ")
+
     fun tokens(value: String, lowercase: Boolean = true): List<String> =
         value
             .split(',')
