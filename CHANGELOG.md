@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-11-19 — Corecții de interfață (A)
+
+- Focus mai vizibil: margine de 3 dp aproape albă pe carduri și suprafețe, iar posterele se măresc ușor (5%).
+- Insignele și meta nu mai afișează „★ —” / „IMDb —” când nota lipsește; textul insignelor e mai mare.
+- Fișa are acțiunile pe un rând (Redă, De la început, Episoade/Surse, Audio și subtitrări, Lista mea, Văzut), ca sursele să rămână pe ecran. Tagline-ul apare doar fără descriere.
+- O limbă cu o singură sursă pornește direct („▶ RO”); în dialogul variantelor apare ce le deosebește, nu „varianta N”.
+- „OK · Sari intro” apare singur 10 s cât rulează intro-ul marcat al serialului; butoanele ±10 s din comenzi au fost scoase (stânga/dreapta pe bară fac același lucru).
+- Etichetele surselor sunt mai scurte („Audio RO · Sub EN · Rezoluție ✓”).
+
 ## 2026-11-19 — Identificarea și gruparea surselor
 
 - Citește prefixele compuse și marcajele 4K/HDR din nume și categorii, cu etichetele pistelor audio afișate separat.

@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalTvMaterial3Api::class)
+@file:OptIn(ExperimentalTvMaterial3Api::class, ExperimentalLayoutApi::class)
 
 package io.github.radumariusi.akvodhub.ui.hub
 
@@ -8,6 +8,8 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -235,34 +237,29 @@ private fun DetailsContent(
                     if (title.mediaType == MediaType.TV) {
                         OutlinedButton(
                             onClick = onShowEpisodes,
-                            modifier = Modifier.fillMaxWidth().focusRequester(episodesFocus),
+                            modifier = Modifier.focusRequester(episodesFocus),
                         ) {
-                            Text("Sezoane și episoade", modifier = Modifier.fillMaxWidth())
+                            Text("Episoade")
                         }
                     } else if (hasSources) {
-                        OutlinedButton(
-                            onClick = { scope.launch { list.animateScrollToItem(1) } },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text("Alege sursa", modifier = Modifier.fillMaxWidth())
+                        OutlinedButton(onClick = { scope.launch { list.animateScrollToItem(1) } }) {
+                            Text("Surse")
                         }
                     }
                     OutlinedButton(
                         onClick = { tracksOpen = true },
                         enabled = trackSources.isNotEmpty(),
-                        modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text("Audio și subtitrări", modifier = Modifier.fillMaxWidth())
+                        Text("Audio și subtitrări")
                     }
                     OutlinedButton(
                         onClick = onWatchlist,
                         enabled = !state.changingLibrary,
-                        modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text(
-                            if (state.inWatchlist) "Scoate din Lista mea" else "Adaugă în Lista mea",
-                            modifier = Modifier.fillMaxWidth(),
-                        )
+                        Text(if (state.inWatchlist) "Scoate din Lista mea" else "+ Lista mea")
+                    }
+                    OutlinedButton(onClick = onWatched, enabled = !state.changingLibrary) {
+                        Text(if (state.watched) "Nevăzut" else "Văzut")
                     }
                 }
             }
@@ -289,9 +286,6 @@ private fun DetailsContent(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     state.credits?.directors?.takeIf { it.isNotEmpty() }?.let {
                         Text("Regia: ${it.joinToString(", ")}", style = MaterialTheme.typography.bodySmall)
-                    }
-                    OutlinedButton(onClick = onWatched, enabled = !state.changingLibrary) {
-                        Text(if (state.watched) "Marchează nevăzut" else "Marchează văzut")
                     }
                 }
             }
@@ -408,62 +402,69 @@ private fun Header(
     actions: @Composable () -> Unit,
 ) {
     val title = details.title
-    Column(Modifier.widthIn(max = 620.dp).fillMaxWidth(0.82f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        var expanded by rememberSaveable(title.id) { mutableStateOf(false) }
-        var summaryTruncated by remember(title.id) { mutableStateOf(false) }
-        var metaTruncated by remember(title.id) { mutableStateOf(false) }
-        var overviewTruncated by remember(title.id) { mutableStateOf(false) }
-        val meta =
-            listOfNotNull(
-                if (title.mediaType == MediaType.MOVIE) "Film" else "Serial",
-                title.year?.toString(),
-                title.dubLabel,
-                title.runtimeMinutes?.let { "$it min" },
-                title.certification,
-                title.rating?.takeIf { it > 0 }?.let { "TMDB %.1f".format(it) } ?: "TMDB —",
-                title.imdbRating?.let { "IMDb %.1f".format(it) } ?: "IMDb —",
-                details.genres.takeIf { it.isNotEmpty() }?.joinToString(", "),
-            ).joinToString(" · ")
-        Text(
-            meta,
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = if (expanded) Int.MAX_VALUE else 2,
-            overflow = TextOverflow.Ellipsis,
-            onTextLayout = { if (!expanded) metaTruncated = it.hasVisualOverflow },
-        )
-        title.tagline?.let {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.widthIn(max = 620.dp).fillMaxWidth(0.82f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            var expanded by rememberSaveable(title.id) { mutableStateOf(false) }
+            var summaryTruncated by remember(title.id) { mutableStateOf(false) }
+            var metaTruncated by remember(title.id) { mutableStateOf(false) }
+            var overviewTruncated by remember(title.id) { mutableStateOf(false) }
+            val meta =
+                listOfNotNull(
+                    if (title.mediaType == MediaType.MOVIE) "Film" else "Serial",
+                    title.year?.toString(),
+                    title.dubLabel,
+                    title.runtimeMinutes?.let { "$it min" },
+                    title.certification,
+                    title.rating?.takeIf { it > 0 }?.let { "TMDB %.1f".format(it) },
+                    title.imdbRating?.let { "IMDb %.1f".format(it) },
+                    details.genres.takeIf { it.isNotEmpty() }?.joinToString(", "),
+                ).joinToString(" · ")
             Text(
-                it,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        if (details.summary.isNotEmpty()) {
-            Text(
-                details.summary,
+                meta,
                 style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.secondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = if (expanded) Int.MAX_VALUE else 2,
                 overflow = TextOverflow.Ellipsis,
-                onTextLayout = { if (!expanded) summaryTruncated = it.hasVisualOverflow },
+                onTextLayout = { if (!expanded) metaTruncated = it.hasVisualOverflow },
             )
-        }
-        title.overview?.let {
-            Text(
-                it,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = if (expanded) Int.MAX_VALUE else 3,
-                overflow = TextOverflow.Ellipsis,
-                onTextLayout = { if (!expanded) overviewTruncated = it.hasVisualOverflow },
-            )
-        }
-        if (expanded || metaTruncated || overviewTruncated || summaryTruncated) {
-            OutlinedButton(onClick = { expanded = !expanded }) {
-                Text(if (expanded) "Arată mai puțin" else "Arată mai mult")
+            // Tagline-ul doar când nu există descriere: altfel ocupă un rând fără informație nouă.
+            title.tagline?.takeIf { title.overview.isNullOrBlank() }?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (details.summary.isNotEmpty()) {
+                Text(
+                    details.summary,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.secondary,
+                    maxLines = if (expanded) Int.MAX_VALUE else 2,
+                    overflow = TextOverflow.Ellipsis,
+                    onTextLayout = { if (!expanded) summaryTruncated = it.hasVisualOverflow },
+                )
+            }
+            title.overview?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = if (expanded) Int.MAX_VALUE else 3,
+                    overflow = TextOverflow.Ellipsis,
+                    onTextLayout = { if (!expanded) overviewTruncated = it.hasVisualOverflow },
+                )
+            }
+            if (expanded || metaTruncated || overviewTruncated || summaryTruncated) {
+                OutlinedButton(onClick = { expanded = !expanded }) {
+                    Text(if (expanded) "Arată mai puțin" else "Arată mai mult")
+                }
             }
         }
-        Column(Modifier.widthIn(max = 300.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) { actions() }
+        // Acțiunile pe un rând (cu trecere pe rândul următor dacă nu încap), ca sursele să rămână pe ecran.
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) { actions() }
         if (title.isLocal) {
             Text(
                 "Titlu negăsit (încă) pe TMDB: informațiile vin din playlist.",
@@ -496,28 +497,61 @@ private fun QualityRow(
             items(group.languages, key = { it.language ?: "unknown" }) { language ->
                 OutlinedButton(onClick = {
                     val variants = language.sources
-                    choice =
-                        Choice(
-                            "${SourceGrouping.qualityLabel(
-                                group.quality,
-                            )} · ${SourceGrouping.languageLabel(language.language)}",
-                            variants.mapIndexed { index, source ->
-                                val info = sources[source.id]
-                                "${sourceTags(source, info)} · ${info?.playlist.orEmpty()} · varianta ${index + 1}"
-                            },
-                            selected = null,
-                            onPick = { index -> onPlay(variants[index].id) },
-                        )
+                    // O singură variantă: pornește direct, fără dialog.
+                    if (variants.size == 1) {
+                        onPlay(variants.first().id)
+                    } else {
+                        choice =
+                            Choice(
+                                "${SourceGrouping.qualityLabel(group.quality)} · " +
+                                    SourceGrouping.languageLabel(language.language),
+                                variantLabels(variants, sources),
+                                selected = null,
+                                onPick = { index -> onPlay(variants[index].id) },
+                            )
+                    }
                 }) {
                     Text(
-                        "${SourceGrouping.languageLabel(language.language)} · ${language.sources.size} " +
-                            if (language.sources.size == 1) "sursă" else "surse",
+                        if (language.sources.size == 1) {
+                            "▶ ${SourceGrouping.languageLabel(language.language)}"
+                        } else {
+                            "${SourceGrouping.languageLabel(language.language)} · ${language.sources.size} surse"
+                        },
                     )
                 }
             }
         }
     }
     choice?.let { ChoiceDialog(it, onDismiss = { choice = null }) }
+}
+
+/**
+ * Etichetele variantelor: ce le deosebește (etichete, playlist). „varianta N” apare doar când două variante
+ * ar avea altfel exact același text.
+ */
+internal fun variantLabels(
+    variants: List<SourceInfo>,
+    sources: Map<Long, SourceDetails>,
+): List<String> {
+    val base =
+        variants.map { source ->
+            val info = sources[source.id]
+            listOf(sourceTags(source, info), info?.playlist.orEmpty())
+                .filter { it.isNotBlank() }
+                .joinToString(" · ")
+                .ifEmpty { "Sursă" }
+        }
+    val counts = base.groupingBy { it }.eachCount()
+    val seen = HashMap<String, Int>()
+    return base.map { label ->
+        if ((counts[label] ?: 0) < 2) {
+            label
+        } else {
+            val n = (seen[label] ?: 0) + 1
+            seen[label] = n
+            "$label · varianta $n"
+        }
+    }
 }
 
 /** Butoanele de redare din fișă: „Continuă de la 12:34” / „De la început” sau „Redă”. */
@@ -535,7 +569,7 @@ private fun PlayActions(
         val best = state.recommended
         when {
             best == null -> {
-                OutlinedButton(onClick = {}, modifier = Modifier.fillMaxWidth().focusRequester(playFocus)) {
+                OutlinedButton(onClick = {}, modifier = Modifier.focusRequester(playFocus)) {
                     Text("Nicio sursă de redare")
                 }
             }
@@ -543,17 +577,17 @@ private fun PlayActions(
             watch != null && Resume.shouldResume(watch.positionMs, watch.durationMs) -> {
                 Button(
                     onClick = { onPlay(PlayRequest(titleId, resume = true)) },
-                    modifier = Modifier.fillMaxWidth().focusRequester(playFocus),
+                    modifier = Modifier.focusRequester(playFocus),
                 ) { Text("Continuă de la ${Resume.format(watch.positionMs)}") }
-                OutlinedButton(onClick = { onPlay(PlayRequest(titleId)) }, modifier = Modifier.fillMaxWidth()) {
-                    Text("De la început", modifier = Modifier.fillMaxWidth())
+                OutlinedButton(onClick = { onPlay(PlayRequest(titleId)) }) {
+                    Text("De la început")
                 }
             }
 
             else -> {
                 Button(onClick = {
                     onPlay(PlayRequest(titleId))
-                }, modifier = Modifier.fillMaxWidth().focusRequester(playFocus)) {
+                }, modifier = Modifier.focusRequester(playFocus)) {
                     Text("Redă")
                 }
             }
@@ -568,7 +602,7 @@ private fun PlayActions(
             val resume = Resume.shouldResume(watch.positionMs, watch.durationMs)
             Button(
                 onClick = { onPlay(episodeRequest(titleId, current, resume)) },
-                modifier = Modifier.fillMaxWidth().focusRequester(playFocus),
+                modifier = Modifier.focusRequester(playFocus),
             ) {
                 Text(
                     if (resume) {
@@ -579,11 +613,8 @@ private fun PlayActions(
                 )
             }
             if (resume) {
-                OutlinedButton(
-                    onClick = { onPlay(episodeRequest(titleId, current)) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("De la începutul episodului", modifier = Modifier.fillMaxWidth())
+                OutlinedButton(onClick = { onPlay(episodeRequest(titleId, current)) }) {
+                    Text("De la început")
                 }
             }
         }
@@ -591,12 +622,12 @@ private fun PlayActions(
         firstEpisode != null -> {
             Button(
                 onClick = { onPlay(episodeRequest(titleId, firstEpisode)) },
-                modifier = Modifier.fillMaxWidth().focusRequester(playFocus),
+                modifier = Modifier.focusRequester(playFocus),
             ) { Text("Redă ${episodeCode(firstEpisode)}") }
         }
 
         else -> {
-            OutlinedButton(onClick = {}, modifier = Modifier.fillMaxWidth().focusRequester(playFocus)) {
+            OutlinedButton(onClick = {}, modifier = Modifier.focusRequester(playFocus)) {
                 Text(if (state.loadingEpisodes) "Se încarcă episoadele…" else "Nicio sursă de redare")
             }
         }

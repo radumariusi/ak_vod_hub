@@ -4,25 +4,25 @@ import io.github.radumariusi.akvodhub.data.catalog.SourceDetails
 import io.github.radumariusi.akvodhub.parser.match.SourceGrouping
 import io.github.radumariusi.akvodhub.parser.match.SourceInfo
 
-/** Ex. „EN · HDR10 · H265 · MKV”. */
+/** Ex. „Audio EN · HDR10 · H265 · MKV · Sub RO”. „✓” = confirmat la redare. */
 fun sourceTags(
     source: SourceInfo,
     info: SourceDetails?,
 ): String {
     val entry = info?.entry
     return listOfNotNull(
-        "Rezoluție confirmată".takeIf { entry?.confirmedQuality != null },
+        "Rezoluție ✓".takeIf { entry?.confirmedQuality != null },
         source.languages
             .joinToString(
                 "+",
             ) { SourceGrouping.languageLabel(it) }
             .takeIf { it.isNotEmpty() }
-            ?.let { "Audio declarat $it" },
+            ?.let { "Audio $it" },
         source.hdr?.name?.replace('_', ' '),
         entry?.codec?.name,
         entry?.containerExt?.uppercase(),
         source.subtitles.takeIf { it.isNotEmpty() }?.let {
-            "Subtitrări declarate " +
+            "Sub " +
                 it.joinToString("+") { s -> SourceGrouping.languageLabel(s) }
         },
     ).joinToString(" · ")
