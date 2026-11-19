@@ -437,8 +437,11 @@ class PlaylistImporter(
 
                         else -> {
                             val parsed = entry.parsed()
+                            // Păstrează potrivirea confirmată dacă importul precedă reparsarea după un update.
+                            val previous = if (old.matchState == MatchState.MATCHED) old.parsed() else old
                             val sameTitle =
-                                parsed.title == old.title && parsed.year == old.year && parsed.tmdbId == old.tmdbId
+                                parsed.title == previous.title && parsed.year == previous.year &&
+                                    parsed.tmdbId == old.tmdbId
                             val sameStream =
                                 sameTitle && old.url == parsed.url && old.streamId == parsed.streamId &&
                                     old.containerExt == parsed.containerExt && old.season == parsed.season &&
