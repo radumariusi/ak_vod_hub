@@ -47,6 +47,12 @@ import androidx.tv.material3.Surface as TvSurface
  * ca aplicația să poată fi folosită și pe telefon. Pe TV comportamentul rămâne identic.
  */
 
+/** Marginea de focus: groasă și aproape albă, vizibilă de la 3 m pe orice poster sau fundal. */
+val FocusBorderWidth = 3.dp
+
+/** Mărirea posterelor la focus: destul cât să se vadă, fără să iasă din spațiul dintre carduri. */
+const val POSTER_FOCUS_SCALE = 1.05f
+
 /** O atingere (fără derulare) pe element apelează [onClick]. */
 @Composable
 private fun tap(
@@ -157,7 +163,12 @@ fun Surface(
             ),
         border =
             ClickableSurfaceDefaults.border(
-                focusedBorder = Border(BorderStroke(2.dp, colors.secondary), inset = 0.dp, shape = shape),
+                focusedBorder =
+                    Border(
+                        BorderStroke(FocusBorderWidth, colors.onBackground),
+                        inset = 0.dp,
+                        shape = shape,
+                    ),
             ),
         content = content,
     )
@@ -168,6 +179,7 @@ fun Card(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
+    focusedScale: Float = 1f,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val shape = MaterialTheme.shapes.medium
@@ -179,12 +191,12 @@ fun Card(
                 .then(tap(true, onClick, onLongClick)),
         onLongClick = onLongClick,
         shape = CardDefaults.shape(shape),
-        scale = CardDefaults.scale(focusedScale = 1f),
+        scale = CardDefaults.scale(focusedScale = focusedScale),
         border =
             CardDefaults.border(
                 focusedBorder =
                     Border(
-                        BorderStroke(2.dp, MaterialTheme.colorScheme.secondary),
+                        BorderStroke(FocusBorderWidth, MaterialTheme.colorScheme.onBackground),
                         inset = 0.dp,
                         shape = shape,
                     ),

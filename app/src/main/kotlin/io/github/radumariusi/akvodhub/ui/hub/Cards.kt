@@ -44,6 +44,7 @@ import io.github.radumariusi.akvodhub.parser.catalog.PosterSize
 import io.github.radumariusi.akvodhub.parser.match.SourceGrouping
 import io.github.radumariusi.akvodhub.parser.title.VideoQuality
 import io.github.radumariusi.akvodhub.ui.touch.Card
+import io.github.radumariusi.akvodhub.ui.touch.POSTER_FOCUS_SCALE
 
 val LocalPosterBadges = staticCompositionLocalOf { PosterBadges.defaults }
 
@@ -104,9 +105,9 @@ fun qualityLabel(ordinal: Int?): String? =
 fun TitleCard.meta(): String =
     listOfNotNull(
         year?.toString(),
-        rating?.takeIf { it > 0 }?.let { "TMDB %.1f".format(it) } ?: "TMDB —",
+        rating?.takeIf { it > 0 }?.let { "TMDB %.1f".format(it) },
         qualityLabel(bestQuality),
-        imdbRating?.let { "IMDb %.1f".format(it) } ?: "IMDb —",
+        imdbRating?.let { "IMDb %.1f".format(it) },
         dubLabel,
     ).joinToString(" · ")
 
@@ -146,6 +147,7 @@ fun PosterCard(
         Card(
             onClick = onClick,
             onLongClick = onLongClick,
+            focusedScale = POSTER_FOCUS_SCALE,
             modifier =
                 Modifier
                     .width(width)
@@ -181,8 +183,8 @@ fun PosterCard(
                     if (ratingsAtBottom) {
                         if (PosterBadge.DUB in badges) card.dubLabel?.let { PosterBadgeText(it) }
                     } else {
-                        if (PosterBadge.TMDB in badges) PosterBadgeText(card.tmdbBadge ?: "★ —")
-                        if (PosterBadge.IMDB in badges) PosterBadgeText(card.imdbBadge ?: "IMDb —")
+                        if (PosterBadge.TMDB in badges) card.tmdbBadge?.let { PosterBadgeText(it) }
+                        if (PosterBadge.IMDB in badges) card.imdbBadge?.let { PosterBadgeText(it) }
                     }
                 }
                 Column(
@@ -199,7 +201,9 @@ fun PosterCard(
                 if (landscape && supportingText != null) {
                     PosterBadgeText(supportingText, Modifier.align(Alignment.BottomStart).padding(8.dp))
                 }
-                if (ratingsAtBottom && (PosterBadge.TMDB in badges || PosterBadge.IMDB in badges)) {
+                val bottomTmdb = card.tmdbBadge.takeIf { PosterBadge.TMDB in badges }
+                val bottomImdb = card.imdbBadge.takeIf { PosterBadge.IMDB in badges }
+                if (ratingsAtBottom && (bottomTmdb != null || bottomImdb != null)) {
                     Row(
                         Modifier
                             .align(Alignment.BottomCenter)
@@ -208,8 +212,8 @@ fun PosterCard(
                             .padding(start = 2.dp, end = 2.dp, bottom = 5.dp, top = 2.dp),
                         horizontalArrangement = Arrangement.Center,
                     ) {
-                        if (PosterBadge.TMDB in badges) PosterBadgeText(card.tmdbBadge ?: "★ —")
-                        if (PosterBadge.IMDB in badges) PosterBadgeText(card.imdbBadge ?: "IMDb —")
+                        if (PosterBadge.TMDB in badges) card.tmdbBadge?.let { PosterBadgeText(it) }
+                        if (PosterBadge.IMDB in badges) card.imdbBadge?.let { PosterBadgeText(it) }
                     }
                 }
                 if (showTitle && PosterBadge.DUB in badges) {
@@ -257,7 +261,7 @@ fun PosterCard(
 private fun PosterBadgeText(label: String, modifier: Modifier = Modifier) {
     Text(
         label,
-        style = MaterialTheme.typography.labelSmall,
+        style = MaterialTheme.typography.labelMedium,
         color = Color.White,
         maxLines = 2,
         overflow = TextOverflow.Ellipsis,

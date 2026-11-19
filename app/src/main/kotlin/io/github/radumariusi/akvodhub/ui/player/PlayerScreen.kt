@@ -66,7 +66,6 @@ import io.github.radumariusi.akvodhub.parser.player.PlayerKeyPress
 import io.github.radumariusi.akvodhub.parser.player.Resume
 import io.github.radumariusi.akvodhub.parser.player.SeekNavigation
 import io.github.radumariusi.akvodhub.parser.player.SeriesPlayback
-import io.github.radumariusi.akvodhub.player.PlayerFactory
 import io.github.radumariusi.akvodhub.player.PlayerUiState
 import io.github.radumariusi.akvodhub.player.PlayerViewModel
 import io.github.radumariusi.akvodhub.ui.hub.Choice
@@ -155,6 +154,17 @@ fun PlayerScreen(
     }
     LaunchedEffect(state.finished) { if (state.finished) onExit() }
     val overlay = state.error != null || state.countdown != null || adjusting
+    // „Sari intro”: apare singur cât rulează intro-ul marcat, 10 s; OK îl activează fără să deschidă comenzile.
+    val introAvailable = state.isSeries && SeriesPlayback.canSkip(position, duration, state.introEndMs)
+    var introPill by remember { mutableStateOf(false) }
+    LaunchedEffect(introAvailable) {
+        introPill = introAvailable
+        if (introAvailable) {
+            delay(INTRO_PILL_MS)
+            introPill = false
+        }
+    }
+    val showIntroPill = introPill && introAvailable && !controls && !overlay
     LaunchedEffect(controls, overlay) {
         if (!overlay) {
             runCatching {
@@ -234,7 +244,12 @@ fun PlayerScreen(
                 if (controls || overlay) return@onKeyEvent false
                 if (e.key.isPlayerOk()) {
                     if (PlayerKeyPress.activate(e.type == KeyEventType.KeyDown, e.nativeKeyEvent.repeatCount)) {
-                        viewModel.togglePlay()
+                        if (showIntroPill) {
+                            introPill = false
+                            viewModel.skipIntro()
+                        } else {
+                            viewModel.togglePlay()
+                        }
                     }
                     return@onKeyEvent true
                 }
@@ -333,6 +348,25 @@ fun PlayerScreen(
                         .widthIn(max = 900.dp)
                         .background(Color.Black.copy(alpha = 0.75f), MaterialTheme.shapes.medium)
                         .padding(horizontal = 20.dp, vertical = 12.dp),
+            )
+        }
+
+        if (showIntroPill) {
+            Text(
+                "OK · Sari intro ▸",
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.Black,
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 48.dp, bottom = 56.dp)
+                        .background(Color.White.copy(alpha = 0.92f), MaterialTheme.shapes.medium)
+                        .pointerInput(Unit) {
+                            detectTapGestures {
+                                introPill = false
+                                viewModel.skipIntro()
+                            }
+                        }.padding(horizontal = 20.dp, vertical = 12.dp),
             )
         }
 
@@ -625,12 +659,6 @@ private fun Controls(
                         onClick = onAdjust,
                     )
                 }
-                PlayerCommand(R.drawable.ic_player_rewind, "Înapoi 10 secunde", onCommandFocus) {
-                    viewModel.seekBy(-PlayerFactory.SEEK_MS)
-                }
-                PlayerCommand(R.drawable.ic_player_forward, "Înainte 10 secunde", onCommandFocus) {
-                    viewModel.seekBy(PlayerFactory.SEEK_MS)
-                }
             }
             OutlinedButton(
                 onClick = onToggleAdvanced,
@@ -846,3 +874,5 @@ private fun sourceChoice(
 private const val MAX_FAILURES_SHOWN = 6
 
 private fun Key.isPlayerOk() = this == Key.DirectionCenter || this == Key.Enter || this == Key.NumPadEnter
+
+private const val INTRO_PILL_MS = 10_000L
