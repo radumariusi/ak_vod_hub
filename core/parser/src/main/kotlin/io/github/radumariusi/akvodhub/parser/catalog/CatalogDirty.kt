@@ -18,17 +18,28 @@ object CatalogDirty {
         listOf("titleId", "quality", "languages", "hdr", "title", "groupTitle", "season", "episode", "providerAddedAt")
     private val titleColumns = listOf("name", "originalName", "originalLanguage", "rating")
 
-    /** Tabelul îl creează Room (entitate); trigger-ele se creează la fiecare deschidere (`IF NOT EXISTS`). */
+    /**
+     * Tabelul îl creează Room (entitate); trigger-ele se creează la fiecare deschidere (`IF NOT EXISTS`).
+     *
+     * Nu folosim `INSERT OR IGNORE`: într-un trigger, politica de conflict a instrucțiunii exterioare o
+     * înlocuiește, iar Room scrie `UPDATE OR ABORT` (`@Update`). Al doilea rând al aceluiași titlu dădea
+     * atunci `SQLiteConstraintException` (importul eșua la reîmprospătare, v0.1.56). Verificăm cu `NOT EXISTS`.
+     * Prima versiune (`catalog_dirty_entry`/`catalog_dirty_title`) se șterge.
+     */
     val TRIGGERS: List<String> =
         listOf(
-            "CREATE TRIGGER IF NOT EXISTS catalog_dirty_entry AFTER UPDATE OF ${entryColumns.joinToString()} " +
+            "DROP TRIGGER IF EXISTS catalog_dirty_entry",
+            "DROP TRIGGER IF EXISTS catalog_dirty_title",
+            "CREATE TRIGGER IF NOT EXISTS catalog_dirty_entry_v2 AFTER UPDATE OF ${entryColumns.joinToString()} " +
                 "ON raw_entry WHEN ${changed(entryColumns)} BEGIN " +
-                "INSERT OR IGNORE INTO catalog_dirty(titleId) SELECT OLD.titleId WHERE OLD.titleId IS NOT NULL; " +
-                "INSERT OR IGNORE INTO catalog_dirty(titleId) SELECT NEW.titleId WHERE NEW.titleId IS NOT NULL; END",
-            "CREATE TRIGGER IF NOT EXISTS catalog_dirty_title AFTER UPDATE OF ${titleColumns.joinToString()} " +
-                "ON title WHEN ${changed(titleColumns)} BEGIN " +
-                "INSERT OR IGNORE INTO catalog_dirty(titleId) VALUES (NEW.id); END",
+                "${mark("OLD.titleId")} ${mark("NEW.titleId")} END",
+            "CREATE TRIGGER IF NOT EXISTS catalog_dirty_title_v2 AFTER UPDATE OF ${titleColumns.joinToString()} " +
+                "ON title WHEN ${changed(titleColumns)} BEGIN ${mark("NEW.id")} END",
         )
+
+    private fun mark(id: String) =
+        "INSERT INTO catalog_dirty(titleId) SELECT $id WHERE $id IS NOT NULL " +
+            "AND NOT EXISTS (SELECT 1 FROM catalog_dirty WHERE titleId = $id);"
 
     private fun changed(columns: List<String>) = columns.joinToString(" OR ") { "OLD.$it IS NOT NEW.$it" }
 }

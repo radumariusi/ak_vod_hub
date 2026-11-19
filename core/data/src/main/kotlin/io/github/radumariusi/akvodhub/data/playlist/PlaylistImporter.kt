@@ -190,7 +190,7 @@ class PlaylistImporter(
                 applyEpisodeVisibility(sourceId, seriesId, series.visible)
                 val cache = db.discoverDao()
                 cache.putCache(
-                    DiscoverCacheEntity("episodes-check:$sourceId:$seriesId", parent.seenRun.toString(), now),
+                    DiscoverCacheEntity("episodes-check:$sourceId:$seriesId", snapshot(parent), now),
                 )
                 cache.trimEpisodeChecks()
                 dao.episodes(sourceId, seriesId)
@@ -199,8 +199,14 @@ class PlaylistImporter(
 
     suspend fun episodeSnapshotCurrent(parent: RawEntryEntity): Boolean {
         val run = db.discoverDao().cached("episodes-check:${parent.sourceId}:${parent.streamId}") ?: return false
-        return run.data == parent.seenRun.toString()
+        return run.data == snapshot(parent)
     }
+
+    /**
+     * Versiunea datelor salvate pe episod face parte din instantaneu: episoadele citite înainte de limba audio
+     * de la furnizor (v0.1.56) se cer din nou o dată, altfel rămâneau cu „limbă necunoscută”.
+     */
+    private fun snapshot(parent: RawEntryEntity) = "$EPISODE_DATA_VERSION:${parent.seenRun}"
 
     private fun applyEpisodeVisibility(sourceId: Long, seriesId: Long, visible: Boolean) {
         val sql = db.openHelper.writableDatabase
@@ -489,5 +495,6 @@ class PlaylistImporter(
         /** Android 6 (SQLite vechi) acceptă cel mult 999 de parametri într-o interogare. */
         const val SQL_CHUNK = 500
         const val PROGRESS_EVERY = 2_000
+        const val EPISODE_DATA_VERSION = 2
     }
 }
