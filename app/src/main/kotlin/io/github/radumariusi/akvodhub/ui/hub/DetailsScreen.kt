@@ -696,7 +696,7 @@ private fun SourceTracksDialog(
                     if (confirmed == null) {
                         item { TrackDetailLine("Pistele acestei variante se confirmă în timpul redării.") }
                     } else {
-                        item { Text("Audio detectat", style = MaterialTheme.typography.titleSmall) }
+                        item { Text("Etichete audio din flux", style = MaterialTheme.typography.titleSmall) }
                         items(confirmed.audio.ifEmpty { listOf("Nicio pistă detectată") }) { TrackDetailLine(it) }
                         item { Text("Subtitrări interne detectate", style = MaterialTheme.typography.titleSmall) }
                         items(confirmed.subtitles.ifEmpty { listOf("Nicio pistă detectată") }) { TrackDetailLine(it) }

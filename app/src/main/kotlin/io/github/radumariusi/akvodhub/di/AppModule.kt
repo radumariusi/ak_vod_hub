@@ -117,7 +117,8 @@ object AppModule {
         db: AkVodDatabase,
         tmdb: TmdbClient,
         settings: TmdbSettings,
-    ): TitleMatcher = TitleMatcher(db, tmdb, settings)
+        indexer: CatalogIndexer,
+    ): TitleMatcher = TitleMatcher(db, tmdb, settings, indexer)
 
     @Provides
     @Singleton

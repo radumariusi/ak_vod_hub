@@ -509,3 +509,19 @@ prin grilă. OK deschide fișa direct de pe poster, iar apăsarea lungă pe OK s
 focusul pe Detalii în hero, cu titlul cardului păstrat. Comanda pornește la eliberarea tastei. În jos
 din hero se restaurează ultimul card din grilă. Paginarea rămâne limitată. Nu sunt modificări de
 schemă sau dependențe. Telecomanda și aspectul ultimului rând se verifică pe TV.
+
+### Identificarea surselor după v0.1.49
+
+Parserul recunoaște prefixe de furnizor precum `4K-SC-HDR`, `4K-AMZ` și `NF-DO`.
+`SC` rămâne un marcaj fără limbă atribuită. Calitatea explicită poate veni și din categorii precum
+`3840P`; Dolby Vision și Dolby Audio sunt tratate separat. Etichetele audio observate în flux
+sunt informative. Filtrele continuă să lucreze cu limba declarată a fiecărei surse.
+Numerele de clasament sunt scoase din titlu numai cu prefix TOP și categorie numerotată.
+
+MatchWorker reparcurge intrările salvate după ID, câte 500, cu checkpoint și pauză la redare.
+Păstrează ID-urile de stream și rezoluția confirmată. Potrivirile TMDB existente și episoadele
+își păstrează legăturile. Intrările locale al căror titlu curat s-a schimbat se pot regrupa și
+pot fi reîncercate la TMDB. Titlurile bilingve se potrivesc după cele două nume și același an,
+iar variantele cu același ID TMDB ajung la aceeași fișă. La legare se preiau Lista mea, istoricul,
+reluarea, progresul episoadelor și preferințele locale ale serialului dacă lipsesc la destinație.
+Titlurile cu dovezi insuficiente pot rămâne locale. Fără migrare Room sau dependențe.

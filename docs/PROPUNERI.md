@@ -202,6 +202,11 @@ Vezi detalii despre schema Room și limitele cunoscute în [HANDOFF.md](HANDOFF.
 
 - Filme și Seriale aliniază grila la rândul curent. Detalii este accesibil prin OK direct pe poster sau prin apăsarea lungă pe OK pentru mutarea în hero.
 
+## Identificarea surselor după v0.1.49
+
+- Prefixe IPTV compuse, calitate completată din categorie și potrivire după titlul tradus, original și an.
+- Reindexare reluabilă pentru intrările existente. Verificare pe TV cu variantele 4K, HDR și DE ale aceluiași film.
+
 ## Ce ar îngreuna aplicația (de evitat sau doar opțional)
 
 1. **Trailere redate în aplicație / pe fundal** (YouTube, WebView): megabytes în plus și RAM. → Deschidem aplicația YouTube.

@@ -8,6 +8,8 @@ enum class MediaType {
     TV,
 }
 
+private val alternativeSeparator = Regex("""\s+[-–—]\s+""")
+
 /** Un rezultat de căutare TMDB, redus la ce contează pentru potrivire. */
 data class MatchCandidate(
     val tmdbId: Long,
@@ -25,6 +27,19 @@ data class MatchQuery(
     /** Limba în care e scris titlul (ISO 639-1), dacă o știm; altfel căutăm în engleză. */
     val language: String? = null,
 ) {
+    /** Unele intrări includ titlul local și original. Un separator apare și în titluri cu subtitlu. */
+    val alternatives: List<String> =
+        if (year != null && language != null && language != "en" && language.length == 2) {
+            alternativeSeparator
+                .split(title, limit = 3)
+                .map(String::trim)
+                .takeIf { parts ->
+                    parts.size == 2 && parts.all { part -> part.count(Char::isLetter) >= 3 }
+                }.orEmpty()
+        } else {
+            emptyList()
+        }
+
     /** Cheia de cache: aceeași cheie = același rezultat, deci o singură cerere TMDB pentru toate duplicatele. */
     val key: String =
         listOf(
@@ -32,7 +47,7 @@ data class MatchQuery(
             TitleSimilarity.normalize(title),
             year?.toString().orEmpty(),
             language.orEmpty(),
-        ).joinToString("|")
+        ).plus(alternatives.map(TitleSimilarity::normalize)).joinToString("|")
 }
 
 /** O cerere de căutare TMDB. `year == null` = fără filtru de an. */
@@ -63,11 +78,16 @@ object MatchScorer {
         rank: Int,
     ): Double {
         val q = TitleSimilarity.normalize(query.title)
-        val sim =
-            maxOf(
-                TitleSimilarity.similarity(q, TitleSimilarity.normalize(candidate.title)),
-                candidate.originalTitle?.let { TitleSimilarity.similarity(q, TitleSimilarity.normalize(it)) } ?: 0.0,
-            )
+        val local = TitleSimilarity.normalize(candidate.title)
+        val original = candidate.originalTitle?.let(TitleSimilarity::normalize).orEmpty()
+        if (query.alternatives.isNotEmpty() && q != local && q != original) {
+            val first = TitleSimilarity.normalize(query.alternatives[0])
+            val second = TitleSimilarity.normalize(query.alternatives[1])
+            val sameWork =
+                first != second && ((first == local && second == original) || (first == original && second == local))
+            return if (sameWork && query.year == candidate.year) 1.0 else 0.0
+        }
+        val sim = maxOf(TitleSimilarity.similarity(q, local), TitleSimilarity.similarity(q, original))
         val yearScore =
             if (query.year == null || candidate.year == null) {
                 0.5
@@ -109,6 +129,8 @@ object MatchScorer {
             list += SearchRequest(query.type, query.title, null, language)
             list += SearchRequest(query.type, "${query.title} ${query.year}", null, language)
         }
+        // Caută jumătățile în aceeași limbă, pentru ca rezultatul să conțină și traducerea, și originalul.
+        for (title in query.alternatives) list += SearchRequest(query.type, title, query.year, language)
         return list
     }
 }

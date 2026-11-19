@@ -33,7 +33,7 @@ class MatchWorker(
             scheduler.enqueueAfterPlaybackPause()
             return Result.success()
         }
-        if (!indexer.refreshSourceLanguages()) {
+        if (!indexer.refreshSourceMetadata()) {
             if (PlaybackActivityState.active) scheduler.enqueueAfterPlaybackPause() else scheduler.enqueue()
             return Result.success()
         }

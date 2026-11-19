@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-19 — Identificarea și gruparea surselor
+
+- Citește prefixele compuse și marcajele 4K/HDR din nume și categorii, cu etichetele pistelor audio afișate separat.
+- Reprocesează catalogul salvat în loturi și potrivește numele bilingve cu titlul original și traducerea TMDB, pe baza anului.
+
 ## 2026-11-19 — Focus și derulare în Filme și Seriale
 
 - Grila se aliniază la rândul cu focus, inclusiv la capătul catalogului. Derularea tactilă se oprește la începutul unui rând.

@@ -5,15 +5,18 @@ import android.os.SystemClock
 import android.util.Log
 import androidx.room.withTransaction
 import io.github.radumariusi.akvodhub.data.db.AkVodDatabase
+import io.github.radumariusi.akvodhub.data.db.MatchState
 import io.github.radumariusi.akvodhub.data.db.PendingEntry
 import io.github.radumariusi.akvodhub.data.db.TitleEntity
 import io.github.radumariusi.akvodhub.parser.VodKind
 import io.github.radumariusi.akvodhub.parser.catalog.ContentVisibility
 import io.github.radumariusi.akvodhub.parser.catalog.DubLabel
 import io.github.radumariusi.akvodhub.parser.catalog.PosterBadges
+import io.github.radumariusi.akvodhub.parser.match.MatchQuery
 import io.github.radumariusi.akvodhub.parser.match.MediaType
 import io.github.radumariusi.akvodhub.parser.match.TitleSimilarity
 import io.github.radumariusi.akvodhub.parser.player.PlaybackActivityState
+import io.github.radumariusi.akvodhub.parser.player.SeriesPlayback
 import io.github.radumariusi.akvodhub.parser.title.TitleParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -94,11 +97,11 @@ class CatalogIndexer(
             }
         }
 
-    /** Actualizează doar limbile din intrările existente, fără a relega titlurile sau episoadele. */
-    suspend fun refreshSourceLanguages(): Boolean =
+    /** Reparsează intrările salvate după actualizarea regulilor, în loturi reluabile. */
+    suspend fun refreshSourceMetadata(): Boolean =
         mutex.withLock {
             withContext(Dispatchers.IO) {
-                val key = "source_languages_v1_after_id"
+                val key = "source_metadata_v2_after_id"
                 var after = prefs.getLong(key, 0L)
                 if (after < 0L) return@withContext true
                 val playlist = db.playlistDao()
@@ -107,11 +110,49 @@ class CatalogIndexer(
                     val lastId =
                         db.withTransaction {
                             val batch = playlist.sourceMetadataBatch(after, 500)
-                            for (entry in batch) {
-                                val parsed = entry.parsed()
-                                if (parsed.languages != entry.languages || parsed.subtitles != entry.subtitles) {
-                                    playlist.updateSourceLanguages(entry.id, parsed.languages, parsed.subtitles)
+                            val regroup = mutableListOf<Triple<LocalKey, String, Long>>()
+                            val updates =
+                                batch.mapNotNull { entry ->
+                                    // Sezonul și episodul fac parte din identitatea de redare deja salvată.
+                                    val parsed = entry.parsed().copy(season = entry.season, episode = entry.episode)
+                                    val nameChanged = entry.title != parsed.title || entry.year != parsed.year
+                                    val local =
+                                        entry.matchState != MatchState.MATCHED &&
+                                            entry.matchState != MatchState.INHERITED
+                                    val title = parsed.title.orEmpty()
+                                    val type = if (entry.kind == VodKind.MOVIE) MediaType.MOVIE else MediaType.TV
+                                    val shouldRetry =
+                                        entry.matchState == MatchState.UNMATCHED &&
+                                            (
+                                                nameChanged || entry.languages != parsed.languages ||
+                                                    MatchQuery(
+                                                        type,
+                                                        title,
+                                                        parsed.year,
+                                                        parsed.languages?.split(',')?.singleOrNull(),
+                                                    ).alternatives.isNotEmpty()
+                                            )
+                                    if (local && nameChanged && entry.titleId != null) {
+                                        localKey(entry.kind, title, parsed.year)?.let { keyForTitle ->
+                                            regroup += Triple(keyForTitle, title, entry.id)
+                                        }
+                                    }
+                                    val updated =
+                                        if (shouldRetry) {
+                                            parsed.copy(
+                                                matchState = MatchState.PENDING_SEARCH,
+                                            )
+                                        } else {
+                                            parsed
+                                        }
+                                    updated.takeUnless { it == entry }
                                 }
+                            if (updates.isNotEmpty()) playlist.updateEntries(updates)
+                            for ((localKey, entries) in regroup.groupBy { it.first }) {
+                                val ids = entries.map { it.third }
+                                val target = ensureLocalTitle(localKey, entries.first().second, ids, clock())
+                                carryLibrary(ids, target, localKey.type)
+                                dao.linkLocal(ids, target)
                             }
                             batch.lastOrNull()?.id ?: -1L
                         }
@@ -138,29 +179,62 @@ class CatalogIndexer(
             db.withTransaction {
                 for ((key, entries) in batch.groupBy(::localKey)) {
                     if (key == null) continue
-                    val first = entries.first()
-                    val type = key.type
-                    val tmdbId = localTmdbId(key)
                     val ids = entries.map { it.id }
-                    val titleId =
-                        dao.title(type, tmdbId)?.id
-                            ?: dao
-                                .insertTitle(
-                                    TitleEntity(
-                                        mediaType = type,
-                                        tmdbId = tmdbId,
-                                        name = displayTitle(first),
-                                        year = key.year,
-                                        posterPath = dao.firstLogo(ids),
-                                        detailsFetched = true,
-                                        updatedAt = now,
-                                    ),
-                                ).takeIf { it > 0 }
-                            ?: dao.title(type, tmdbId)!!.id
+                    val titleId = ensureLocalTitle(key, displayTitle(entries.first()), ids, now)
                     dao.linkLocal(ids, titleId)
                 }
             }
         }
+    }
+
+    private suspend fun ensureLocalTitle(key: LocalKey, name: String, ids: List<Long>, now: Long): Long {
+        val tmdbId = localTmdbId(key)
+        return dao.title(key.type, tmdbId)?.id
+            ?: dao
+                .insertTitle(
+                    TitleEntity(
+                        mediaType = key.type,
+                        tmdbId = tmdbId,
+                        name = name,
+                        year = key.year,
+                        posterPath = dao.firstLogo(ids),
+                        detailsFetched = true,
+                        updatedAt = now,
+                    ),
+                ).takeIf { it > 0 }
+            ?: dao.title(key.type, tmdbId)!!.id
+    }
+
+    /** Se apelează în aceeași tranzacție cu legarea surselor. Preferințele deja alese pe destinație au prioritate. */
+    internal suspend fun carryLibrary(ids: List<Long>, titleId: Long, type: MediaType) {
+        dao.carryWatchlist(ids, titleId)
+        dao.carryHistory(ids, titleId)
+        dao.carryEpisodeProgress(ids, titleId)
+        dao.carryWatchState(ids, titleId)
+        dao.updateCarriedProgress(titleId)
+        if (type != MediaType.TV) return
+        val settings = contentPrefs.all
+        if (settings.keys.none { it.startsWith("series.local_") }) return
+        val target = dao.titleById(titleId) ?: return
+        val targetKey = SeriesPlayback.key(target.tmdbId, target.originalName ?: target.name, target.year)
+        val missing = listOf("intro", "audio", "text").filterTo(mutableSetOf()) { "series.$targetKey.$it" !in settings }
+        if (missing.isEmpty()) return
+        val edit = contentPrefs.edit()
+        for (old in dao.localTitlesForEntries(ids)) {
+            if (old.id == titleId) continue
+            val oldKey = SeriesPlayback.key(old.tmdbId, old.originalName ?: old.name, old.year)
+            val keys = missing.iterator()
+            while (keys.hasNext()) {
+                val typeKey = keys.next()
+                val value = settings["series.$oldKey.$typeKey"] as? String ?: continue
+                val newKey = "series.$targetKey.$typeKey"
+                if (!SeriesPlayback.validSetting(newKey, value)) continue
+                edit.putString(newKey, value)
+                keys.remove()
+            }
+            if (missing.isEmpty()) break
+        }
+        edit.apply()
     }
 
     private fun updateSourceVisibility(languages: String, categories: String, hideAdult: Boolean) {
@@ -304,12 +378,14 @@ class CatalogIndexer(
     private fun displayTitle(entry: PendingEntry): String =
         entry.title?.ifBlank { null } ?: TitleParser.parse(entry.name, entry.groupTitle).title.ifBlank { entry.name }
 
-    private fun localKey(entry: PendingEntry): LocalKey? {
-        val title = TitleSimilarity.normalize(displayTitle(entry))
+    private fun localKey(entry: PendingEntry): LocalKey? = localKey(entry.kind, displayTitle(entry), entry.year)
+
+    private fun localKey(kind: VodKind, name: String, year: Int?): LocalKey? {
+        val title = TitleSimilarity.normalize(name)
         if (title.isEmpty()) return null
-        val type = if (entry.kind == VodKind.MOVIE) MediaType.MOVIE else MediaType.TV
+        val type = if (kind == VodKind.MOVIE) MediaType.MOVIE else MediaType.TV
         // La seriale, anul din numele episoadelor e adesea anul episodului: grupăm doar după nume.
-        return LocalKey(type, title, if (type == MediaType.MOVIE) entry.year else null)
+        return LocalKey(type, title, if (type == MediaType.MOVIE) year else null)
     }
 
     /** ID negativ stabil (FNV-1a pe 63 de biți), ca același titlu local să fie refolosit la reîmprospătare. */

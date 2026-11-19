@@ -60,11 +60,8 @@ interface CatalogDao {
         titleId: Long,
     )
 
-    @Query("UPDATE raw_entry SET titleId = NULL, matchState = :state WHERE id IN (:ids)")
-    suspend fun setState(
-        ids: List<Long>,
-        state: Int,
-    )
+    @Query("UPDATE raw_entry SET matchState = 2 WHERE id IN (:ids)")
+    suspend fun markUnmatched(ids: List<Long>)
 
     /** ID-ul de la furnizor era greșit: intrările titlului se caută din nou după nume. */
     @Query("UPDATE raw_entry SET titleId = NULL, matchState = 4 WHERE titleId = :titleId")
@@ -281,6 +278,20 @@ interface CatalogDao {
             "WHERE w.titleId IN (SELECT titleId FROM raw_entry WHERE id IN (:ids)) ORDER BY w.updatedAt DESC LIMIT 1",
     )
     suspend fun carryWatchState(ids: List<Long>, titleId: Long)
+
+    @Query(
+        "SELECT * FROM title WHERE tmdbId < 0 AND id IN (SELECT titleId FROM raw_entry WHERE id IN (:ids)) ORDER BY id",
+    )
+    suspend fun localTitlesForEntries(ids: List<Long>): List<TitleEntity>
+
+    @Query(
+        "UPDATE title SET watchProgress = COALESCE((SELECT CASE WHEN w.durationMs > 0 THEN " +
+            "MIN(1.0, MAX(0.0, w.positionMs * 1.0 / w.durationMs)) ELSE 0.0 END " +
+            "FROM watch_state w WHERE w.titleId = :titleId), " +
+            "(SELECT MIN(1.0, MAX(0.0, h.progress)) FROM watch_history h WHERE h.titleId = :titleId), watchProgress) " +
+            "WHERE id = :titleId",
+    )
+    suspend fun updateCarriedProgress(titleId: Long)
 
     @Query("DELETE FROM watch_state WHERE titleId = :titleId")
     suspend fun deleteWatchState(titleId: Long)

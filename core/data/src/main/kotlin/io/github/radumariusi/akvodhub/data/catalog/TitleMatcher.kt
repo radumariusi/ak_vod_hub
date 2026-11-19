@@ -3,7 +3,6 @@ package io.github.radumariusi.akvodhub.data.catalog
 import androidx.room.withTransaction
 import io.github.radumariusi.akvodhub.data.db.AkVodDatabase
 import io.github.radumariusi.akvodhub.data.db.MatchCacheEntity
-import io.github.radumariusi.akvodhub.data.db.MatchState
 import io.github.radumariusi.akvodhub.data.db.PendingEntry
 import io.github.radumariusi.akvodhub.data.db.TitleEntity
 import io.github.radumariusi.akvodhub.data.tmdb.TmdbAuthException
@@ -62,6 +61,7 @@ class TitleMatcher(
     private val db: AkVodDatabase,
     private val tmdb: TmdbClient,
     private val settings: TmdbSettings,
+    private val indexer: CatalogIndexer,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private val dao = db.catalogDao()
@@ -103,11 +103,8 @@ class TitleMatcher(
 
     // ---------------------------------------------------------------- 1. ID-uri de la furnizor
 
-    private suspend fun linkKeepingLibrary(ids: List<Long>, titleId: Long) {
-        dao.carryWatchlist(ids, titleId)
-        dao.carryHistory(ids, titleId)
-        dao.carryEpisodeProgress(ids, titleId)
-        dao.carryWatchState(ids, titleId)
+    private suspend fun linkKeepingLibrary(ids: List<Long>, titleId: Long, type: MediaType) {
+        indexer.carryLibrary(ids, titleId, type)
         dao.link(ids, titleId)
     }
 
@@ -133,7 +130,7 @@ class TitleMatcher(
                                     updatedAt = clock(),
                                 )
                             }
-                        entries.map { it.id }.chunked(SQL_CHUNK).forEach { linkKeepingLibrary(it, titleId) }
+                        entries.map { it.id }.chunked(SQL_CHUNK).forEach { linkKeepingLibrary(it, titleId, type) }
                     }
             }
         }
@@ -211,10 +208,11 @@ class TitleMatcher(
                         ) {
                             unmatched += ids
                         } else {
-                            ids.chunked(SQL_CHUNK).forEach { linkKeepingLibrary(it, titleId) }
+                            val type = mediaType(entries.first().kind)
+                            ids.chunked(SQL_CHUNK).forEach { linkKeepingLibrary(it, titleId, type) }
                         }
                     }
-                unmatched.chunked(SQL_CHUNK).forEach { dao.setState(it, MatchState.UNMATCHED) }
+                unmatched.chunked(SQL_CHUNK).forEach { dao.markUnmatched(it) }
             }
         }
     }
