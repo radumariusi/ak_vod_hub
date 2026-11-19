@@ -131,6 +131,21 @@ class PlaybackSettings(
         }
     }
 
+    /** Ultimele căutări (cel mult 5), cele mai noi primele. Nu intră în starea observată: se citesc la cerere. */
+    fun recentSearches(): List<String> =
+        prefs
+            .getString(RECENT_SEARCHES, "")
+            .orEmpty()
+            .split('\n')
+            .filter { it.isNotBlank() }
+
+    fun addRecentSearch(text: String) {
+        val value = text.replace('\n', ' ').trim().take(60)
+        if (value.length < 2) return
+        val list = (listOf(value) + recentSearches().filterNot { it.equals(value, ignoreCase = true) }).take(5)
+        prefs.edit().putString(RECENT_SEARCHES, list.joinToString("\n")).apply()
+    }
+
     fun setBrowseFilter(key: String, value: String) {
         val safe = BrowseFilters.sanitize(key, value) ?: return
         prefs.edit().putString(key, safe).apply()
@@ -507,6 +522,7 @@ class PlaybackSettings(
         private val CONTENT_KEYS =
             listOf("content_languages", "hidden_languages", "hidden_categories", "audio_language")
         private const val BUFFER = "buffer_preset"
+        private const val RECENT_SEARCHES = "recent_searches"
         private const val NIGHT = "night_mode"
         private const val PASSTHROUGH = "audio_passthrough"
         private const val FRAME_RATE = "match_frame_rate"

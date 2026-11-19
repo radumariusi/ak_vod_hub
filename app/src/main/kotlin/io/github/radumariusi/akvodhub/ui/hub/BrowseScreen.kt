@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalTvMaterial3Api::class, ExperimentalComposeUiApi::class)
+@file:OptIn(ExperimentalTvMaterial3Api::class, ExperimentalComposeUiApi::class, ExperimentalLayoutApi::class)
 
 package io.github.radumariusi.akvodhub.ui.hub
 
@@ -240,7 +240,15 @@ fun BrowseScreen(
                                 val key = "browse:$screenKey:${card.id}"
                                 PosterCard(
                                     card = card,
-                                    onClick = { onOpen(card, key) },
+                                    onClick = {
+                                        if (search) browser.rememberSearch()
+                                        onOpen(card, key)
+                                    },
+                                    onPlay = {
+                                        context.startActivity(
+                                            PlayerActivity.intent(context, PlayRequest(card.id, resume = true)),
+                                        )
+                                    },
                                     onFocused = {
                                         if (!search) {
                                             preview.value = card
@@ -277,6 +285,19 @@ fun BrowseScreen(
                     Message(
                         "Scrie un titlu sau alege un filtru. Caută după titlul TMDB, titlul original sau numele din playlist.",
                     )
+                    val recent = remember(filter.text) { browser.recentSearches() }
+                    if (recent.isNotEmpty()) {
+                        Text(
+                            "Căutări recente",
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
+                        )
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            recent.forEach { text ->
+                                OutlinedButton(onClick = { browser.setFilter(filter.copy(text = text)) }) { Text(text) }
+                            }
+                        }
+                    }
                 }
 
                 else -> {

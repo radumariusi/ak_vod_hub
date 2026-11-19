@@ -11,6 +11,7 @@ fun sourceTags(
 ): String {
     val entry = info?.entry
     return listOfNotNull(
+        "⚠ a eșuat recent".takeIf { info?.failing == true },
         "Rezoluție ✓".takeIf { entry?.confirmedQuality != null },
         source.languages
             .joinToString(

@@ -23,6 +23,11 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
@@ -127,6 +132,7 @@ fun PosterCard(
     landscape: Boolean = false,
     showTitle: Boolean = true,
     onLongClick: (() -> Unit)? = null,
+    onPlay: (() -> Unit)? = null,
 ) {
     val width = if (landscape) PosterWidth * 2.05f else PosterWidth
     val height = if (landscape) width * (9f / 16) else PosterHeight
@@ -151,6 +157,7 @@ fun PosterCard(
             modifier =
                 Modifier
                     .width(width)
+                    .then(if (onPlay == null) Modifier else playKey(onPlay))
                     .focusRequester(requester)
                     .onFocusChanged { if (it.isFocused) onFocused() },
         ) {
@@ -256,6 +263,14 @@ fun PosterCard(
         }
     }
 }
+
+/** Tasta Play / Play-Pauză a telecomenzii pe un poster pornește direct redarea (fără fișă). */
+private fun playKey(onPlay: () -> Unit): Modifier =
+    Modifier.onPreviewKeyEvent { event ->
+        if (event.key != Key.MediaPlay && event.key != Key.MediaPlayPause) return@onPreviewKeyEvent false
+        if (event.type == KeyEventType.KeyUp) onPlay()
+        true
+    }
 
 @Composable
 private fun PosterBadgeText(label: String, modifier: Modifier = Modifier) {

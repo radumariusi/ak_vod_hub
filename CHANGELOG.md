@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-11-19 — Propuneri ușoare (B)
+
+- Tasta Play / Play-Pauză a telecomenzii pe un poster (Acasă, Filme, Seriale, Căutare) pornește direct redarea, fără fișă.
+- Sursa care a pornit ultima dată pentru un titlu se încearcă prima. O sursă cu 2 eșecuri la rând coboară la final 7 zile și apare cu „⚠ a eșuat recent”. Datele stau într-un singur rând din cache, fără migrare.
+- Căutare: ultimele 5 căutări (cele care au dus la o fișă deschisă) apar când câmpul e gol.
+- Setări → Avansate → „Diagnostic surse”: câte surse nu au limbă sau calitate și categoriile mari fără limbă. Pagina „Configurare de pe telefon” are „Descarcă diagnostic”: categorii, un eșantion de nume cu ce a dedus parserul și metadatele tehnice Xtream (`info.video` / `info.audio`) ale unui film și ale unui serial, fără adrese, conturi sau parole.
+
 ## 2026-11-19 — Corecții de interfață (A)
 
 - Focus mai vizibil: margine de 3 dp aproape albă pe carduri și suprafețe, iar posterele se măresc ușor (5%).

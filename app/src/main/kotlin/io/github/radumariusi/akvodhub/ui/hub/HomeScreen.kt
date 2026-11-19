@@ -235,6 +235,15 @@ private fun HomeRows(
                                         supportingText = info?.progressLabel(),
                                         landscape = row.key == HomeViewModel.CONTINUE,
                                         showTitle = false,
+                                        onPlay = {
+                                            if (info != null) {
+                                                play(info, resume = true)
+                                            } else {
+                                                context.startActivity(
+                                                    PlayerActivity.intent(context, PlayRequest(card.id, resume = true)),
+                                                )
+                                            }
+                                        },
                                     )
                                     if (info != null && prefs.continueDirect) {
                                         OutlinedButton(onClick = { actions(card, key, info) }) { Text("Acțiuni") }

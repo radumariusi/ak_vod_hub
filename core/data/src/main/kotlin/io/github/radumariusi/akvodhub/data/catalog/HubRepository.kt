@@ -39,6 +39,8 @@ import io.github.radumariusi.akvodhub.parser.catalog.TitleLogo
 import io.github.radumariusi.akvodhub.parser.match.QualityGroup
 import io.github.radumariusi.akvodhub.parser.match.SourceGrouping
 import io.github.radumariusi.akvodhub.parser.match.SourceInfo
+import io.github.radumariusi.akvodhub.parser.player.SourceHealth
+import io.github.radumariusi.akvodhub.parser.player.SourceHealthRecord
 import io.github.radumariusi.akvodhub.parser.player.SourceProfile
 import io.github.radumariusi.akvodhub.parser.stremio.StremioIds
 import io.github.radumariusi.akvodhub.parser.title.VideoQuality
@@ -51,6 +53,8 @@ import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
@@ -75,6 +79,8 @@ data class Credits(
 data class SourceDetails(
     val entry: RawEntryEntity,
     val playlist: String,
+    /** A eșuat de mai multe ori la rând recent (vezi [SourceHealth]). */
+    val failing: Boolean = false,
 )
 
 @Serializable
@@ -136,6 +142,40 @@ class HubRepository(
             preferredLanguages,
             originalLanguage.takeIf { playback.state.value.preferOriginalLanguage },
         )
+
+    // ---------------------------------------------------------------- sănătatea surselor
+
+    private val healthMutex = Mutex()
+    private var health: MutableMap<Long, SourceHealthRecord>? = null
+
+    private suspend fun <T> withHealth(block: (MutableMap<Long, SourceHealthRecord>) -> T): T =
+        healthMutex.withLock {
+            val map =
+                health ?: SourceHealth
+                    .decode(db.discoverDao().cached(HEALTH_KEY)?.data)
+                    .toMutableMap()
+                    .also { health = it }
+            block(map)
+        }
+
+    private suspend fun saveHealth() {
+        val data = withHealth { SourceHealth.encode(it) }
+        db.discoverDao().putCache(DiscoverCacheEntity(HEALTH_KEY, data, System.currentTimeMillis()))
+    }
+
+    suspend fun sourceHealth(): Map<Long, SourceHealthRecord> = withHealth { it.toMap() }
+
+    /** Sursa a pornit: devine prima alegere data viitoare pentru titlul ei. */
+    suspend fun markSourceStarted(entryId: Long) {
+        withHealth { it[entryId] = SourceHealth.started(it[entryId], System.currentTimeMillis()) }
+        saveHealth()
+    }
+
+    /** Sursa n-a pornit sau s-a oprit definitiv: după două eșecuri la rând coboară la final. */
+    suspend fun markSourceFailed(entryId: Long) {
+        withHealth { it[entryId] = SourceHealth.failed(it[entryId], System.currentTimeMillis()) }
+        saveHealth()
+    }
 
     fun sourceReason(source: SourceInfo, originalLanguage: String?): String {
         val original = originalLanguage?.lowercase()
@@ -628,10 +668,15 @@ class HubRepository(
     private suspend fun describe(entries: List<RawEntryEntity>): Map<Long, SourceDetails> {
         if (entries.isEmpty()) return emptyMap()
         val names = playlistDao.sources().associate { it.id to it.name }
-        return entries.associate { it.id to SourceDetails(it, names[it.sourceId].orEmpty()) }
+        val health = sourceHealth()
+        val now = System.currentTimeMillis()
+        return entries.associate {
+            it.id to SourceDetails(it, names[it.sourceId].orEmpty(), SourceHealth.isDead(health[it.id], now))
+        }
     }
 
     private companion object {
+        const val HEALTH_KEY = "source-health"
         const val MAX_LANGUAGES = 30
         const val MAX_CAST = 15
     }

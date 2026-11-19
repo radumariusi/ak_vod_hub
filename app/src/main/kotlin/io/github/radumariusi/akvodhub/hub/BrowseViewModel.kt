@@ -144,6 +144,14 @@ class Browser(
         }
     }
 
+    /** Ultimele căutări (doar pentru Căutare). */
+    fun recentSearches(): List<String> = if (needsInput) preferences?.recentSearches().orEmpty() else emptyList()
+
+    /** Textul căutat a dus la un titlu deschis: îl ținem minte printre ultimele căutări. */
+    fun rememberSearch() {
+        if (needsInput) preferences?.addRecentSearch(mutableState.value.filter.text)
+    }
+
     fun setFilter(filter: CatalogFilter) {
         val old = mutableState.value.filter
         if (filter == old) return
@@ -229,7 +237,8 @@ class BrowseViewModel
                 needsInput = false,
                 preferences = preferences,
             )
-        val search = Browser(viewModelScope, repository, CatalogFilter(), needsInput = true)
+        val search =
+            Browser(viewModelScope, repository, CatalogFilter(), needsInput = true, preferences = preferences)
 
         private val mutableLanguages = MutableStateFlow<List<String>>(emptyList())
 
