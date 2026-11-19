@@ -192,86 +192,92 @@ private fun HomeRows(
             }
             // Rândul cu focus urcă mereu sub antet, întreg (titlul rândului rămâne vizibil).
             Box(Modifier.weight(1f)) {
-            PivotScroll(54.dp) {
-                LazyColumn(
-                    state = rememberLazyListState(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding = PaddingValues(bottom = 24.dp),
-                    modifier = Modifier.fillMaxSize().clipToBounds(),
-                ) {
-                    items(rows, key = { it.key }) { row ->
-                        val rowState = rememberLazyListState()
-                        DisposableEffect(row.key, rowState) {
-                            visibleRows[row.key] = rowState
-                            onDispose { visibleRows.remove(row.key) }
-                        }
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(row.title, style = MaterialTheme.typography.titleMedium)
-                            DefaultScroll {
-                            LazyRow(
-                                state = rowState,
-                                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 10.dp),
-                                modifier = Modifier.focusRestorer(),
-                            ) {
-                                itemsIndexed(row.items, key = { _, card -> card.id }) { index, card ->
-                                    val key = cardKey(row, card)
-                                    val info = row.continueInfo[card.id]
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        PosterCard(
-                                            card = card,
-                                            onClick = {
-                                                when {
-                                                    info == null -> onOpen(card, key)
-                                                    prefs.continueDirect -> play(info, resume = true)
-                                                    else -> actions(card, key, info)
-                                                }
-                                            },
-                                            onFocused = {
-                                                focusedRowKey.value = row.key
-                                                focused.value = card
-                                                viewModel.onItemFocused(row.key, index)
-                                            },
-                                            requestFocus = key == focusKey || (choice == null && key == returnToCard),
-                                            onFocusRequested = {
-                                                initialFocusDone = true
-                                                returnToCard = null
-                                                onRestored()
-                                            },
-                                            supportingText = info?.progressLabel(),
-                                            landscape = row.key == HomeViewModel.CONTINUE,
-                                            showTitle = false,
-                                            onLongClick =
-                                                if (prefs.homeHero) {
-                                                    {
+                PivotScroll(54.dp) {
+                    LazyColumn(
+                        state = rememberLazyListState(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = PaddingValues(bottom = 24.dp),
+                        modifier = Modifier.fillMaxSize().clipToBounds(),
+                    ) {
+                        items(rows, key = { it.key }) { row ->
+                            val rowState = rememberLazyListState()
+                            DisposableEffect(row.key, rowState) {
+                                visibleRows[row.key] = rowState
+                                onDispose { visibleRows.remove(row.key) }
+                            }
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(row.title, style = MaterialTheme.typography.titleMedium)
+                                DefaultScroll {
+                                    LazyRow(
+                                        state = rowState,
+                                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 10.dp),
+                                        modifier = Modifier.focusRestorer(),
+                                    ) {
+                                        itemsIndexed(row.items, key = { _, card -> card.id }) { index, card ->
+                                            val key = cardKey(row, card)
+                                            val info = row.continueInfo[card.id]
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                PosterCard(
+                                                    card = card,
+                                                    onClick = {
+                                                        when {
+                                                            info == null -> onOpen(card, key)
+                                                            prefs.continueDirect -> play(info, resume = true)
+                                                            else -> actions(card, key, info)
+                                                        }
+                                                    },
+                                                    onFocused = {
                                                         focusedRowKey.value = row.key
                                                         focused.value = card
-                                                        runCatching { heroPlayFocus.requestFocus() }
-                                                    }
-                                                } else {
-                                                    null
-                                                },
-                                            onPlay = {
-                                                if (info != null) {
-                                                    play(info, resume = true)
-                                                } else {
-                                                    context.startActivity(
-                                                        PlayerActivity.intent(context, PlayRequest(card.id, resume = true)),
-                                                    )
+                                                        viewModel.onItemFocused(row.key, index)
+                                                    },
+                                                    requestFocus =
+                                                        key == focusKey || (choice == null && key == returnToCard),
+                                                    onFocusRequested = {
+                                                        initialFocusDone = true
+                                                        returnToCard = null
+                                                        onRestored()
+                                                    },
+                                                    supportingText = info?.progressLabel(),
+                                                    landscape = row.key == HomeViewModel.CONTINUE,
+                                                    showTitle = false,
+                                                    onLongClick =
+                                                        if (prefs.homeHero) {
+                                                            {
+                                                                focusedRowKey.value = row.key
+                                                                focused.value = card
+                                                                runCatching { heroPlayFocus.requestFocus() }
+                                                            }
+                                                        } else {
+                                                            null
+                                                        },
+                                                    onPlay = {
+                                                        if (info != null) {
+                                                            play(info, resume = true)
+                                                        } else {
+                                                            context.startActivity(
+                                                                PlayerActivity.intent(
+                                                                    context,
+                                                                    PlayRequest(card.id, resume = true),
+                                                                ),
+                                                            )
+                                                        }
+                                                    },
+                                                )
+                                                if (info != null && prefs.continueDirect) {
+                                                    OutlinedButton(
+                                                        onClick = { actions(card, key, info) },
+                                                    ) { Text("Acțiuni") }
                                                 }
-                                            },
-                                        )
-                                        if (info != null && prefs.continueDirect) {
-                                            OutlinedButton(onClick = { actions(card, key, info) }) { Text("Acțiuni") }
+                                            }
                                         }
                                     }
                                 }
                             }
-                            }
                         }
                     }
                 }
-            }
             }
         }
     }

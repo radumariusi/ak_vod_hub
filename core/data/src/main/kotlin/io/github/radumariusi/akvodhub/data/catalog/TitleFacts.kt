@@ -12,21 +12,57 @@ object TitleFacts {
 
     fun from(info: TmdbTitleInfo, title: TitleEntity): List<Pair<String, String>> {
         val facts = mutableListOf<Pair<String, String>>()
+
         fun add(label: String, value: String?) {
             value?.takeIf { it.isNotBlank() }?.let { facts += label to it }
         }
         val original = info.originalTitle ?: info.originalName
         if (original != null && !original.equals(title.name, ignoreCase = true)) add("Titlu original", original)
-        add(if (info.firstAirDate != null) "Prima difuzare" else "Premieră", date(info.releaseDate ?: info.firstAirDate))
+        add(
+            if (info.firstAirDate !=
+                null
+            ) {
+                "Prima difuzare"
+            } else {
+                "Premieră"
+            },
+            date(info.releaseDate ?: info.firstAirDate),
+        )
         info.lastAirDate?.takeIf { info.firstAirDate != null }?.let { add("Ultima difuzare", date(it)) }
         add("Stare", status(info.status))
         if (info.seasons != null && info.episodes != null) {
             add("Sezoane", "${info.seasons} (${info.episodes} episoade)")
         }
-        add("Limbi", info.spokenLanguages.mapNotNull { language(it.code) ?: it.englishName }.distinct().take(5).joinToString(", "))
-        add("Țări", info.countries.mapNotNull { it.name }.take(4).joinToString(", "))
-        add("Rețea", info.networks.mapNotNull { it.name }.take(3).joinToString(", "))
-        add("Producție", info.companies.mapNotNull { it.name }.take(4).joinToString(", "))
+        add(
+            "Limbi",
+            info.spokenLanguages
+                .mapNotNull {
+                    language(it.code) ?: it.englishName
+                }.distinct()
+                .take(5)
+                .joinToString(", "),
+        )
+        add(
+            "Țări",
+            info.countries
+                .mapNotNull { it.name }
+                .take(4)
+                .joinToString(", "),
+        )
+        add(
+            "Rețea",
+            info.networks
+                .mapNotNull { it.name }
+                .take(3)
+                .joinToString(", "),
+        )
+        add(
+            "Producție",
+            info.companies
+                .mapNotNull { it.name }
+                .take(4)
+                .joinToString(", "),
+        )
         info.budget?.takeIf { it > 0 }?.let { add("Buget", money(it)) }
         info.revenue?.takeIf { it > 0 }?.let { add("Încasări", money(it)) }
         info.voteCount?.takeIf { it > 0 }?.let { add("Voturi TMDB", "%,d".format(Locale.US, it).replace(',', '.')) }

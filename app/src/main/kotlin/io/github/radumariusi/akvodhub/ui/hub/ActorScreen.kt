@@ -1,21 +1,14 @@
 package io.github.radumariusi.akvodhub.ui.hub
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.style.TextOverflow
-import coil3.compose.AsyncImage
-import io.github.radumariusi.akvodhub.data.catalog.TitleFacts
-import io.github.radumariusi.akvodhub.data.tmdb.TmdbPerson
-import java.util.Calendar
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
@@ -29,14 +22,21 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import coil3.compose.AsyncImage
+import io.github.radumariusi.akvodhub.data.catalog.TitleFacts
 import io.github.radumariusi.akvodhub.data.db.TitleCard
+import io.github.radumariusi.akvodhub.data.tmdb.TmdbPerson
 import io.github.radumariusi.akvodhub.hub.ActorState
 import io.github.radumariusi.akvodhub.hub.ActorViewModel
 import io.github.radumariusi.akvodhub.ui.touch.OutlinedButton
 import kotlinx.coroutines.flow.distinctUntilChanged
+import java.util.Calendar
 
 @Composable
 fun ActorScreen(

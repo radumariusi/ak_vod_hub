@@ -200,7 +200,10 @@ fun BrowseScreen(
                 ) {
                     Text(title, style = MaterialTheme.typography.titleMedium)
                     if (showGridHint) {
-                        Text("OK: detalii · Ține apăsat OK: sus la Redă / Detalii", style = MaterialTheme.typography.labelSmall)
+                        Text(
+                            "OK: detalii · Ține apăsat OK: sus la Redă / Detalii",
+                            style = MaterialTheme.typography.labelSmall,
+                        )
                     }
                 }
             } else {
@@ -236,9 +239,18 @@ fun BrowseScreen(
                                 columns = gridCells,
                                 horizontalArrangement = Arrangement.spacedBy(14.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                                contentPadding = PaddingValues(start = 6.dp, end = 6.dp, top = 10.dp, bottom = trailing),
+                                contentPadding =
+                                    PaddingValues(
+                                        start = 6.dp,
+                                        end = 6.dp,
+                                        top = 10.dp,
+                                        bottom = trailing,
+                                    ),
                                 flingBehavior = fling,
-                                modifier = Modifier.fillMaxSize().then(if (search) Modifier else Modifier.focusRestorer()),
+                                modifier =
+                                    Modifier.fillMaxSize().then(
+                                        if (search) Modifier else Modifier.focusRestorer(),
+                                    ),
                             ) {
                                 itemsIndexed(state.items, key = { _, card -> card.id }) { _, card ->
                                     val key = "browse:$screenKey:${card.id}"
