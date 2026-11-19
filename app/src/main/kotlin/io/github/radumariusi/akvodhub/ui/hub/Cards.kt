@@ -18,6 +18,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -158,6 +161,7 @@ fun PosterCard(
                 Modifier
                     .width(width)
                     .then(if (onPlay == null) Modifier else playKey(onPlay))
+                    .then(if (onLongClick == null) Modifier else menuKey(onLongClick))
                     .focusRequester(requester)
                     .onFocusChanged { if (it.isFocused) onFocused() },
         ) {
@@ -190,8 +194,8 @@ fun PosterCard(
                     if (ratingsAtBottom) {
                         if (PosterBadge.DUB in badges) card.dubLabel?.let { PosterBadgeText(it) }
                     } else {
-                        if (PosterBadge.TMDB in badges) card.tmdbBadge?.let { PosterBadgeText(it) }
-                        if (PosterBadge.IMDB in badges) card.imdbBadge?.let { PosterBadgeText(it) }
+                        if (PosterBadge.TMDB in badges) card.tmdbBadge?.let { RatingChip(RatingBrand.TMDB, it) }
+                        if (PosterBadge.IMDB in badges) card.imdbBadge?.let { RatingChip(RatingBrand.IMDB, it) }
                     }
                 }
                 Column(
@@ -211,16 +215,18 @@ fun PosterCard(
                 val bottomTmdb = card.tmdbBadge.takeIf { PosterBadge.TMDB in badges }
                 val bottomImdb = card.imdbBadge.takeIf { PosterBadge.IMDB in badges }
                 if (ratingsAtBottom && (bottomTmdb != null || bottomImdb != null)) {
+                    // Bandă subțire, cu fundal în degrade: acoperă cât mai puțin din titlul de pe poster.
                     Row(
                         Modifier
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
-                            .background(Color(0xD9111319))
-                            .padding(start = 2.dp, end = 2.dp, bottom = 5.dp, top = 2.dp),
-                        horizontalArrangement = Arrangement.Center,
+                            .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xE6000000))))
+                            .padding(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        if (PosterBadge.TMDB in badges) card.tmdbBadge?.let { PosterBadgeText(it) }
-                        if (PosterBadge.IMDB in badges) card.imdbBadge?.let { PosterBadgeText(it) }
+                        bottomTmdb?.let { RatingChip(RatingBrand.TMDB, it, plain = true) }
+                        bottomImdb?.let { RatingChip(RatingBrand.IMDB, it, plain = true) }
                     }
                 }
                 if (showTitle && PosterBadge.DUB in badges) {
@@ -269,6 +275,59 @@ private fun playKey(onPlay: () -> Unit): Modifier =
     Modifier.onPreviewKeyEvent { event ->
         if (event.key != Key.MediaPlay && event.key != Key.MediaPlayPause) return@onPreviewKeyEvent false
         if (event.type == KeyEventType.KeyUp) onPlay()
+        true
+    }
+
+private enum class RatingBrand(val label: String, val background: Color, val foreground: Color) {
+    IMDB("IMDb", Color(0xFFF5C518), Color.Black),
+    TMDB("TMDB", Color(0xFF0D253F), Color(0xFF01D277)),
+}
+
+/**
+ * Nota cu sigla sursei în locul textului: „[IMDb] 5,6”, „[TMDB] 7,6”. [badge] e textul salvat de index
+ * („IMDb 5,6”, „★ 7,6”); păstrăm doar valoarea. [plain] = fără fundal propriu (stă deja pe banda întunecată).
+ */
+@Composable
+private fun RatingChip(brand: RatingBrand, badge: String, plain: Boolean = false) {
+    val value = badge.substringAfter(' ', badge)
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        modifier =
+            if (plain) {
+                Modifier
+            } else {
+                Modifier
+                    .background(Color(0xCC000000), MaterialTheme.shapes.extraSmall)
+                    .padding(horizontal = 3.dp, vertical = 1.dp)
+            },
+    ) {
+        Text(
+            brand.label,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Black,
+            color = brand.foreground,
+            maxLines = 1,
+            modifier =
+                Modifier
+                    .background(brand.background, RoundedCornerShape(3.dp))
+                    .padding(horizontal = 3.dp),
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = Color.White,
+            maxLines = 1,
+        )
+    }
+}
+
+/** Tasta Meniu face ce face apăsarea lungă pe OK (ex. sus la Redă / Detalii). */
+private fun menuKey(onMenu: () -> Unit): Modifier =
+    Modifier.onPreviewKeyEvent { event ->
+        if (event.key != Key.Menu) return@onPreviewKeyEvent false
+        if (event.type == KeyEventType.KeyUp) onMenu()
         true
     }
 
