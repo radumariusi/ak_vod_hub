@@ -10,13 +10,18 @@ build_tools=$(ls -d "${ANDROID_HOME:?Lipsește ANDROID_HOME}"/build-tools/*/ | s
 apksigner="${build_tools}apksigner"
 
 certificate() {
-  local output
+  local output digests
   output=$("$apksigner" verify --print-certs "$1")
-  if [[ $(grep -c '^Signer #[0-9]* certificate SHA-256 digest:' <<<"$output") -ne 1 ]]; then
-    echo "$1: se așteaptă un singur certificat de semnare." >&2
+  # Formatul diferă între versiunile build-tools („Signer #1 …” sau „Signer (minSdkVersion=…) …”), iar
+  # schemele v1/v2/v3 pot lista același semnatar de mai multe ori: contează amprentele distincte.
+  digests=$(sed -n 's/^Signer.* certificate SHA-256 digest: //p' <<<"$output" | sed 's/[:[:space:]]//g' |
+    tr 'A-F' 'a-f' | sort -u)
+  if [[ -z "$digests" || $(wc -l <<<"$digests") -ne 1 ]]; then
+    echo "$1: se așteaptă un singur certificat de semnare. apksigner a afișat:" >&2
+    echo "$output" >&2
     return 1
   fi
-  sed -n 's/^Signer #1 certificate SHA-256 digest: //p' <<<"$output" | tr -d ':[:space:]' | tr 'A-F' 'a-f'
+  echo "$digests"
 }
 
 build_and_verify() {
