@@ -2,6 +2,7 @@
 
 package io.github.radumariusi.akvodhub.ui.touch
 
+import android.view.ViewConfiguration
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.BoxScope
@@ -13,6 +14,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Border
@@ -46,10 +52,18 @@ import androidx.tv.material3.Surface as TvSurface
 private fun tap(
     enabled: Boolean,
     onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
 ): Modifier {
     val click by rememberUpdatedState(onClick)
+    val longClick by rememberUpdatedState(onLongClick)
     val active by rememberUpdatedState(enabled)
-    return Modifier.pointerInput(Unit) { detectTapGestures { if (active) click() } }
+    val hasLongClick = onLongClick != null
+    return Modifier.pointerInput(hasLongClick) {
+        detectTapGestures(
+            onLongPress = if (hasLongClick) ({ _ -> if (active) longClick?.invoke() }) else null,
+            onTap = { if (active) click() },
+        )
+    }
 }
 
 @Composable
@@ -153,12 +167,17 @@ fun Surface(
 fun Card(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val shape = MaterialTheme.shapes.medium
     TvCard(
         onClick = onClick,
-        modifier = modifier.then(tap(true, onClick)),
+        modifier =
+            modifier
+                .then(if (onLongClick == null) Modifier else cardKeyActions(onClick, onLongClick))
+                .then(tap(true, onClick, onLongClick)),
+        onLongClick = onLongClick,
         shape = CardDefaults.shape(shape),
         scale = CardDefaults.scale(focusedScale = 1f),
         border =
@@ -173,6 +192,24 @@ fun Card(
         content = content,
     )
 }
+
+/** Mută focusul abia la eliberarea OK, astfel încât butonul destinație să nu primească aceeași apăsare. */
+private fun cardKeyActions(onClick: () -> Unit, onLongClick: () -> Unit): Modifier =
+    Modifier.onPreviewKeyEvent { event ->
+        when (event.key) {
+            Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                if (event.type == KeyEventType.KeyUp && !event.nativeKeyEvent.isCanceled) {
+                    val elapsed = event.nativeKeyEvent.eventTime - event.nativeKeyEvent.downTime
+                    if (elapsed >= ViewConfiguration.getLongPressTimeout()) onLongClick() else onClick()
+                }
+                true
+            }
+
+            else -> {
+                false
+            }
+        }
+    }
 
 @Composable
 fun ListItem(

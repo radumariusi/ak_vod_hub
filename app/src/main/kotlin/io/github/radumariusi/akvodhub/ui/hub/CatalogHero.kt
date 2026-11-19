@@ -100,6 +100,7 @@ internal fun CatalogHero(
     neighborTitleIds: () -> List<Long> = { emptyList() },
     onPlay: (TitleCard) -> Unit,
     onDetails: (TitleCard) -> Unit,
+    detailsModifier: Modifier = Modifier,
     extraActions: @Composable RowScope.() -> Unit = {},
 ) {
     val target = focused() ?: fallback
@@ -212,7 +213,7 @@ internal fun CatalogHero(
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Button(onClick = { onPlay(shown) }) { Text("Redă") }
-                OutlinedButton(onClick = { onDetails(shown) }) { Text("Detalii") }
+                OutlinedButton(onClick = { onDetails(target) }, modifier = detailsModifier) { Text("Detalii") }
                 extraActions()
             }
         }

@@ -125,6 +125,7 @@ fun PosterCard(
     supportingText: String? = null,
     landscape: Boolean = false,
     showTitle: Boolean = true,
+    onLongClick: (() -> Unit)? = null,
 ) {
     val width = if (landscape) PosterWidth * 2.05f else PosterWidth
     val height = if (landscape) width * (9f / 16) else PosterHeight
@@ -144,6 +145,7 @@ fun PosterCard(
     ) {
         Card(
             onClick = onClick,
+            onLongClick = onLongClick,
             modifier =
                 Modifier
                     .width(width)
