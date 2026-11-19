@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-19 — Focus și derulare în Filme și Seriale
+
+- Grila se aliniază la rândul cu focus, inclusiv la capătul catalogului. Derularea tactilă se oprește la începutul unui rând.
+- OK pe orice poster deschide fișa. O apăsare lungă pe OK mută focusul la Detalii pentru același titlu.
+
 ## 2026-11-19 — Pornirea ecranului Acasă
 
 - Acasă afișează rândurile locale pe măsură ce se încarcă. Reindexarea începe după afișarea datelor deja salvate.
