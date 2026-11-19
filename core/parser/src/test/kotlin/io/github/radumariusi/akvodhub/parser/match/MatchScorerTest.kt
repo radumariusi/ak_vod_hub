@@ -1,5 +1,6 @@
 package io.github.radumariusi.akvodhub.parser.match
 
+import io.github.radumariusi.akvodhub.parser.title.TitleParser
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
@@ -68,6 +69,34 @@ class MatchScorerTest {
                 listOf(c(238, "Der Pate", 1972, "The Godfather")),
             )!!
         assertTrue(en.score >= MatchScorer.THRESHOLD)
+    }
+
+    @Test
+    fun distinctSourceLabelsAndTranslatedNamesMatchOneCatalogIdentity() {
+        val variants =
+            listOf(
+                "4K-SC-HDR - The Glass Island (2026)",
+                "DE - Insel aus Glas (2026)",
+                "4K-DE - Insel aus Glas - The Glass Island (2026)",
+            )
+        val tmdb = c(721, "Insel aus Glas", 2026, "The Glass Island")
+        val unrelated = c(722, "Insel aus Glas", 2026, "The Broken House")
+        val remake = c(723, "Insel aus Glas", 2006, "The Glass Island")
+        for (variant in variants) {
+            val parsed = TitleParser.parse(variant)
+            val query = movie(parsed.title, parsed.year, parsed.languages.singleOrNull())
+            val best = MatchScorer.best(query, listOf(tmdb))!!
+            assertEquals(variant, tmdb.tmdbId, best.candidate.tmdbId)
+            assertTrue(variant, best.score >= MatchScorer.THRESHOLD)
+        }
+        val aliases = movie("Insel aus Glas - The Glass Island", 2026, "de")
+        assertTrue(MatchScorer.score(aliases, unrelated, 0) < MatchScorer.THRESHOLD)
+        assertTrue(MatchScorer.score(aliases, remake, 0) < MatchScorer.THRESHOLD)
+        assertEquals(
+            listOf("Insel aus Glas", "The Glass Island"),
+            MatchScorer.plan(aliases).takeLast(2).map { it.query },
+        )
+        assertNotEquals(aliases.key, movie("Insel aus Glas The Glass Island", 2026, "de").key)
     }
 
     @Test

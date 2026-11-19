@@ -43,9 +43,6 @@ interface PlaylistDao {
     @Query("SELECT * FROM raw_entry WHERE id > :after ORDER BY id LIMIT :limit")
     suspend fun sourceMetadataBatch(after: Long, limit: Int): List<RawEntryEntity>
 
-    @Query("UPDATE raw_entry SET languages = :audio, subtitles = :subtitles WHERE id = :id")
-    suspend fun updateSourceLanguages(id: Long, audio: String?, subtitles: String?)
-
     @Query("SELECT EXISTS(SELECT 1 FROM raw_entry WHERE sourceId = :sourceId)")
     suspend fun hasEntries(sourceId: Long): Boolean
 

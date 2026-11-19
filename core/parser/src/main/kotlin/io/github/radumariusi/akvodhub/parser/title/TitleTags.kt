@@ -126,7 +126,7 @@ internal object TitleTags {
 
     val quality: Map<String, VideoQuality> =
         buildMap {
-            listOf("8K", "4K", "UHD", "2160P", "2160", "4KUHD", "UHD4K").forEach { put(it, VideoQuality.UHD) }
+            listOf("8K", "4K", "UHD", "2160P", "2160", "3840P", "4KUHD", "UHD4K").forEach { put(it, VideoQuality.UHD) }
             listOf("FHD", "1080P", "1080I", "1080", "FULLHD").forEach { put(it, VideoQuality.FHD) }
             listOf("HD", "720P", "720", "HDTV").forEach { put(it, VideoQuality.HD) }
             listOf("SD", "480P", "576P", "480", "576", "DVDRIP", "DVD", "LQ").forEach { put(it, VideoQuality.SD) }
@@ -247,6 +247,12 @@ internal object TitleTags {
             "PARAMOUNT",
             "SKY",
             "TOP",
+            "A+",
+            "AMZ",
+            "D+",
+            "PRMT",
+            // Marcaj de furnizor întâlnit lângă 4K/HDR, fără o limbă audio stabilită.
+            "SC",
             "MOVIES",
             "MOVIE",
             "FILME",
@@ -263,6 +269,7 @@ internal object TitleTags {
             "4K",
             "UHD",
             "2160P",
+            "3840P",
             "1080P",
             "1080I",
             "720P",

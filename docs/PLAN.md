@@ -210,6 +210,9 @@ Documentele astea, `.gitignore`, workflow de curățenie automată, reguli de lu
 
 Vezi [planul separat al corecțiilor și verificarea pe Android 11 TV](CORECTII_TV.md).
 
+- Identificarea surselor după v0.1.49 include prefixele și categoriile playlistului, reindexarea intrărilor
+  salvate și gruparea traducerilor după același ID TMDB. Pistele audio detectate rămân informații per sursă.
+
 ## Idei suplimentare
 
 1. **Verificare sănătate surse**: test rapid în fundal al linkurilor; sursele moarte sunt marcate și puse la final.
