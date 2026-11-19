@@ -25,7 +25,7 @@ object TitleParser {
         name: String,
         groupTitle: String? = null,
     ): ParsedTitle {
-        val fromName = parseName(name)
+        val fromName = parseName(name, groupTitle)
         if (groupTitle.isNullOrBlank()) return fromName
         val group = parseGroup(groupTitle)
         return fromName.copy(
@@ -83,6 +83,7 @@ object TitleParser {
         Regex("""(?i)\.(mkv|mp4|avi|m4v|mov|wmv|mpg|mpeg|flv|webm|divx|ts|m3u8)$""")
     private val codecDot = Regex("""(?i)\b([hx])\.(26[45])\b""")
     private val multiSubtitle = Regex("""(?i)\bMULTI[-.]SUBS?\b""")
+    private val dolbyVision = Regex("""(?i)\bDOLBY[\s.-]+VISION\b""")
     private val declaredAudioChannels = Regex("""(?i)\b(EN|ENG)([ .-]+)5\.1\b""")
     private val audioDot = Regex("""\b(\d)\.(\d)\b""")
     private val spaces = Regex("""\s+""")
@@ -100,6 +101,7 @@ object TitleParser {
         var s = extension.replace(sb.toString().trim(), "")
         s = codecDot.replace(s, "$1$2")
         s = multiSubtitle.replace(s, "MULTISUB")
+        s = dolbyVision.replace(s, "DOLBYVISION")
         s = declaredAudioChannels.replace(s) { "${it.groupValues[1].uppercase()}${it.groupValues[2]}AUDIO51" }
         s = audioDot.replace(s, "$1 $2")
         // Nume „scene” (The.Matrix.1999.1080p): punctele sunt separatori.
@@ -162,7 +164,8 @@ object TitleParser {
         token: String,
         context: Context,
     ): Tag? {
-        val up = token.uppercase().let { if (it.endsWith('+') && it !in TitleTags.hdr) it.trimEnd('+') else it }
+        val upper = token.uppercase()
+        val up = if (upper.endsWith('+') && upper !in TitleTags.hdr) upper.trimEnd('+') else upper
         val hasLower = token.any { it.isLowerCase() }
         val isDigits = token.all { it.isDigit() }
         if (isDigits && context == Context.TAIL) return null
@@ -187,7 +190,9 @@ object TitleParser {
             if (context != Context.TAIL) return Tag.Noise
             if (!hasLower && !isDigits && up !in noiseNotInTail) return Tag.Noise
         }
-        if (context == Context.TAGGED && up in TitleTags.platforms) return Tag.Platform
+        if (context == Context.TAGGED && (up in TitleTags.platforms || upper in TitleTags.platforms)) {
+            return Tag.Platform
+        }
         return null
     }
 
@@ -237,9 +242,12 @@ object TitleParser {
 
     private class TagGroup(
         val tags: List<Tag>,
+        val ranked: Boolean = false,
     )
 
     private val dashPrefix = Regex("""^([A-Z0-9+]{2,6}(?:[ /+-][A-Z0-9+]{2,6}){0,2})\s*[-:–—»•★☆●►▶◆■♦]\s+""")
+    private val rankedCategory = Regex("""(?i)\bTOP\s+\d{1,3}\b""")
+    private val rankingPosition = Regex("""^\d{1,3}\.\s+(?=\p{L})""")
 
     /** Taie prefixul de furnizor; întoarce poziția de unde începe titlul și etichetele găsite. */
     private fun stripPrefix(
@@ -257,9 +265,9 @@ object TitleParser {
                 c == '[' || c == '(' || c == '{' -> {
                     val close = s.indexOf(closing(c), pos + 1)
                     if (close < 0) break@loop
-                    val tags = allTags(s, pos + 1, close, Context.TAGGED) ?: break@loop
+                    val tags = prefixTags(s, pos + 1, close) ?: break@loop
                     if (!hasTitleAfter(s, close + 1)) break@loop
-                    groups += TagGroup(tags)
+                    groups += tags
                     pos = close + 1
                 }
 
@@ -271,17 +279,17 @@ object TitleParser {
                 else -> {
                     val pipe = s.indexOf('|', pos)
                     if (pipe in (pos + 1)..(pos + 20)) {
-                        val tags = allTags(s, pos, pipe, Context.TAGGED)
+                        val tags = prefixTags(s, pos, pipe)
                         if (tags != null && hasTitleAfter(s, pipe + 1)) {
-                            groups += TagGroup(tags)
+                            groups += tags
                             pos = pipe + 1
                             continue@loop
                         }
                     }
                     val m = dashPrefix.find(s.substring(pos)) ?: break@loop
-                    val tags = allTags(s, pos, pos + m.groups[1]!!.range.last + 1, Context.TAGGED) ?: break@loop
+                    val tags = prefixTags(s, pos, pos + m.groups[1]!!.range.last + 1) ?: break@loop
                     if (!hasTitleAfter(s, pos + m.range.last + 1)) break@loop
-                    groups += TagGroup(tags)
+                    groups += tags
                     pos += m.range.last + 1
                 }
             }
@@ -302,15 +310,19 @@ object TitleParser {
     ): Boolean = (from until s.length).any { s[it].isLetterOrDigit() }
 
     /** Etichetele din [from, to) dacă toate cuvintele sunt etichete cunoscute, altfel null. */
-    private fun allTags(
+    private fun prefixTags(
         s: String,
         from: Int,
         to: Int,
-        context: Context,
-    ): List<Tag>? {
+    ): TagGroup? {
         val words = tokens(s, from, to)
         if (words.isEmpty()) return null
-        return words.map { classify(it.text, context) ?: return null }
+        // Unele categorii Netflix folosesc NF-DO pentru Dolby Audio. Nu îl interpreta ca limbă sau HDR.
+        if (s.regionMatches(from, "NF-DO", 0, 5) && to - from == 5) return TagGroup(listOf(Tag.Platform))
+        return TagGroup(
+            tags = words.map { classify(it.text, Context.TAGGED) ?: return null },
+            ranked = words.any { it.text == "TOP" },
+        )
     }
 
     // ---------------------------------------------------------------- sezon / episod
@@ -361,11 +373,17 @@ object TitleParser {
     private val bracketRegex = Regex("""[\[({]([^\[\](){}]*)[\])}]""")
     private val trimChars = charArrayOf(' ', '-', '–', '—', ':', '|', ',', '.', ';', '/', '~', '•', '*', '+')
 
-    private fun parseName(raw: String): ParsedTitle {
+    private fun parseName(raw: String, groupTitle: String?): ParsedTitle {
         val s = normalize(raw)
         val groups = mutableListOf<TagGroup>()
         val start = stripPrefix(s, groups)
-        val rest = s.substring(start)
+        val titleAndTags = s.substring(start)
+        val rest =
+            if (groups.any { it.ranked } && groupTitle != null && rankedCategory.containsMatchIn(groupTitle)) {
+                rankingPosition.replace(titleAndTags, "")
+            } else {
+                titleAndTags
+            }
 
         val consumed = mutableListOf<IntRange>()
         val se = findSeasonEpisode(rest)

@@ -7,6 +7,52 @@ import org.junit.Test
 
 class TitleParserTest {
     @Test
+    fun providerPrefixesPreserveKnownQualityAndLanguage() {
+        val title = "The Glass Island"
+        for (prefix in listOf("4K-SC", "4K-SC-HDR", "4K-AMZ", "4K-A+", "4K-TOP")) {
+            val parsed = TitleParser.parse("$prefix - $title (2026)")
+            assertEquals(prefix, title, parsed.title)
+            assertEquals(prefix, VideoQuality.UHD, parsed.quality)
+            assertEquals(prefix, if (prefix.endsWith("HDR")) HdrFormat.HDR else null, parsed.hdr)
+            assertTrue(prefix, parsed.languages.isEmpty())
+        }
+        for (prefix in listOf("NF-DO", "A+", "D+", "PRMT", "TOP")) {
+            val parsed = TitleParser.parse("$prefix - $title")
+            assertEquals(prefix, title, parsed.title)
+            assertNull(prefix, parsed.quality)
+            assertNull(prefix, parsed.hdr)
+            assertTrue(prefix, parsed.languages.isEmpty())
+        }
+        val french = TitleParser.parse("4K-FR - Île de verre (2026)", "FR - FILMS Dolby Audio 4K 3840P")
+        assertEquals("Île de verre", french.title)
+        assertEquals(VideoQuality.UHD, french.quality)
+        assertEquals(listOf("fr"), french.languages)
+        assertNull(french.hdr)
+    }
+
+    @Test
+    fun categoryCompletesMetadataWithoutInventingAudioOrHdr() {
+        val group = "MOVIES ³⁸⁴⁰ᵖ Dolby Vision"
+        val source = TitleParser.parse("SC - The Glass Island (2026)", group)
+        assertEquals(VideoQuality.UHD, source.quality)
+        assertEquals(HdrFormat.DOLBY_VISION, source.hdr)
+        assertTrue(source.languages.isEmpty())
+        assertEquals(VideoQuality.FHD, TitleParser.parse("1080-ES - The Glass Island", group).quality)
+        assertEquals(listOf("es"), TitleParser.parse("1080-ES - The Glass Island", "EN - FILMS").languages)
+    }
+
+    @Test
+    fun onlyRemovesRankingPositionInRankedCategories() {
+        val name = "DE-TOP - 26. Insel aus Glas (2026)"
+        val ranked = TitleParser.parse(name, "DE - IMDB TOP 100")
+        assertEquals("Insel aus Glas", ranked.title)
+        assertEquals(listOf("de"), ranked.languages)
+        assertNull(ranked.quality)
+        assertEquals("26. Insel aus Glas", TitleParser.parse(name, "DE - FILME").title)
+        assertEquals("1917", TitleParser.parse("DE-TOP - 1917 (2019)", "DE - IMDB TOP 100").title)
+    }
+
+    @Test
     fun readsDeclaredAudioSeparatelyFromSubtitlesAndQuality() {
         for (label in listOf("EN 5.1", "ENG 5.1", "[eng 5.1]", "EN 5.1 MULTI-SUB")) {
             val source = TitleParser.parse("Insula de sticlă $label")
