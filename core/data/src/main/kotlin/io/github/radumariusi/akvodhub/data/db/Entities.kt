@@ -380,3 +380,12 @@ data class EpisodeProgressEntity(
     val finished: Boolean,
     val updatedAt: Long,
 )
+
+/**
+ * Titlurile de reindexat la următorul `CatalogIndexer.refresh()`, completate de trigger-ele din
+ * `CatalogDirty` (potriviri TMDB, calitate confirmată, nume/notă schimbate). Se golește după reindexare.
+ */
+@Entity(tableName = "catalog_dirty")
+data class CatalogDirtyEntity(
+    @PrimaryKey val titleId: Long,
+)

@@ -9,6 +9,7 @@ import io.github.radumariusi.akvodhub.data.db.MatchState
 import io.github.radumariusi.akvodhub.data.db.PendingEntry
 import io.github.radumariusi.akvodhub.data.db.TitleEntity
 import io.github.radumariusi.akvodhub.parser.VodKind
+import io.github.radumariusi.akvodhub.parser.catalog.CatalogDirty
 import io.github.radumariusi.akvodhub.parser.catalog.ContentVisibility
 import io.github.radumariusi.akvodhub.parser.catalog.DubLabel
 import io.github.radumariusi.akvodhub.parser.catalog.PosterBadges
@@ -35,7 +36,9 @@ import kotlinx.coroutines.withContext
  * 2. **Rezumate:** pentru fiecare titlu, numărul surselor, data adăugării, calitățile și limbile.
  * 3. **Căutare:** reface indexul FTS `title_search`.
  *
- * Totul rulează doar dacă s-a schimbat ceva (vezi `CatalogDao.fingerprint`).
+ * După import (amprenta `CatalogDao.structureFingerprint` schimbată) se reface tot catalogul. După
+ * potriviri TMDB sau calitate confirmată la redare se refac doar titlurile notate în `catalog_dirty`
+ * (vezi `CatalogDirty`), într-o tranzacție mică.
  */
 class CatalogIndexer(
     context: Context,
@@ -63,37 +66,58 @@ class CatalogIndexer(
                 val hiddenCategories = contentPrefs.getString("hidden_categories", "").orEmpty()
                 val hideAdult = contentPrefs.getBoolean("hide_adult_movies", false)
                 val visibility = "$hiddenLanguages|$hiddenCategories|$hideAdult"
-                if (!force && visibility == prefs.getString("visibility", "") &&
-                    dao.fingerprint() == prefs.getString(FINGERPRINT, null) &&
-                    searchIndexReady()
-                ) {
+                var full =
+                    force || visibility != prefs.getString("visibility", "") ||
+                        dao.structureFingerprint() != prefs.getString(FINGERPRINT, null) ||
+                        !searchIndexReady()
+                if (!full && dao.dirtyCount() == 0) {
+                    // Nimic de reindexat: doar insignele „Nou” expirate și posterele/descrierile actualizate.
+                    var cardsChanged = false
                     if (prefs.getLong("badge_day", -1L) != day) {
-                        val changed = dao.expireNewBadges(now - PosterBadges.NEW_WINDOW_MS, now)
+                        cardsChanged = dao.expireNewBadges(now - PosterBadges.NEW_WINDOW_MS, now) > 0
                         prefs.edit().putLong("badge_day", day).apply()
-                        if (changed > 0) notifyCardsChanged()
                     }
+                    val stamp = dao.titlesStamp()
+                    if (stamp != prefs.getLong(TITLES_STAMP, -1L)) {
+                        prefs.edit().putLong(TITLES_STAMP, stamp).apply()
+                        cardsChanged = true
+                    }
+                    if (cardsChanged) notifyCardsChanged()
                     return@withContext
                 }
                 val start = clock()
                 linkLocalTitles()
                 db.playlistDao().inheritSeriesTitles()
+                var dirty = 0
                 db.withTransaction {
-                    updateSourceVisibility(hiddenLanguages, hiddenCategories, hideAdult)
-                    dao.updateSummaries()
-                    rebuildSourceOptions()
-                    updateDubLabels()
-                    updateEpisodeNews()
+                    // Snapshot în tranzacție: ce se notează după commit intră la următoarea reindexare.
+                    if (!full) {
+                        dirty = dao.dirtyCount()
+                        full = dirty > PARTIAL_LIMIT
+                    }
+                    val scoped = !full
+                    updateSourceVisibility(hiddenLanguages, hiddenCategories, hideAdult, scoped)
+                    if (scoped) dao.updateDirtySummaries() else dao.updateSummaries()
+                    rebuildSourceOptions(scoped)
+                    updateDubLabels(scoped)
+                    updateEpisodeNews(scoped)
                     dao.deleteEmptyLocalTitles()
-                    rebuildSearchIndex()
+                    rebuildSearchIndex(scoped)
+                    if (scoped && prefs.getLong("badge_day", -1L) != day) {
+                        dao.expireNewBadges(now - PosterBadges.NEW_WINDOW_MS, now)
+                    }
+                    dao.clearDirty()
                 }
                 prefs
                     .edit()
-                    .putString(FINGERPRINT, dao.fingerprint())
+                    .putString(FINGERPRINT, dao.structureFingerprint())
                     .putString("visibility", visibility)
                     .putLong("badge_day", day)
+                    .putLong(TITLES_STAMP, dao.titlesStamp())
                     .apply()
                 mutableVersion.value = clock()
-                Log.i(TAG, "Catalog reindexat în ${clock() - start} ms")
+                val scope = if (full) "complet" else "incremental, $dirty titluri"
+                Log.i(TAG, "Catalog reindexat ($scope) în ${clock() - start} ms")
             }
         }
 
@@ -237,30 +261,38 @@ class CatalogIndexer(
         edit.apply()
     }
 
-    private fun updateSourceVisibility(languages: String, categories: String, hideAdult: Boolean) {
+    /** [scoped] = doar sursele titlurilor din `catalog_dirty` (o potrivire poate muta o sursă ascunsă la alt titlu). */
+    private fun updateSourceVisibility(languages: String, categories: String, hideAdult: Boolean, scoped: Boolean) {
         val sql = db.openHelper.writableDatabase
-        sql.execSQL("UPDATE raw_entry SET visible = 1 WHERE visible = 0")
+        val scope = if (scoped) " AND raw_entry.titleId IN ${CatalogDirty.IDS}" else ""
+        sql.execSQL("UPDATE raw_entry SET visible = 1 WHERE visible = 0$scope")
         val hidden = ContentVisibility.hiddenSources(languages, categories)
-        sql.execSQL(hidden.sql, hidden.args.toTypedArray())
+        sql.execSQL(hidden.sql + scope, hidden.args.toTypedArray())
         if (hideAdult) {
             val adults = ContentVisibility.adultMovieSources()
-            sql.execSQL(adults.sql, adults.args.toTypedArray())
+            sql.execSQL(adults.sql + scope, adults.args.toTypedArray())
         }
         sql.execSQL(
             "UPDATE raw_entry SET visible = 0 WHERE kind = 'EPISODE' AND seriesId IS NOT NULL AND " +
                 "EXISTS(SELECT 1 FROM raw_entry s WHERE s.sourceId = raw_entry.sourceId AND " +
-                "s.providerKey = 'series:' || raw_entry.seriesId AND s.visible = 0)",
+                "s.providerKey = 'series:' || raw_entry.seriesId AND s.visible = 0)$scope",
         )
     }
 
-    private fun rebuildSourceOptions() {
+    private fun rebuildSourceOptions(scoped: Boolean) {
         val sql = db.openHelper.writableDatabase
-        sql.execSQL("DELETE FROM title_source_option")
-        sql.execSQL(ContentVisibility.SOURCE_OPTIONS)
+        if (scoped) {
+            sql.execSQL("DELETE FROM title_source_option WHERE titleId IN ${CatalogDirty.IDS}")
+            sql.execSQL(ContentVisibility.DIRTY_SOURCE_OPTIONS)
+        } else {
+            sql.execSQL("DELETE FROM title_source_option")
+            sql.execSQL(ContentVisibility.SOURCE_OPTIONS)
+        }
     }
 
     /** Un singur parcurs după cheia titlului; nici liste complete, nici interogări pe poster. */
-    private fun updateDubLabels() {
+    private fun updateDubLabels(scoped: Boolean) {
+        val scope = if (scoped) " AND t.id IN ${CatalogDirty.IDS}" else ""
         val sql = db.openHelper.writableDatabase
         val update =
             sql.compileStatement(
@@ -272,7 +304,7 @@ class CatalogIndexer(
                 .query(
                     "SELECT t.id, t.originalLanguage, r.languages, t.rating, t.imdbRating, t.addedAt, r.hdr " +
                         "FROM title t " +
-                        "JOIN raw_entry r ON r.titleId = t.id WHERE r.visible = 1 ORDER BY t.id",
+                        "JOIN raw_entry r ON r.titleId = t.id WHERE r.visible = 1$scope ORDER BY t.id",
                 ).use { cursor ->
                     var titleId = -1L
                     var label: DubLabel? = null
@@ -315,20 +347,25 @@ class CatalogIndexer(
                 }
         }
         sql.execSQL(
-            "UPDATE title SET dubLabel = NULL, hasOriginalAudio = 0, hdrBadge = NULL, isNew = 0 WHERE sourceCount = 0",
+            "UPDATE title SET dubLabel = NULL, hasOriginalAudio = 0, hdrBadge = NULL, isNew = 0 WHERE sourceCount = 0" +
+                if (scoped) " AND id IN ${CatalogDirty.IDS}" else "",
         )
     }
 
     /** MIN pe episod evită ca o nouă variantă de calitate/limbă să pară un episod nou. */
-    private fun updateEpisodeNews() {
+    private fun updateEpisodeNews(scoped: Boolean) {
         val sql = db.openHelper.writableDatabase
-        sql.execSQL("UPDATE title SET newEpisodeAt = NULL WHERE newEpisodeAt IS NOT NULL")
+        val scope = if (scoped) " AND titleId IN ${CatalogDirty.IDS}" else ""
+        sql.execSQL(
+            "UPDATE title SET newEpisodeAt = NULL WHERE newEpisodeAt IS NOT NULL" +
+                if (scoped) " AND id IN ${CatalogDirty.IDS}" else "",
+        )
         sql.compileStatement("UPDATE title SET newEpisodeAt = ? WHERE id = ?").use { update ->
             sql
                 .query(
                     "SELECT titleId, season, episode, MIN(firstSeenAt) FROM raw_entry " +
                         "WHERE kind = 'EPISODE' AND visible = 1 AND titleId IS NOT NULL " +
-                        "AND season IS NOT NULL AND episode IS NOT NULL " +
+                        "AND season IS NOT NULL AND episode IS NOT NULL$scope " +
                         "GROUP BY titleId, season, episode ORDER BY titleId",
                 ).use { cursor ->
                     var titleId = -1L
@@ -354,13 +391,18 @@ class CatalogIndexer(
         }
     }
 
-    private fun rebuildSearchIndex() {
+    private fun rebuildSearchIndex(scoped: Boolean) {
         val sql = db.openHelper.writableDatabase
-        sql.execSQL("DELETE FROM title_search")
+        if (scoped) {
+            sql.execSQL("DELETE FROM title_search WHERE docid IN ${CatalogDirty.IDS}")
+        } else {
+            sql.execSQL("DELETE FROM title_search")
+        }
         sql.execSQL(
             "INSERT INTO title_search(docid, name, alt) SELECT t.id, t.name, " +
                 "IFNULL(t.originalName, '') || ' ' || IFNULL((SELECT group_concat(DISTINCT r.title) " +
-                "FROM raw_entry r WHERE r.titleId = t.id AND r.visible = 1), '') FROM title t WHERE t.sourceCount > 0",
+                "FROM raw_entry r WHERE r.titleId = t.id AND r.visible = 1), '') FROM title t WHERE t.sourceCount > 0" +
+                if (scoped) " AND t.id IN ${CatalogDirty.IDS}" else "",
         )
     }
 
@@ -399,7 +441,11 @@ class CatalogIndexer(
 
     companion object {
         private const val TAG = "CatalogIndexer"
-        private const val FINGERPRINT = "fingerprint_v15"
+        private const val FINGERPRINT = "fingerprint_v19"
+        private const val TITLES_STAMP = "titles_stamp"
+
+        /** Peste atât, o reindexare completă (fără `IN`) e mai rapidă decât una incrementală. */
+        private const val PARTIAL_LIMIT = 20_000
         private const val BATCH = 2_000
     }
 }

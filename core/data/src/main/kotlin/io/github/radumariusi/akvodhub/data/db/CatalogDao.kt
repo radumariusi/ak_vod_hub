@@ -9,6 +9,7 @@ import androidx.room.RawQuery
 import androidx.room.Update
 import androidx.sqlite.db.SupportSQLiteQuery
 import io.github.radumariusi.akvodhub.parser.VodKind
+import io.github.radumariusi.akvodhub.parser.catalog.CatalogDirty
 import io.github.radumariusi.akvodhub.parser.match.MediaType
 import io.github.radumariusi.akvodhub.parser.title.VideoQuality
 import kotlinx.coroutines.flow.Flow
@@ -327,22 +328,18 @@ interface CatalogDao {
     )
 
     /** Rezumatele surselor pentru fiecare titlu (vezi [TitleEntity]). `bestQuality` = `VideoQuality.ordinal`. */
-    @Query(
-        "UPDATE title SET " +
-            "playlistAddedAt = (SELECT MIN(r.firstSeenAt) FROM raw_entry r " +
-            "WHERE r.titleId = title.id AND r.visible = 1), " +
-            "sourceCount = (SELECT COUNT(*) FROM raw_entry r WHERE r.titleId = title.id AND r.visible = 1), " +
-            "addedAt = (SELECT MAX(CASE WHEN r.providerAddedAt IS NULL THEN r.firstSeenAt " +
-            "WHEN r.providerAddedAt < 100000000000 THEN r.providerAddedAt * 1000 ELSE r.providerAddedAt END) " +
-            "FROM raw_entry r WHERE r.titleId = title.id AND r.visible = 1), " +
-            "bestQuality = (SELECT MAX(CASE r.quality WHEN 'UHD' THEN 3 WHEN 'FHD' THEN 2 WHEN 'HD' THEN 1 " +
-            "WHEN 'SD' THEN 0 END) FROM raw_entry r WHERE r.titleId = title.id AND r.visible = 1), " +
-            "qualities = (SELECT ',' || group_concat(DISTINCT r.quality) || ',' FROM raw_entry r " +
-            "WHERE r.titleId = title.id AND r.visible = 1), " +
-            "audioLanguages = (SELECT ',' || group_concat(DISTINCT r.languages) || ',' FROM raw_entry r " +
-            "WHERE r.titleId = title.id AND r.visible = 1)",
-    )
+    @Query(SUMMARIES_SQL)
     suspend fun updateSummaries()
+
+    /** [updateSummaries] doar pentru titlurile marcate în `catalog_dirty`. */
+    @Query(SUMMARIES_SQL + " WHERE id IN " + CatalogDirty.IDS)
+    suspend fun updateDirtySummaries()
+
+    @Query("SELECT COUNT(*) FROM catalog_dirty")
+    suspend fun dirtyCount(): Int
+
+    @Query("DELETE FROM catalog_dirty")
+    suspend fun clearDirty()
 
     /** Titlurile locale rămase fără surse (potrivite între timp pe TMDB sau scoase din playlist). */
     @Query(
@@ -361,12 +358,30 @@ interface CatalogDao {
     )
     suspend fun confirmQuality(id: Long, quality: VideoQuality, rank: Int): Int
 
-    /** O „amprentă” ieftină a catalogului: dacă nu s-a schimbat, indexarea nu are ce reface. */
-    @Query(
-        "SELECT (SELECT COUNT(*) || ':' || TOTAL(id) || ':' || TOTAL(titleId) || ':' || " +
-            "IFNULL(MAX(seenRun), 0) || ':' || TOTAL(CASE confirmedQuality WHEN 'UHD' THEN 4 WHEN 'FHD' THEN 3 " +
-            "WHEN 'HD' THEN 2 WHEN 'SD' THEN 1 ELSE 0 END) FROM raw_entry) || '|' || " +
-            "(SELECT COUNT(*) || ':' || IFNULL(MAX(updatedAt), 0) || ':' || TOTAL(sourceCount > 0) FROM title)",
-    )
-    suspend fun fingerprint(): String
+    /**
+     * Amprenta structurală: se schimbă doar la import (intrări noi, șterse sau văzute din nou). Atunci refacem
+     * tot catalogul. Restul schimbărilor (potriviri TMDB, calitate confirmată) le notează trigger-ele din
+     * `CatalogDirty`, iar indexerul reface doar acele titluri.
+     */
+    @Query("SELECT COUNT(*) || ':' || TOTAL(id) || ':' || IFNULL(MAX(seenRun), 0) FROM raw_entry")
+    suspend fun structureFingerprint(): String
+
+    /** Ultima actualizare a unui titlu (poster, descriere): doar reîncarcă listele, fără reindexare. */
+    @Query("SELECT IFNULL(MAX(updatedAt), 0) FROM title")
+    suspend fun titlesStamp(): Long
 }
+
+private const val SUMMARIES_SQL =
+    "UPDATE title SET " +
+        "playlistAddedAt = (SELECT MIN(r.firstSeenAt) FROM raw_entry r " +
+        "WHERE r.titleId = title.id AND r.visible = 1), " +
+        "sourceCount = (SELECT COUNT(*) FROM raw_entry r WHERE r.titleId = title.id AND r.visible = 1), " +
+        "addedAt = (SELECT MAX(CASE WHEN r.providerAddedAt IS NULL THEN r.firstSeenAt " +
+        "WHEN r.providerAddedAt < 100000000000 THEN r.providerAddedAt * 1000 ELSE r.providerAddedAt END) " +
+        "FROM raw_entry r WHERE r.titleId = title.id AND r.visible = 1), " +
+        "bestQuality = (SELECT MAX(CASE r.quality WHEN 'UHD' THEN 3 WHEN 'FHD' THEN 2 WHEN 'HD' THEN 1 " +
+        "WHEN 'SD' THEN 0 END) FROM raw_entry r WHERE r.titleId = title.id AND r.visible = 1), " +
+        "qualities = (SELECT ',' || group_concat(DISTINCT r.quality) || ',' FROM raw_entry r " +
+        "WHERE r.titleId = title.id AND r.visible = 1), " +
+        "audioLanguages = (SELECT ',' || group_concat(DISTINCT r.languages) || ',' FROM raw_entry r " +
+        "WHERE r.titleId = title.id AND r.visible = 1)"
