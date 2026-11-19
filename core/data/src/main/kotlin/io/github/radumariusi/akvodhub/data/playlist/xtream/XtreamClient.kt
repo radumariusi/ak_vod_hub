@@ -12,6 +12,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import okhttp3.Call
 import okhttp3.HttpUrl
@@ -106,6 +107,14 @@ class XtreamClient(
                 XtreamJson.parse(getText(account, "get_series_info", "series_id" to seriesId.toString())),
             )
         }
+
+    /** Răspunsul brut `get_vod_info` / `get_series_info` (doar pentru diagnostic). */
+    suspend fun rawInfo(
+        account: XtreamAccount,
+        action: String,
+        idName: String,
+        id: Long,
+    ): JsonElement = jsonOperation(action) { XtreamJson.parse(getText(account, action, idName to id.toString())) }
 
     private fun apiUrl(
         account: XtreamAccount,

@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import io.github.radumariusi.akvodhub.parser.VodKind
+import io.github.radumariusi.akvodhub.parser.title.VideoQuality
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -15,6 +16,28 @@ interface PlaylistDao {
 
     @Query("SELECT * FROM playlist_source ORDER BY id")
     suspend fun sources(): List<PlaylistSourceEntity>
+
+    // ---------------------------------------------------------------- diagnostic (Setări, export)
+
+    @Query(
+        "SELECT kind, COUNT(*) AS total, SUM(CASE WHEN languages IS NULL THEN 1 ELSE 0 END) AS noLanguage, " +
+            "SUM(CASE WHEN quality IS NULL THEN 1 ELSE 0 END) AS noQuality FROM raw_entry GROUP BY kind",
+    )
+    suspend fun diagnosticCounts(): List<DiagnosticCount>
+
+    @Query(
+        "SELECT groupTitle, kind, COUNT(*) AS total, " +
+            "SUM(CASE WHEN languages IS NULL THEN 1 ELSE 0 END) AS noLanguage FROM raw_entry " +
+            "WHERE groupTitle IS NOT NULL GROUP BY groupTitle, kind ORDER BY total DESC LIMIT :limit",
+    )
+    suspend fun diagnosticCategories(limit: Int): List<DiagnosticCategory>
+
+    @Query(
+        "SELECT r.name, r.groupTitle, r.kind, r.languages, r.quality, r.streamId, s.type AS playlistType, " +
+            "r.sourceId FROM raw_entry r JOIN playlist_source s ON s.id = r.sourceId " +
+            "WHERE r.kind = :kind ORDER BY random() LIMIT :limit",
+    )
+    suspend fun diagnosticNames(kind: VodKind, limit: Int): List<DiagnosticName>
 
     @Query("SELECT * FROM playlist_source WHERE id = :id")
     suspend fun source(id: Long): PlaylistSourceEntity?
@@ -132,3 +155,28 @@ interface PlaylistDao {
         seriesId: Long,
     ): List<RawEntryEntity>
 }
+
+data class DiagnosticCount(
+    val kind: VodKind,
+    val total: Int,
+    val noLanguage: Int,
+    val noQuality: Int,
+)
+
+data class DiagnosticCategory(
+    val groupTitle: String,
+    val kind: VodKind,
+    val total: Int,
+    val noLanguage: Int,
+)
+
+data class DiagnosticName(
+    val name: String,
+    val groupTitle: String?,
+    val kind: VodKind,
+    val languages: String?,
+    val quality: VideoQuality?,
+    val streamId: Long?,
+    val playlistType: PlaylistType,
+    val sourceId: Long,
+)

@@ -16,6 +16,7 @@ import io.github.radumariusi.akvodhub.data.catalog.HubRepository
 import io.github.radumariusi.akvodhub.data.catalog.MatchScheduler
 import io.github.radumariusi.akvodhub.data.catalog.TitleMatcher
 import io.github.radumariusi.akvodhub.data.db.AkVodDatabase
+import io.github.radumariusi.akvodhub.data.diagnostic.SourceDiagnostics
 import io.github.radumariusi.akvodhub.data.discover.DiscoverRepository
 import io.github.radumariusi.akvodhub.data.imdb.ImdbRatingsScheduler
 import io.github.radumariusi.akvodhub.data.imdb.ImdbRatingsSettings
@@ -255,10 +256,19 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun sourceDiagnostics(
+        db: AkVodDatabase,
+        importer: PlaylistImporter,
+        xtream: XtreamClient,
+    ): SourceDiagnostics = SourceDiagnostics(db, importer, xtream)
+
+    @Provides
+    @Singleton
     fun phoneSetupServer(
         playlists: PlaylistRepository,
         catalog: CatalogRepository,
         installer: AddonInstaller,
         backup: SettingsBackup,
-    ): PhoneSetupServer = PhoneSetupServer(playlists, catalog, installer, backup)
+        diagnostics: SourceDiagnostics,
+    ): PhoneSetupServer = PhoneSetupServer(playlists, catalog, installer, backup, diagnostics)
 }

@@ -38,6 +38,8 @@ import io.github.radumariusi.akvodhub.parser.player.Resume
 import io.github.radumariusi.akvodhub.parser.player.SeekNavigation
 import io.github.radumariusi.akvodhub.parser.player.SeriesPlayback
 import io.github.radumariusi.akvodhub.parser.player.SleepTimer
+import io.github.radumariusi.akvodhub.parser.player.SourceHealth
+import io.github.radumariusi.akvodhub.parser.player.SourceHealthRecord
 import io.github.radumariusi.akvodhub.parser.stremio.AddonSubtitle
 import io.github.radumariusi.akvodhub.parser.stremio.SubtitleChoice
 import io.github.radumariusi.akvodhub.parser.stremio.SubtitleLanguages
@@ -198,6 +200,9 @@ class PlayerViewModel
         /** Limbile subtitrărilor încorporate în sursa curentă (null = pistele nu se știu încă). */
         private var embeddedTextLanguages: List<String?>? = null
 
+        /** Ultima pornire / eșecurile fiecărei surse (ordinea de încercare și „⚠” din liste). */
+        private var health: Map<Long, SourceHealthRecord> = emptyMap()
+
         /** Alegerea automată a subtitrării s-a făcut (sau utilizatorul a ales singur) pentru acest titlu / episod. */
         private var subtitleDecided = false
 
@@ -211,6 +216,11 @@ class PlayerViewModel
                             mutableState.update { it.copy(loading = false) }
                             if (!started) {
                                 started = true
+                                queue?.current?.let { id ->
+                                    health =
+                                        health + (id to SourceHealth.started(health[id], System.currentTimeMillis()))
+                                    viewModelScope.launch { repository.markSourceStarted(id) }
+                                }
                             } else if (player.playWhenReady && rebufferHistory.ready(SystemClock.elapsedRealtime())) {
                                 recoverUnstableSource("întreruperi repetate")
                             }
@@ -353,6 +363,7 @@ class PlayerViewModel
             }
             if (details.title.mediaType != MediaType.TV) searchAddonSubtitles(null, null)
             val watch = repository.watchState(request.titleId)
+            health = repository.sourceHealth()
             if (details.title.mediaType == MediaType.TV) {
                 val localEpisodes = repository.episodes(request.titleId)
                 val episodes =
@@ -433,7 +444,12 @@ class PlayerViewModel
         ) {
             countdownJob?.cancel()
             sources = list.associateBy { it.id }
-            val ordered = repository.playOrder(list, title?.originalLanguage).map { it.id }
+            val ordered =
+                SourceHealth.reorder(
+                    repository.playOrder(list, title?.originalLanguage).map { it.id },
+                    health,
+                    System.currentTimeMillis(),
+                )
             queue = FallbackQueue(ordered, chosen?.takeIf { it in sources })
             mutableState.update { it.copy(error = null, failures = emptyList(), countdown = null) }
             playCurrent(positionMs)
@@ -548,6 +564,8 @@ class PlayerViewModel
             val q = queue ?: return
             val failed = q.current ?: return
             watchdog?.cancel()
+            health = health + (failed to SourceHealth.failed(health[failed], System.currentTimeMillis()))
+            viewModelScope.launch { repository.markSourceFailed(failed) }
             val position = if (started) player.currentPosition.coerceAtLeast(0) else startPosition
             val autoplay = player.playWhenReady
             val preferred =

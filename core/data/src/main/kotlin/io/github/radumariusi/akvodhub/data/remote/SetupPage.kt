@@ -86,6 +86,13 @@ internal object SetupPage {
         <button id="restore">Restaurează</button><div class="msg" id="rmsg"></div>
         </section>
 
+        <section>
+        <h2>Diagnostic surse</h2>
+        <small>Nume de categorii și un eșantion de titluri, cu limba și calitatea deduse, plus metadatele tehnice
+        ale unui film și ale unui serial Xtream. Fără adrese, conturi sau parole. Durează câteva secunde.</small><br>
+        <a class="btn" id="diag" href="#">Descarcă diagnostic</a>
+        </section>
+
         <script>
         var token = new URLSearchParams(location.search).get('t') || '';
         function show(el, ok, text) { el.className = 'msg ' + (ok ? 'ok' : 'err'); el.textContent = text; }
@@ -105,6 +112,7 @@ internal object SetupPage {
           });
         });
         document.getElementById('dl').href = '/api/backup?t=' + encodeURIComponent(token);
+        document.getElementById('diag').href = '/api/diagnostic?t=' + encodeURIComponent(token);
         document.getElementById('restore').addEventListener('click', function () {
           var file = document.getElementById('file').files[0];
           var el = document.getElementById('rmsg');

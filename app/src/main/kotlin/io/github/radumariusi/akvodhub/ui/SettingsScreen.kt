@@ -306,6 +306,7 @@ fun SettingsScreen(
 
                         Text("Avansate", style = MaterialTheme.typography.titleLarge)
                         ImageCacheSection()
+                        DiagnosticSection(playbackViewModel)
                         Text("Despre", style = MaterialTheme.typography.titleLarge)
                         Text(
                             "AK VOD Hub, software liber sub licența GPL-3.0. Cod sursă: github.com/radumariusi/ak_vod_hub",

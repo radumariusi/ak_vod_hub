@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.radumariusi.akvodhub.data.catalog.HubRepository
+import io.github.radumariusi.akvodhub.data.diagnostic.SourceDiagnostics
 import io.github.radumariusi.akvodhub.data.player.PlaybackPrefs
 import io.github.radumariusi.akvodhub.data.player.PlaybackSettings
 import io.github.radumariusi.akvodhub.data.player.SubtitleStyle
@@ -47,7 +48,36 @@ class PlaybackSettingsViewModel
         private val repository: HubRepository,
         private val stremioAddons: StremioAddons,
         private val installer: AddonInstaller,
+        private val diagnostics: SourceDiagnostics,
     ) : ViewModel() {
+        private val mutableDiagnostic = MutableStateFlow<String?>(null)
+
+        /** Rezumatul „Diagnostic surse” din Setări; null = necalculat. */
+        val diagnostic = mutableDiagnostic.asStateFlow()
+
+        fun loadDiagnostic() {
+            mutableDiagnostic.value = "Se calculează…"
+            viewModelScope.launch {
+                mutableDiagnostic.value =
+                    runCatching { diagnostics.summary() }
+                        .map { s ->
+                            buildString {
+                                append("${s.total} surse · ${s.noLanguage} fără limbă audio · ")
+                                append("${s.noQuality} fără calitate declarată.")
+                                if (s.categoriesWithoutLanguage.isNotEmpty()) {
+                                    append("\nCategorii mari fără limbă: ")
+                                    append(
+                                        s.categoriesWithoutLanguage
+                                            .take(
+                                                8,
+                                            ).joinToString(", ") { "${it.first} (${it.second})" },
+                                    )
+                                }
+                            }
+                        }.getOrElse { "Diagnosticul nu a putut fi calculat." }
+            }
+        }
+
         val prefs: StateFlow<PlaybackPrefs> = settings.state
         private val mutableStatistics = MutableStateFlow("Se calculează…")
         val statistics = mutableStatistics.asStateFlow()

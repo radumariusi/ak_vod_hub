@@ -2,6 +2,7 @@ package io.github.radumariusi.akvodhub.data.remote
 
 import io.github.radumariusi.akvodhub.data.backup.SettingsBackup
 import io.github.radumariusi.akvodhub.data.catalog.CatalogRepository
+import io.github.radumariusi.akvodhub.data.diagnostic.SourceDiagnostics
 import io.github.radumariusi.akvodhub.data.playlist.PlaylistRepository
 import io.github.radumariusi.akvodhub.data.stremio.AddonInstaller
 import io.github.radumariusi.akvodhub.parser.remote.HttpMessage
@@ -50,6 +51,7 @@ class PhoneSetupServer(
     private val catalog: CatalogRepository,
     private val installer: AddonInstaller,
     private val backup: SettingsBackup,
+    private val diagnostics: SourceDiagnostics,
 ) {
     private var socket: ServerSocket? = null
     private var job: Job? = null
@@ -134,6 +136,18 @@ class PhoneSetupServer(
                     "application/json; charset=utf-8",
                     body,
                     mapOf("Content-Disposition" to "attachment; filename=\"ak-vod-hub-backup-$day.json\""),
+                )
+            }
+
+            "GET" to "/api/diagnostic" -> {
+                val day = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(Date())
+                val body = diagnostics.report().toByteArray()
+                event("Diagnostic surse descărcat pe telefon")
+                HttpMessage.response(
+                    200,
+                    "text/plain; charset=utf-8",
+                    body,
+                    mapOf("Content-Disposition" to "attachment; filename=\"ak-vod-hub-diagnostic-$day.txt\""),
                 )
             }
 
