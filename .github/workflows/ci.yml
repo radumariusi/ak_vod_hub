@@ -34,6 +34,13 @@ jobs:
       - name: Build, teste, lint
         run: ./gradlew --no-daemon --stacktrace :core:parser:test testDebugUnitTest lintDebug assembleDebug
 
+      # Release nesemnat (R8/minify + varianta de profilare), ca să nu aflăm de erori abia la Release.
+      # Un singur ABI: R8 e la fel pentru toate, iar build-ul rămâne scurt.
+      - name: Build release (nesemnat, arm64)
+        run: >
+          ./gradlew --no-daemon --stacktrace -Pakvod.releaseAbi=arm64-v8a
+          :app:assembleRelease :app:compileNonMinifiedReleaseKotlin
+
       - name: APK de test (doar la rulare manuală)
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v7
