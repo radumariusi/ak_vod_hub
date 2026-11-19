@@ -57,6 +57,10 @@ class CatalogDirtyTest {
             assert dirty() == [2], dirty()
             db.execute("UPDATE title SET rating = 8 WHERE id = 1")
             assert dirty() == [1, 2], dirty()
+            # Room scrie `UPDATE OR ABORT`: un titlu deja marcat nu trebuie să dea eroare de constrângere.
+            db.execute("UPDATE OR ABORT raw_entry SET quality = 'UHD'")
+            db.execute("UPDATE OR ABORT title SET rating = 9")
+            assert dirty() == [1, 2, 3], dirty()
             """.trimIndent()
         val process =
             try {

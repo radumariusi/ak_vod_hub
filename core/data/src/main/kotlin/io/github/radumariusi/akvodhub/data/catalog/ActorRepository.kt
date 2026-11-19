@@ -7,6 +7,7 @@ import io.github.radumariusi.akvodhub.data.db.DiscoverCacheEntity
 import io.github.radumariusi.akvodhub.data.db.PersonCreditEntity
 import io.github.radumariusi.akvodhub.data.db.TitleCard
 import io.github.radumariusi.akvodhub.data.tmdb.TmdbClient
+import io.github.radumariusi.akvodhub.data.tmdb.TmdbPerson
 import io.github.radumariusi.akvodhub.data.tmdb.TmdbSettings
 import io.github.radumariusi.akvodhub.parser.catalog.ActorFilmography
 import io.github.radumariusi.akvodhub.parser.catalog.FilmographyCredit
@@ -51,6 +52,25 @@ class ActorRepository(
                 // Offline/eroare: filmografia din cache rămâne utilă; nu modificăm titlurile sau sursele.
             }
         }
+
+    private val profiles = java.util.concurrent.ConcurrentHashMap<Long, TmdbPerson>()
+
+    /** Biografia și datele persoanei (ținute în memorie). null = fără cheie, offline sau inexistentă. */
+    suspend fun profile(personId: Long): TmdbPerson? {
+        if (personId <= 0) return null
+        profiles[personId]?.let { return it }
+        val apiKey = settings.apiKey() ?: return null
+        val person =
+            try {
+                tmdb.person(apiKey, personId)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                null
+            } ?: return null
+        profiles[personId] = person
+        return person
+    }
 
     suspend fun page(personId: Long, afterId: Long, limit: Int): List<TitleCard> {
         val query = ActorFilmography.page(personId, afterId, limit)

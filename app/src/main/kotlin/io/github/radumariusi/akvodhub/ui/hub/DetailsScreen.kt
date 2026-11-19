@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -50,6 +51,7 @@ import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
+import io.github.radumariusi.akvodhub.data.catalog.Credits
 import io.github.radumariusi.akvodhub.data.catalog.Person
 import io.github.radumariusi.akvodhub.data.catalog.SourceDetails
 import io.github.radumariusi.akvodhub.data.catalog.SourceTracks
@@ -283,11 +285,7 @@ private fun DetailsContent(
             }
 
             item("title-info") {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    state.credits?.directors?.takeIf { it.isNotEmpty() }?.let {
-                        Text("Regia: ${it.joinToString(", ")}", style = MaterialTheme.typography.bodySmall)
-                    }
-                }
+                TitleInfo(state.credits)
             }
 
             val cast = state.credits?.cast.orEmpty()
@@ -315,7 +313,7 @@ private fun DetailsContent(
                                         AsyncImage(
                                             model = Images.profile(person.profilePath),
                                             contentDescription = person.name,
-                                            contentScale = ContentScale.Fit,
+                                            contentScale = ContentScale.Crop,
                                             modifier =
                                                 Modifier
                                                     .size(96.dp, 144.dp)
@@ -327,7 +325,7 @@ private fun DetailsContent(
                                             style = MaterialTheme.typography.labelLarge,
                                             textAlign = TextAlign.Center,
                                             modifier = Modifier.fillMaxWidth(),
-                                            maxLines = 2,
+                                            maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
                                         )
                                         Text(
@@ -336,7 +334,7 @@ private fun DetailsContent(
                                             color = LocalContentColor.current.copy(alpha = 0.9f),
                                             textAlign = TextAlign.Center,
                                             modifier = Modifier.fillMaxWidth(),
-                                            maxLines = 2,
+                                            maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
                                         )
                                     }
@@ -361,6 +359,42 @@ private fun DetailsContent(
             }
             discovery?.rows.orEmpty().forEach { row ->
                 item("discover:${row.key}") { DiscoverCards(row.title, null, row.items, onOpen) }
+            }
+        }
+    }
+}
+
+/** Regia, scenariul și faptele de la TMDB (premieră, studiouri, buget…), pe două coloane. */
+@Composable
+private fun TitleInfo(credits: Credits?) {
+    credits ?: return
+    val lines =
+        buildList {
+            credits.directors.takeIf { it.isNotEmpty() }?.let { add("Regia" to it.joinToString(", ")) }
+            credits.writers.takeIf { it.isNotEmpty() }?.let { add("Scenariul" to it.joinToString(", ")) }
+            addAll(credits.facts)
+        }
+    if (lines.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Informații", style = MaterialTheme.typography.titleMedium)
+        lines.chunked(2).forEach { pair ->
+            Row(horizontalArrangement = Arrangement.spacedBy(24.dp), modifier = Modifier.fillMaxWidth()) {
+                pair.forEach { (label, value) ->
+                    Row(Modifier.weight(1f)) {
+                        Text(
+                            "$label: ",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            value,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                if (pair.size == 1) Spacer(Modifier.weight(1f))
             }
         }
     }

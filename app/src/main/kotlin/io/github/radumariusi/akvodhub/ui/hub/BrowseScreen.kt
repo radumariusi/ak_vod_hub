@@ -96,6 +96,7 @@ fun BrowseScreen(
     var restoreFiltersFocus by remember { mutableStateOf(false) }
     val filtersFocus = remember { FocusRequester() }
     val detailsFocus = remember { FocusRequester() }
+    val playFocus = remember { FocusRequester() }
     LaunchedEffect(showFilters) {
         if (!showFilters && restoreFiltersFocus) {
             filtersFocus.requestFocus()
@@ -166,6 +167,7 @@ fun BrowseScreen(
                     },
                     onDetails = { card -> onOpen(card, "browse:$screenKey:${card.id}") },
                     detailsModifier = Modifier.focusRequester(detailsFocus),
+                    playModifier = Modifier.focusRequester(playFocus),
                     extraActions = {
                         OutlinedButton(
                             onClick = { showFilters = true },
@@ -198,7 +200,10 @@ fun BrowseScreen(
                 ) {
                     Text(title, style = MaterialTheme.typography.titleMedium)
                     if (showGridHint) {
-                        Text("OK pentru detalii · Ține OK pentru acțiuni", style = MaterialTheme.typography.labelSmall)
+                        Text(
+                            "OK: detalii · Ține apăsat OK: sus la Redă / Detalii",
+                            style = MaterialTheme.typography.labelSmall,
+                        )
                     }
                 }
             } else {
@@ -227,51 +232,56 @@ fun BrowseScreen(
                                     SnapPosition.Start,
                                 )
                             }
-                        LazyVerticalGrid(
-                            state = grid,
-                            columns = gridCells,
-                            horizontalArrangement = Arrangement.spacedBy(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            contentPadding = PaddingValues(start = 6.dp, end = 6.dp, top = 10.dp, bottom = trailing),
-                            flingBehavior = fling,
-                            modifier = Modifier.fillMaxSize().then(if (search) Modifier else Modifier.focusRestorer()),
-                        ) {
-                            itemsIndexed(state.items, key = { _, card -> card.id }) { index, card ->
-                                val key = "browse:$screenKey:${card.id}"
-                                PosterCard(
-                                    card = card,
-                                    onClick = {
-                                        if (search) browser.rememberSearch()
-                                        onOpen(card, key)
-                                    },
-                                    onPlay = {
-                                        context.startActivity(
-                                            PlayerActivity.intent(context, PlayRequest(card.id, resume = true)),
-                                        )
-                                    },
-                                    onFocused = {
-                                        if (!search) {
-                                            preview.value = card
-                                            if (grid.firstVisibleItemIndex / columns != index / columns ||
-                                                grid.firstVisibleItemScrollOffset != 0
-                                            ) {
-                                                grid.requestScrollToItem(index)
-                                            }
-                                        }
-                                    },
-                                    onLongClick =
-                                        if (showHero) {
-                                            {
-                                                preview.value = card
-                                                detailsFocus.requestFocus()
-                                            }
-                                        } else {
-                                            null
+                        // Rândul cu focus urcă mereu sus (sub antet), întreg; în căutare, derulare obișnuită.
+                        PivotScroll(20.dp, enabled = !search) {
+                            LazyVerticalGrid(
+                                state = grid,
+                                columns = gridCells,
+                                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                contentPadding =
+                                    PaddingValues(
+                                        start = 6.dp,
+                                        end = 6.dp,
+                                        top = 10.dp,
+                                        bottom = trailing,
+                                    ),
+                                flingBehavior = fling,
+                                modifier =
+                                    Modifier.fillMaxSize().then(
+                                        if (search) Modifier else Modifier.focusRestorer(),
+                                    ),
+                            ) {
+                                itemsIndexed(state.items, key = { _, card -> card.id }) { _, card ->
+                                    val key = "browse:$screenKey:${card.id}"
+                                    PosterCard(
+                                        card = card,
+                                        onClick = {
+                                            if (search) browser.rememberSearch()
+                                            onOpen(card, key)
                                         },
-                                    requestFocus = key == restoreKey,
-                                    onFocusRequested = onRestored,
-                                    showTitle = search,
-                                )
+                                        onPlay = {
+                                            context.startActivity(
+                                                PlayerActivity.intent(context, PlayRequest(card.id, resume = true)),
+                                            )
+                                        },
+                                        onFocused = {
+                                            if (!search) preview.value = card
+                                        },
+                                        onLongClick =
+                                            if (showHero) {
+                                                {
+                                                    preview.value = card
+                                                    runCatching { playFocus.requestFocus() }
+                                                }
+                                            } else {
+                                                null
+                                            },
+                                        requestFocus = key == restoreKey,
+                                        onFocusRequested = onRestored,
+                                        showTitle = search,
+                                    )
+                                }
                             }
                         }
                     }

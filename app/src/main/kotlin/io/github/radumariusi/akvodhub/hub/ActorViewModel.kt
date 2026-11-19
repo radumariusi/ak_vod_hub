@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.radumariusi.akvodhub.data.catalog.ActorRepository
 import io.github.radumariusi.akvodhub.data.catalog.HubRepository
 import io.github.radumariusi.akvodhub.data.db.TitleCard
+import io.github.radumariusi.akvodhub.data.tmdb.TmdbPerson
 import io.github.radumariusi.akvodhub.parser.catalog.KeysetPage
 import io.github.radumariusi.akvodhub.parser.catalog.PageWindow
 import kotlinx.coroutines.CancellationException
@@ -31,6 +32,11 @@ class ActorViewModel
     constructor(private val repository: ActorRepository, hub: HubRepository) : ViewModel() {
         private val mutableState = MutableStateFlow(ActorState())
         val state = mutableState.asStateFlow()
+        private val mutableProfile = MutableStateFlow<TmdbPerson?>(null)
+
+        /** Biografia persoanei deschise (separat de filmografie, ca să nu întârzie grila). */
+        val profile = mutableProfile.asStateFlow()
+        private var profileJob: Job? = null
         private var job: Job? = null
         private var window = PageWindow<Long, TitleCard>()
 
@@ -59,6 +65,11 @@ class ActorViewModel
 
         fun open(personId: Long, reload: Boolean = false, restoreThrough: Long? = null) {
             if (!reload && mutableState.value.personId == personId) return
+            if (mutableProfile.value?.id != personId) {
+                profileJob?.cancel()
+                mutableProfile.value = null
+                profileJob = viewModelScope.launch { mutableProfile.value = repository.profile(personId) }
+            }
             job?.cancel()
             mutableState.value = ActorState(personId)
             job =
